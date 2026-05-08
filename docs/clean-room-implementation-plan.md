@@ -65,7 +65,8 @@ The app is much cleaner, but the source still contains inherited internals that 
 - Duplicate review.
 - Basic contact/outreach status.
 - Users/roles.
-- Villages/districts/precincts.
+- Villages and precincts.
+- Districts only if generated from public/DPG-defined mapping, not inherited Josh/Tina team/district mapping.
 - Audit logs.
 - SMS/email configuration pages, with live sends disabled until approved.
 - GEC voter-list import/search/matching if it is based on public GEC data and DPG requirements, not Josh/Tina workflow assumptions.
@@ -78,7 +79,7 @@ The app is much cleaner, but the source still contains inherited internals that 
 - Staff/admin login.
 - Supporter/contact registry.
 - Import DPG-owned supporter/member lists.
-- Search/filter by village/precinct/district where available.
+- Search/filter by village/precinct; district only after DPG defines/approves its own district grouping.
 - Basic contact logging and follow-up status.
 - Duplicate detection/review.
 - Users/roles with scoped permissions.
@@ -92,7 +93,7 @@ The app is much cleaner, but the source still contains inherited internals that 
 - Canvassing contact attempts and status history.
 - Mass SMS/email reminders after sender/legal/opt-in details are approved.
 - QR/public signup improvements.
-- Precinct/village/district organizing views.
+- Precinct/village organizing views; district organizing views only from DPG-defined mapping.
 
 ### Explicitly defer until separately scoped
 
@@ -104,6 +105,7 @@ The app is much cleaner, but the source still contains inherited internals that 
 - OCR/photo paper-form ingestion.
 - AI/automation.
 - Any quota/village-org workflow unless DPG defines their own version.
+- Any inherited Josh/Tina district mapping or team-to-district assignments.
 
 ## Recommended sequence before isolated deployment
 

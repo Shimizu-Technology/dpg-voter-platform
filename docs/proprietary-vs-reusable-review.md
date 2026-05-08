@@ -77,7 +77,8 @@ These are Shimizu-created/general platform features and should **not** be remove
 - audit/activity logs
 - SMS/email plumbing and opt-in logic
 - generic CRM/supporter records
-- village/district/precinct data models where used generically
+- village and precinct data models where used generically
+- district data structures only if they use neutral/public DPG-defined districts, not Josh/Tina internal district mapping
 - QR signup links as generic access/marketing mechanism
 - generic OCR/photo intake as a neutral platform feature, if later scoped
 - generic GEC/public voter-list import/search/matching
@@ -96,7 +97,8 @@ These are Shimizu-created/general platform features and should **not** be remove
 - duplicate review
 - contact/follow-up status
 - user/role management
-- villages/districts/precincts
+- villages and precincts
+- districts only after confirming they are DPG/public-neutral, not inherited Josh/Tina district mapping
 - audit logs
 - SMS/email settings/plumbing, with live blasts only after approval
 - GEC/public voter-list mechanics if DPG needs them and they are implemented generically
@@ -106,6 +108,7 @@ These are Shimizu-created/general platform features and should **not** be remove
 - hardcoded Josh/Tina names, URLs, copy, assets, defaults
 - Josh/Tina users/data/seeds/example records
 - quota/campaign-cycle dashboards that reflect Josh/Tina village-org cadence
+- Josh/Tina internal district mapping or team-to-district assignments
 - motorcade/yard-sign fields and UI assumptions
 - Rose/Trish-specific review flow labels or approval rules
 - war-room dashboard if it mirrors Josh/Tina's operating model
@@ -124,6 +127,7 @@ These may be valuable platform features but need genericization or DPG-specific 
 - GEC matching: generally safe because public voter-list matching is generic and DPG requested it; avoid Josh/Tina-specific statuses/reporting.
 - QR: safe generic feature; removal is not required if implemented as generic signup/share QR.
 - Dashboard/reporting: safe if generic; risky if it encodes quota/village-chief workflow.
+- District mapping: Guam village/precinct geography is public/generic, but Josh/Tina team/district mapping should be treated as sensitive and removed or rebuilt from DPG requirements.
 
 ## DPG requested/needed functionality
 
@@ -133,7 +137,7 @@ These may be valuable platform features but need genericization or DPG-specific 
 - staff/admin login
 - supporter/contact registry
 - DPG-owned list import
-- search/filter by village/precinct/district where available
+- search/filter by village/precinct; district only if DPG defines/approves its own district grouping
 - contact logging and follow-up status
 - duplicate detection/review
 - users/roles/permissions
@@ -147,7 +151,7 @@ These may be valuable platform features but need genericization or DPG-specific 
 - canvassing contact attempts and status history
 - mass SMS/email reminders after opt-in/sender/legal details are approved
 - QR/public signup improvements
-- precinct/village/district organizing views
+- precinct/village organizing views; district organizing views only after DPG defines its own mapping
 
 ### Later / explicitly scoped only
 
