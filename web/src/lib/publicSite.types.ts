@@ -1,0 +1,70 @@
+export type PublicSiteVariant = 'jt' | 'dpg';
+
+export type PublicSiteConfig = {
+  variant: PublicSiteVariant;
+  topBar: string;
+  wordmark: {
+    mode: 'text' | 'image';
+    title: string;
+    titleSecondary?: string;
+    subtitle: string;
+    amp?: string;
+    imageSrc?: string;
+    imageAlt?: string;
+  };
+  officialInfoUrl: string;
+  officialInfoLabel: string;
+  heroEyebrow: string;
+  heroTitleMobile: string;
+  heroTitleDesktop: string;
+  heroLeadMobile: string;
+  heroSupportTextMobile: string;
+  heroLeadDesktop: string;
+  primaryCta: string;
+  secondaryCta: string;
+  featurePanelLabel: string;
+  featurePanelImageSrc: string;
+  featurePanelImageAlt: string;
+  featurePanelKicker: string;
+  featurePanelText: string;
+  signupHeroKicker: string;
+  signupHeroTitle: string;
+  signupHeroDescription: string;
+  signupNetworkTitle: string;
+  signupNetworkImageSrc: string;
+  signupNetworkImageAlt: string;
+  signupMobileDescription: string;
+  consentName: string;
+  thankYouTitle: string;
+  thankYouSubtitle: string;
+  thankYouBody: string;
+  thankYouImageSrc?: string;
+  thankYouImageAlt?: string;
+  followLabel: string;
+  footerContactEmail: string;
+  footerContactLabel: string;
+  footerMailTitle: string;
+  footerMailBody: string;
+  footerDisclaimer: string;
+  appTitle: string;
+  metaDescription: string;
+  cards: {
+    supportTitle: string;
+    supportBody: string;
+    informedTitle: string;
+    informedBody: string;
+    activityTitle: string;
+    activityBody: string;
+  };
+  signupSteps: {
+    recordTitle: string;
+    recordBody: string;
+    helpTitle: string;
+    helpBody: string;
+    householdTitle: string;
+    householdBody: string;
+  };
+  thankYouNextStepTitle: string;
+  thankYouNextStepBody: string;
+};
+

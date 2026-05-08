@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+vendor/bundle/
+
+# Environment
+.env
+.env.local
+.env.*.local
+web/.env.production
+
+# Build
+dist/
+build/
+tmp/
+log/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Ruby
+*.gem
+.bundle/
+
+# Coverage
+coverage/
+.env.deploy
+data/

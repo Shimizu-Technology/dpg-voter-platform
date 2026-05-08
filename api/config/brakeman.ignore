@@ -1,0 +1,22 @@
+{
+  "ignored_warnings": [
+    {
+      "fingerprint": "c6982d9f9509b931821b24f70f9d973df89e370e67dbccff68a8e062a20e1f68",
+      "note": "Role assignment in user_create_params is intentional — endpoint is restricted to campaign_admin/district_coordinator only via RBAC checks in the controller"
+    },
+    {
+      "fingerprint": "8636a8cad12c8330c4b5e883d7b2c03ce72a4fffc336d707a24be1484f8087c5",
+      "note": "Role assignment in user_update_params is intentional — endpoint is restricted to campaign_admin/district_coordinator only via RBAC checks in the controller"
+    },
+    {
+      "fingerprint": "6d7188bba7423fe298cb2512a42db11523e6bd43f58ead66bdb3eee11ac860ec",
+      "note": "File extension is validated against allowlist (.xlsx/.xls/.csv) before use — no path traversal risk"
+    },
+    {
+      "fingerprint": "991eaf51d5ebc14556e1c8504d9114c6add268c289223f169702eb1f875cb6e4",
+      "note": "The batched GEC matcher builds a VALUES CTE from connection-quoted literals and only interpolates private, static SQL fragments selected inside the model. This is a Brakeman false positive, not user-controlled SQL."
+    }
+  ],
+  "updated": "2026-03-20",
+  "brakeman_version": "8.0.4"
+}

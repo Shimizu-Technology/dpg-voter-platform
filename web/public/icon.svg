@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="120" fill="#0F3E86" />
+  <path d="M392 76l18 56h58l-47 34 18 56-47-34-48 34 18-56-46-34h57l19-56Z" fill="#D5A332" />
+  <text x="256" y="324" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="188" font-style="italic" font-weight="900" letter-spacing="-10">
+    <tspan fill="#ffffff">J</tspan><tspan dx="-6" fill="#E23A22">&amp;</tspan><tspan dx="-6" fill="#ffffff">T</tspan>
+  </text>
+  <text x="78" y="418" font-family="Arial, Helvetica, sans-serif" font-size="54" font-style="italic" font-weight="700" fill="#8DC5FF">PLEASE VOTE</text>
+</svg>

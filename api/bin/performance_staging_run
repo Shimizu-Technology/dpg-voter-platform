@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Staging benchmark helper.
+# Usage examples:
+#   api/bin/performance_staging_run
+#   DATASET_SIZE=30000 REPORTS_PER_PRECINCT=8 ITERATIONS=10 api/bin/performance_staging_run
+#
+# Notes:
+# - This is non-production only.
+# - It seeds synthetic supporters + poll reports, then captures a baseline JSON.
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+DATASET_SIZE="${DATASET_SIZE:-30000}"
+REPORTS_PER_PRECINCT="${REPORTS_PER_PRECINCT:-8}"
+ITERATIONS="${ITERATIONS:-10}"
+SEED="${SEED:-20260213}"
+
+if [[ "$DATASET_SIZE" != "5000" && "$DATASET_SIZE" != "10000" && "$DATASET_SIZE" != "30000" ]]; then
+  echo "DATASET_SIZE must be one of: 5000, 10000, 30000"
+  exit 1
+fi
+
+echo "===> Running DB migrations"
+bundle exec rails db:migrate
+
+echo "===> Seeding synthetic supporters (size=$DATASET_SIZE, seed=$SEED)"
+RESET=true SEED="$SEED" bundle exec rails "data:seed_synthetic_supporters[${DATASET_SIZE}]"
+
+echo "===> Seeding synthetic poll reports (reports_per_precinct=$REPORTS_PER_PRECINCT, seed=$SEED)"
+RESET_TODAY=true SEED="$SEED" bundle exec rails "data:seed_synthetic_poll_reports[${REPORTS_PER_PRECINCT}]"
+
+echo "===> Capturing benchmark baseline (iterations=$ITERATIONS)"
+ITERATIONS="$ITERATIONS" bundle exec rails "performance:capture_baseline[${DATASET_SIZE}]"
+
+echo "===> Done. Inspect:"
+echo "     docs/performance/baseline-latest.json"
+echo "     docs/performance/baseline-report-2026-02-13.md"

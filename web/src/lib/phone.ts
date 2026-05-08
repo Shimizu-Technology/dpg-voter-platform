@@ -1,0 +1,1 @@
+export const DEFAULT_GUAM_PHONE_PREFIX = "+1671";

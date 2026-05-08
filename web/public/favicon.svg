@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="16" fill="#0F3E86" />
+  <path d="M50 12l1.85 5.71H58l-5 3.63 1.9 5.66L50 23.36 45.1 27l1.9-5.66-5-3.63h6.15L50 12Z" fill="#D5A332" />
+  <text x="32" y="42" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-style="italic" font-weight="900" letter-spacing="-1.5">
+    <tspan fill="#ffffff">J</tspan><tspan dx="-1" fill="#E23A22">&amp;</tspan><tspan dx="-1" fill="#ffffff">T</tspan>
+  </text>
+</svg>

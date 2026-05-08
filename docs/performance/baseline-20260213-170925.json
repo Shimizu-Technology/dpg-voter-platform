@@ -1,0 +1,89 @@
+{
+  "captured_at": "2026-02-13T17:09:25Z",
+  "environment": "development",
+  "dataset_hint_size": 30000,
+  "totals": {
+    "supporters_active_count": 30008,
+    "supporters_total_count": 30008,
+    "villages_count": 19,
+    "precincts_count": 59,
+    "poll_reports_today_count": 472
+  },
+  "scenarios": {
+    "supporters_index_default": {
+      "runs": 10,
+      "timing_ms": {
+        "p50": 4.46,
+        "p95": 10.38,
+        "avg": 5.1,
+        "min": 3.93,
+        "max": 10.38
+      },
+      "sql_queries": {
+        "avg": 3.0,
+        "min": 3,
+        "max": 3
+      }
+    },
+    "supporters_index_filtered_search": {
+      "runs": 10,
+      "timing_ms": {
+        "p50": 9.58,
+        "p95": 18.1,
+        "avg": 10.48,
+        "min": 7.31,
+        "max": 18.1
+      },
+      "sql_queries": {
+        "avg": 4.0,
+        "min": 4,
+        "max": 4
+      }
+    },
+    "dashboard_show_payload": {
+      "runs": 10,
+      "timing_ms": {
+        "p50": 15.25,
+        "p95": 18.43,
+        "avg": 14.64,
+        "min": 9.97,
+        "max": 18.43
+      },
+      "sql_queries": {
+        "avg": 7.0,
+        "min": 7,
+        "max": 7
+      }
+    },
+    "war_room_index_payload": {
+      "runs": 10,
+      "timing_ms": {
+        "p50": 12.31,
+        "p95": 25.26,
+        "avg": 13.35,
+        "min": 8.23,
+        "max": 25.26
+      },
+      "sql_queries": {
+        "avg": 7.0,
+        "min": 7,
+        "max": 7
+      }
+    },
+    "poll_watcher_index_payload": {
+      "runs": 10,
+      "timing_ms": {
+        "p50": 6.32,
+        "p95": 9.32,
+        "avg": 6.47,
+        "min": 5.07,
+        "max": 9.32
+      },
+      "sql_queries": {
+        "avg": 3.0,
+        "min": 3,
+        "max": 3
+      }
+    }
+  }
+}
