@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { MessageSquare, Send, Users, Zap, DollarSign, CheckCircle, AlertTriangle, Phone, Settings } from 'lucide-react';
-import { getSmsStatus, sendTestSms, sendSmsBlast, getEvents, sendEventNotify, getSmsBlasts, getSmsBlastStatus } from '../../lib/api';
+import { getSmsStatus, sendTestSms, sendSmsBlast, getSmsBlasts, getSmsBlastStatus } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
 import { DEFAULT_GUAM_PHONE_PREFIX } from '../../lib/phone';
 import WorkspacePage from '../../components/WorkspacePage';
 
-type Tab = 'blast' | 'event' | 'test';
+type Tab = 'blast' | 'test';
 
 interface SmsBlastResult {
   dry_run?: boolean;
@@ -18,22 +18,6 @@ interface SmsBlastResult {
   sent?: number;
   failed?: number;
   skipped?: number;
-}
-
-interface EventItem {
-  id: number;
-  name: string;
-  date: string;
-  invited_count: number;
-}
-
-interface EventNotifyResult {
-  event: string;
-  type: string;
-  sent?: number;
-  failed?: number;
-  queued?: boolean;
-  total_targeted?: number;
 }
 
 interface SmsTestResult {
@@ -51,10 +35,6 @@ export default function SmsPage() {
     queryFn: getSmsStatus,
   });
 
-  const { data: eventsData } = useQuery({
-    queryKey: ['events'],
-    queryFn: () => getEvents(),
-  });
 
   if (statusLoading) {
     return (
@@ -126,10 +106,9 @@ export default function SmsPage() {
         )}
 
         {/* Tabs */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
           {([
             { key: 'blast', label: 'Blast', icon: Users },
-            { key: 'event', label: 'Event Notify', icon: Zap },
             { key: 'test', label: 'Test SMS', icon: Send },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
@@ -148,7 +127,6 @@ export default function SmsPage() {
         </div>
 
         {activeTab === 'blast' && <BlastTab />}
-        {activeTab === 'event' && <EventTab events={eventsData?.events || []} />}
         {activeTab === 'test' && <TestTab />}
       </div>
     </WorkspacePage>
@@ -157,7 +135,7 @@ export default function SmsPage() {
 
 function BlastTab() {
   const [message, setMessage] = useState('');
-  const [filters, setFilters] = useState({ motorcade: false, registered: false, yardSign: false });
+  const [filters, setFilters] = useState({ registered: false });
   const [result, setResult] = useState<SmsBlastResult | null>(null);
   const [activeBlastId, setActiveBlastId] = useState<number | null>(null);
 
@@ -184,9 +162,7 @@ function BlastTab() {
   const dryRunMutation = useMutation({
     mutationFn: () => sendSmsBlast({
       message,
-      motorcade_available: filters.motorcade ? 'true' : undefined,
       registered_voter: filters.registered ? 'true' : undefined,
-      yard_sign: filters.yardSign ? 'true' : undefined,
       dry_run: 'true',
     }),
     onSuccess: (data) => setResult(data),
@@ -195,9 +171,7 @@ function BlastTab() {
   const sendMutation = useMutation({
     mutationFn: () => sendSmsBlast({
       message,
-      motorcade_available: filters.motorcade ? 'true' : undefined,
       registered_voter: filters.registered ? 'true' : undefined,
-      yard_sign: filters.yardSign ? 'true' : undefined,
     }),
     onSuccess: (data) => {
       setResult(data);
@@ -233,30 +207,13 @@ function BlastTab() {
           <label className="flex items-center gap-2 text-sm min-h-[44px]">
             <input
               type="checkbox"
-              checked={filters.motorcade}
-              onChange={(e) => setFilters(f => ({ ...f, motorcade: e.target.checked }))}
-              className="rounded border-[var(--border-soft)] text-primary focus:ring-primary"
-            />
-            Motorcade available only
-          </label>
-          <label className="flex items-center gap-2 text-sm min-h-[44px]">
-            <input
-              type="checkbox"
               checked={filters.registered}
               onChange={(e) => setFilters(f => ({ ...f, registered: e.target.checked }))}
               className="rounded border-[var(--border-soft)] text-primary focus:ring-primary"
             />
             Registered voters only
           </label>
-          <label className="flex items-center gap-2 text-sm min-h-[44px]">
-            <input
-              type="checkbox"
-              checked={filters.yardSign}
-              onChange={(e) => setFilters(f => ({ ...f, yardSign: e.target.checked }))}
-              className="rounded border-[var(--border-soft)] text-primary focus:ring-primary"
-            />
-            Yard sign supporters only
-          </label>
+
         </div>
       </div>
 
@@ -367,91 +324,6 @@ function BlastTab() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function EventTab({ events }: { events: EventItem[] }) {
-  const [selectedEvent, setSelectedEvent] = useState('');
-  const [notifyType, setNotifyType] = useState('rsvp');
-  const [result, setResult] = useState<EventNotifyResult | null>(null);
-
-  const mutation = useMutation({
-    mutationFn: () => sendEventNotify(Number(selectedEvent), notifyType),
-    onSuccess: (data) => setResult(data),
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="app-card p-4">
-        <h3 className="font-semibold text-[var(--text-primary)] mb-3">Event Notification</h3>
-
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Event</label>
-            <select
-              value={selectedEvent}
-              onChange={(e) => setSelectedEvent(e.target.value)}
-              className="w-full border border-[var(--border-soft)] rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Select an event...</option>
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.name} — {event.date} ({event.invited_count} invited)
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Notification Type</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {[
-                { key: 'rsvp', label: 'RSVP Confirm' },
-                { key: 'reminder', label: 'Reminder' },
-                { key: 'motorcade', label: 'Motorcade' },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setNotifyType(key)}
-                  className={`py-2 min-h-[44px] rounded-xl text-sm font-medium border transition-all ${
-                    notifyType === key
-                      ? 'bg-primary text-white border-primary'
-                      : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] hover:bg-[var(--surface-bg)]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <button
-        onClick={() => {
-          if (window.confirm('Send notifications to all RSVPs for this event?')) {
-            mutation.mutate();
-          }
-        }}
-        disabled={!selectedEvent || mutation.isPending}
-        className="w-full bg-primary text-white py-3 rounded-xl font-semibold text-sm hover:bg-blue-900 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-      >
-        <Send className="w-4 h-4" />
-        {mutation.isPending ? 'Sending...' : 'Send Notifications'}
-      </button>
-
-      {result && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span className="text-green-800 font-medium">Notifications sent!</span>
-          </div>
-          <div className="text-sm text-green-600">
-            Event: {result.event} · Sent: {result.sent} · Failed: {result.failed}
           </div>
         </div>
       )}

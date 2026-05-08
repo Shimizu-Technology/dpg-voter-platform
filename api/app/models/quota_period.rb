@@ -151,7 +151,6 @@ class QuotaPeriod < ApplicationRecord
   end
 
   # Returns the last Monday of the given month/year.
-  # Per Trisha (Feb 26, 2026): GEC quota deadline is last Monday of each month.
   # Example: last_monday_of_month(2026, 2) => Date.new(2026, 2, 23)
   def self.last_monday_of_month(year, month)
     # Start at last day of month and walk back to Monday

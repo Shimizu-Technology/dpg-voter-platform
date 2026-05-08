@@ -5,11 +5,7 @@ class ApplyCampaignVariantDefaults < ActiveRecord::Migration[8.1]
   DPG_SIGNUP_PROMPT = "Know someone who wants to stay connected with the Democratic Party of Guam? Finish your signup, then share this form with them too."
   DPG_THANK_YOU_PROMPT = "Share this signup link with family and friends who want voter information, outreach updates, and election reminders from the Democratic Party of Guam."
 
-  JT_WELCOME_SMS = "Si Yu'os Ma'åse, {first_name}! Thank you for supporting Josh & Tina 2026. Together we'll make Guam better for everyone. #JoshAndTina2026"
-
   def up
-    return unless ENV.fetch("CAMPAIGN_VARIANT", "jt").to_s.downcase == "dpg"
-
     execute <<~SQL.squish
       UPDATE campaigns
       SET name = 'Democratic Party of Guam',
@@ -28,16 +24,6 @@ class ApplyCampaignVariantDefaults < ActiveRecord::Migration[8.1]
   end
 
   def down
-    return unless ENV.fetch("CAMPAIGN_VARIANT", "jt").to_s.downcase == "dpg"
-
-    execute <<~SQL.squish
-      UPDATE campaigns
-      SET name = 'Josh & Tina for Guam',
-          candidate_names = 'Josh Tenorio & Tina Muña Barnes',
-          party = 'Democratic',
-          welcome_sms_template = #{connection.quote(JT_WELCOME_SMS)},
-          updated_at = CURRENT_TIMESTAMP
-      WHERE status = 'active'
-    SQL
+    # This fork is DPG-specific; do not restore inherited campaign defaults.
   end
 end

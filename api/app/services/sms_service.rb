@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-# High-level SMS messaging for the campaign.
-# All templates live here so they're easy to tweak before Saturday's demo.
+# High-level SMS messaging for the DPG voter engagement platform.
 class SmsService
   CAMPAIGN_NAME = CampaignBranding::CAMPAIGN_LABEL
 
@@ -26,33 +25,6 @@ class SmsService
 
     def welcome_supporter(supporter)
       send(to: supporter.contact_number, body: welcome_supporter_body(supporter), category: "welcome")
-    end
-
-    # ── Event RSVP confirmation ────────────────────────────────────
-    def event_rsvp_confirmation(supporter, event)
-      body = "You're confirmed for #{event.name} " \
-             "on #{event.date&.strftime('%A, %b %d')}#{event.location.present? ? " at #{event.location}" : ''}. " \
-             "See you there! — #{CAMPAIGN_NAME}"
-
-      send(to: supporter.contact_number, body: body, category: "event_rsvp")
-    end
-
-    # ── Event reminder (day before) ────────────────────────────────
-    def event_reminder(supporter, event)
-      body = "Reminder: #{event.name} is TOMORROW#{event.time.present? ? " at #{event.time}" : ''}#{event.location.present? ? ", #{event.location}" : ''}. " \
-             "We're counting on you! — #{CAMPAIGN_NAME}"
-
-      send(to: supporter.contact_number, body: body, category: "event_reminder")
-    end
-
-    # ── Village motorcade blast ────────────────────────────────────
-    def motorcade_notification(supporter, event)
-      village_name = event.village&.name || "your village"
-      body = "🚗 Motorcade in #{village_name}! " \
-             "#{event.name} — #{event.date&.strftime('%A, %b %d')}#{event.time.present? ? " at #{event.time}" : ''}. " \
-             "Come show your support! — #{CAMPAIGN_NAME}"
-
-      send(to: supporter.contact_number, body: body, category: "motorcade")
     end
 
     # ── Custom blast to a list of supporters ───────────────────────

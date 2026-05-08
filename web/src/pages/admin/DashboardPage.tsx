@@ -6,12 +6,8 @@ import {
   ShieldCheck,
   UserCheck,
   Users,
-  Camera,
   ClipboardPlus,
   ClipboardCheck,
-  CalendarPlus,
-  TrendingUp,
-  MapPin,
   Upload,
   FileSpreadsheet,
 } from 'lucide-react';
@@ -152,22 +148,18 @@ export default function DashboardPage() {
       }));
 
   const quickActions = [
-    permissions?.can_create_staff_supporters ? { to: '/admin/scan', icon: Camera, label: 'Scan Form' } : null,
     permissions?.can_create_staff_supporters ? { to: '/admin/supporters/new', icon: ClipboardPlus, label: 'New Entry' } : null,
     permissions?.can_import_supporters ? { to: '/admin/import', icon: Upload, label: 'Excel Import' } : null,
     permissions?.can_access_reports ? { to: '/admin/reports', icon: FileSpreadsheet, label: 'Reports' } : null,
     permissions?.can_view_supporters ? { to: '/admin/supporters', icon: ClipboardCheck, label: 'Supporters' } : null,
-    permissions?.can_access_events ? { to: '/admin/events', icon: CalendarPlus, label: 'Events' } : null,
-    permissions?.can_access_war_room ? { to: '/admin/war-room', icon: TrendingUp, label: 'War Room' } : null,
-    permissions?.can_access_poll_watcher ? { to: '/admin/poll-watcher', icon: MapPin, label: 'Poll Watcher' } : null,
   ].filter(Boolean) as Array<{ to: string; icon: ComponentType<{ className?: string }>; label: string }>;
 
   return (
     <WorkspacePage width="full" className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-(--text-primary) tracking-tight">Campaign Operations</h1>
+        <h1 className="text-2xl font-bold text-(--text-primary) tracking-tight">DPG Voter Engagement</h1>
         <p className="text-sm text-(--text-secondary) mt-1">
-          Submit supporter data, monitor approved totals, and track what is still waiting on data-team review.
+          Track public signups, supporter records, voter-help follow-up, and outreach activity for the Democratic Party of Guam.
         </p>
       </div>
 
@@ -186,7 +178,6 @@ export default function DashboardPage() {
           icon={ShieldCheck}
           color="amber"
           detail="Submitted entries still waiting for data-team approval"
-          to={permissions?.can_access_data_team ? '/data/vetting' : undefined}
         />
         <StatCard
           label="Pending Public Signups"
@@ -194,10 +185,9 @@ export default function DashboardPage() {
           icon={UserCheck}
           color="blue"
           detail="Separate public submissions waiting on intake review"
-          to={permissions?.can_access_data_team ? '/data/public-review' : undefined}
         />
         <StatCard
-          label="Matched To GEC"
+          label="Matched To Voter List"
           value={counts?.matched_to_gec ?? 0}
           icon={Users}
           color="gray"
@@ -205,12 +195,6 @@ export default function DashboardPage() {
         />
       </div>
 
-      {Number(summary.observed_elsewhere_count ?? 0) > 0 && (permissions?.can_access_war_room || permissions?.can_access_poll_watcher) && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          {Number(summary.observed_elsewhere_count).toLocaleString()} supporter turnout exception{Number(summary.observed_elsewhere_count) === 1 ? '' : 's'} are marked observed elsewhere.
-          Review War Room or supporter detail before treating them as clean in-precinct turnout.
-        </div>
-      )}
 
       {period && (
         <div className={`rounded-xl border p-5 ${period.overdue ? 'bg-red-50 border-red-200' : period.due_soon ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>

@@ -53,8 +53,6 @@ type SignupForm = {
   needs_homebound_voting_help: boolean;
   needs_voter_registration_help: boolean;
   needs_election_day_ride: boolean;
-  yard_sign: boolean;
-  motorcade_available: boolean;
   opt_in_email: boolean;
   opt_in_text: boolean;
   household_members: HouseholdMemberForm[];
@@ -77,7 +75,7 @@ const EMPTY_HOUSEHOLD_MEMBER: HouseholdMemberForm = {
 };
 
 const SUPPORT_NEED_OPTIONS = [
-  { key: 'wants_to_volunteer', label: 'Get involved in the campaign' },
+  { key: 'wants_to_volunteer', label: 'Get involved with the party' },
   { key: 'needs_absentee_ballot_help', label: 'Absentee ballot help' },
   { key: 'needs_homebound_voting_help', label: 'Homebound voting help' },
   { key: 'needs_voter_registration_help', label: 'Register to vote help' },
@@ -115,10 +113,8 @@ export default function SignupPage() {
     needs_homebound_voting_help: false,
     needs_voter_registration_help: false,
     needs_election_day_ride: false,
-    yard_sign: false,
     opt_in_email: false,
     opt_in_text: false,
-    motorcade_available: false,
     household_members: [],
   });
 
@@ -151,8 +147,6 @@ export default function SignupPage() {
         help_request_count: supportRequestCount(form),
         opted_in_email: form.opt_in_email,
         opted_in_text: form.opt_in_text,
-        yard_sign: form.yard_sign,
-        motorcade_available: form.motorcade_available,
         household_member_count: form.household_members.length,
       });
       navigate('/thank-you');
@@ -647,32 +641,9 @@ export default function SignupPage() {
                 )}
               </section>
 
-              <div className="space-y-1 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
-                <label htmlFor="yard_sign" className="flex min-h-[44px] cursor-pointer items-center gap-3 py-1">
-                  <input
-                    type="checkbox"
-                    id="yard_sign"
-                    checked={form.yard_sign}
-                    onChange={(e) => updateField('yard_sign', e.target.checked)}
-                    className="h-5 w-5 shrink-0 rounded text-primary"
-                  />
-                  <span className="text-gray-700">I would like a yard sign if available</span>
-                </label>
-
-                <label htmlFor="motorcade" className="flex min-h-[44px] cursor-pointer items-center gap-3 py-1">
-                  <input
-                    type="checkbox"
-                    id="motorcade"
-                    checked={form.motorcade_available}
-                    onChange={(e) => updateField('motorcade_available', e.target.checked)}
-                    className="h-5 w-5 shrink-0 rounded text-primary"
-                  />
-                  <span className="text-gray-700">I&apos;ll join motorcades</span>
-                </label>
-              </div>
 
               <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4">
-                <p className="mb-2 text-sm font-medium text-gray-700">Stay updated on the campaign:</p>
+                <p className="mb-2 text-sm font-medium text-gray-700">Stay updated by the party:</p>
                 <label htmlFor="opt_in_text" className="flex min-h-[44px] cursor-pointer items-center gap-3 py-1">
                   <input
                     type="checkbox"
@@ -694,7 +665,7 @@ export default function SignupPage() {
                   <span className="text-gray-700">Send me email updates</span>
                 </label>
                 <p className="mt-2 text-xs leading-5 text-gray-400">
-                  By checking the above, you agree to receive campaign communications from {publicSite.consentName}. You can opt out at any time.
+                  By checking the above, you agree to receive party communications from {publicSite.consentName}. You can opt out at any time.
                 </p>
               </div>
 

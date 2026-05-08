@@ -10,17 +10,10 @@ import {
   Users,
   ClipboardCheck,
   ClipboardPlus,
-  CalendarPlus,
-  Camera,
-  QrCode,
-  Trophy,
   MessageSquare,
   Mail,
   Shield,
-  Target,
   MapPin,
-  Copy,
-  TrendingUp,
   ScrollText,
   Upload,
   FileSpreadsheet,
@@ -32,7 +25,6 @@ import {
 } from 'lucide-react';
 import WorkspaceBrandPanel from './WorkspaceBrandPanel';
 import { publicSiteConfig } from '../lib/publicSite';
-import { filterNavItemsForDeployment } from '../lib/deploymentMode';
 
 interface NavItem {
   to: string;
@@ -51,12 +43,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const { data: sessionData } = useSession();
   const { toasts, handleEvent, dismiss } = useRealtimeToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isWarRoomRoute = location.pathname.startsWith('/admin/war-room');
-  // Keep one global realtime subscription for admin pages so nav badges
-  // (like pending vetting) update live even when not on dashboard.
-  // Disable here on War Room route to avoid duplicate subscription,
-  // since War Room subscribes with custom toast handling.
-  useCampaignUpdates(handleEvent, !isWarRoomRoute);
+  useCampaignUpdates(handleEvent, true);
 
   const permissions = sessionData?.permissions;
 
@@ -66,14 +53,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       items: [
         { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
         ...(permissions?.can_view_supporters ? [ { to: '/admin/supporters', label: 'Supporters', icon: Users } ] : []),
-        ...(permissions?.can_access_events ? [ { to: '/admin/events', label: 'Events', icon: CalendarPlus } ] : []),
-        ...(permissions?.can_access_war_room ? [ { to: '/admin/war-room', label: 'War Room', icon: TrendingUp } ] : []),
       ],
     },
     {
       label: 'Data Entry',
       items: [
-        ...(permissions?.can_create_staff_supporters ? [ { to: '/admin/scan', label: 'Scan Form', icon: Camera } ] : []),
         ...(permissions?.can_create_staff_supporters ? [ { to: '/admin/supporters/new', label: 'New Entry', icon: ClipboardPlus } ] : []),
         ...(permissions?.can_import_supporters ? [ { to: '/admin/import', label: 'Excel Import', icon: Upload } ] : []),
       ],
@@ -84,7 +68,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         ...(permissions?.can_view_supporters ? [ { to: '/admin/outreach', label: 'Voter Help Follow-Up', icon: ClipboardCheck } ] : []),
         ...(permissions?.can_send_sms ? [ { to: '/admin/sms', label: 'SMS Blasts', icon: MessageSquare } ] : []),
         ...(permissions?.can_send_email ? [ { to: '/admin/email', label: 'Email Blasts', icon: Mail } ] : []),
-        ...(permissions?.can_access_qr ? [ { to: '/admin/qr', label: 'QR Codes', icon: QrCode } ] : []),
       ],
     },
     {
@@ -92,14 +75,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       items: [
         ...(permissions?.can_access_reports ? [ { to: '/admin/reports', label: 'Reports', icon: FileSpreadsheet } ] : []),
         ...(permissions?.can_access_duplicates ? [ { to: '/admin/duplicates', label: 'Duplicates', icon: Copy } ] : []),
-        ...(permissions?.can_access_leaderboard ? [ { to: '/admin/leaderboard', label: 'Leaderboard', icon: Trophy } ] : []),
         ...(permissions?.can_access_audit_logs ? [ { to: '/admin/audit-logs', label: 'Activity Log', icon: ScrollText } ] : []),
-      ],
-    },
-    {
-      label: 'Operations',
-      items: [
-        ...(permissions?.can_access_poll_watcher ? [ { to: '/admin/poll-watcher', label: 'Poll Watcher', icon: MapPin } ] : []),
       ],
     },
     {
@@ -107,12 +83,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       items: [
         ...(permissions?.can_manage_users ? [ { to: '/admin/users', label: 'Users', icon: Shield } ] : []),
         ...(permissions?.can_manage_configuration ? [ { to: '/admin/districts', label: 'Districts', icon: MapPin } ] : []),
-        ...(permissions?.can_manage_configuration ? [ { to: '/admin/quotas', label: 'Quotas', icon: Target } ] : []),
         ...(permissions?.can_manage_configuration ? [ { to: '/admin/precincts', label: 'Precincts', icon: MapPin } ] : []),
         ...(permissions?.can_manage_configuration ? [ { to: '/admin/sms/settings', label: 'SMS & Social Settings', icon: Settings } ] : []),
       ],
     },
-  ].map((group) => ({ ...group, items: filterNavItemsForDeployment(group.items) })).filter(g => g.items.length > 0);
+  ].filter(g => g.items.length > 0);
 
   const isActive = (to: string) => {
     if (to === '/admin') return location.pathname === '/admin';
@@ -127,7 +102,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     return false;
   };
 
-  const campaignName = 'Campaign Operations';
+  const campaignName = publicSiteConfig.wordmark.subtitle;
 
   const navLink = (item: NavItem) => {
     const Icon = item.icon;
@@ -253,7 +228,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
       {/* Main content */}
       <div className="lg:pl-[240px]">
-        {/* Real-time toast notifications for non-War Room admin pages */}
+        {/* Real-time toast notifications */}
         {!isWarRoomRoute && toasts.length > 0 && (
           <div className="fixed top-16 left-2 right-2 sm:left-auto sm:right-4 z-50 space-y-2 max-w-sm sm:max-w-md">
             {toasts.map(toast => (

@@ -46,7 +46,7 @@ module Api
         params.require(:supporter).permit(
           :first_name, :middle_name, :last_name, :print_name, :contact_number, :dob, :email, :street_address,
           :village_id, :precinct_id, :block_id,
-          :registered_voter, :yard_sign, :motorcade_available,
+          :registered_voter,
           :opt_in_email, :opt_in_text
         )
       end

@@ -1,16 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { getDashboard, getGecStats, getReportsList, getCurrentCycle } from '../../lib/api';
+import { getDashboard, getReportsList } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
 import {
-  ShieldCheck,
-  UserCheck,
   FileSpreadsheet,
   Upload,
-  Camera,
   ClipboardPlus,
-  Database,
-  AlertTriangle,
   CheckCircle,
   TrendingUp,
   Users,
@@ -24,17 +19,11 @@ export default function TeamDashboardPage() {
     queryFn: getDashboard,
     enabled: !!session?.user?.id,
   });
-  const { data: gecStats } = useQuery({ queryKey: ['gec-stats'], queryFn: getGecStats });
   const { data: reportsInfo } = useQuery({ queryKey: ['reports-list'], queryFn: getReportsList });
-  const { data: cycleData } = useQuery({ queryKey: ['current-cycle'], queryFn: getCurrentCycle });
 
   const counts = session?.counts;
   const summary = dashboard?.summary;
   const quickStats = reportsInfo?.quick_stats;
-  const period = cycleData?.current_period;
-  const periodProgress = Number(period?.official_count ?? period?.total_assigned ?? period?.eligible_count ?? 0);
-  const periodTarget = Number(period?.quota_target ?? 0);
-  const periodPct = periodTarget > 0 ? Math.round((periodProgress / periodTarget) * 100) : 0;
   const villageMeta = new Map<number, Record<string, unknown>>(
     (dashboard?.villages || []).map((v: Record<string, unknown>) => [Number(v.id), v])
   );
@@ -82,7 +71,7 @@ export default function TeamDashboardPage() {
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-gray-900">Data Ops Workspace</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Daily voter operations and quota tracking</p>
+        <p className="text-sm text-gray-500 mt-0.5">Daily voter engagement and outreach operations</p>
       </div>
 
       {/* Key Metrics */}
@@ -100,7 +89,6 @@ export default function TeamDashboardPage() {
           icon={ShieldCheck}
           color="amber"
           detail="Pending submissions awaiting data-team approval"
-          to="/data/vetting"
         />
         <StatCard
           label="Pending Public Signups"
@@ -108,10 +96,9 @@ export default function TeamDashboardPage() {
           icon={UserCheck}
           color="blue"
           detail="Waiting for intake review"
-          to="/data/public-review"
         />
         <StatCard
-          label="Matched To GEC"
+          label="Matched To Voter List"
           value={quickStats?.matched_to_gec ?? counts?.matched_to_gec ?? 0}
           icon={Users}
           color="gray"
@@ -119,109 +106,17 @@ export default function TeamDashboardPage() {
         />
       </div>
 
-      {/* Current Quota Period */}
-      {period && (() => {
-        const p = period;
-        return (
-          <div className={`rounded-xl border p-5 ${p.overdue ? 'bg-red-50 border-red-200' : p.due_soon ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-sm font-semibold text-gray-700">{p.name} Quota Progress</h2>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Due {new Date(p.due_date).toLocaleDateString()}
-                  {p.overdue && <span className="text-red-600 font-semibold ml-1">OVERDUE</span>}
-                  {p.due_soon && !p.overdue && <span className="text-amber-600 font-semibold ml-1">({p.days_until_due} days left)</span>}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900">{periodProgress.toLocaleString()}</div>
-                <div className="text-xs text-gray-400">of {(p.quota_target || 0).toLocaleString()} target</div>
-              </div>
-            </div>
-            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${periodPct >= 100 ? 'bg-green-500' : periodPct >= 75 ? 'bg-blue-500' : periodPct >= 50 ? 'bg-amber-500' : 'bg-red-400'}`}
-                style={{ width: `${Math.min(periodPct, 100)}%` }}
-              />
-            </div>
-            <div className="flex justify-between mt-1.5 text-[10px] text-gray-400">
-              <span>{periodPct}% complete</span>
-              <span>{Math.max((p.quota_target || 0) - periodProgress, 0).toLocaleString()} remaining</span>
-            </div>
-            <div className="mt-2 text-[11px] text-gray-500">
-              Current progress counts supporters approved during this period. Matched to GEC: {(p.matched_count || 0).toLocaleString()}.
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Quick Actions */}
       <div>
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <QuickAction to="/data/scan" icon={Camera} label="Scan Blue Form" />
           <QuickAction to="/data/entry" icon={ClipboardPlus} label="Manual Entry" />
           <QuickAction to="/data/import" icon={Upload} label="Excel Import" />
-          <QuickAction to="/data/gec" icon={Database} label="GEC Voter List" />
         </div>
       </div>
 
       {/* Two-column layout */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* GEC Status */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-700">GEC Voter List Status</h2>
-            <Link to="/data/gec" className="text-xs text-blue-600 hover:text-blue-700 font-medium">Manage</Link>
-          </div>
-          {gecStats ? (
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Total Registered Voters</span>
-                <span className="font-semibold text-gray-900">{(gecStats.total_voters || 0).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Latest List Date</span>
-                <span className="font-semibold text-gray-900">
-                  {gecStats.latest_list_date ? new Date(gecStats.latest_list_date).toLocaleDateString() : 'Not loaded'}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Official Villages</span>
-                <span className="font-semibold text-gray-900">
-                  {Number(gecStats.official_village_count ?? (gecStats.villages?.filter((v: { name: string }) => v.name !== 'Unassigned').length || 0)).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Unassigned GEC Voters</span>
-                <span className={`font-semibold ${(gecStats.unassigned_gec_voters || 0) > 0 ? 'text-amber-600' : 'text-gray-900'}`}>
-                  {gecStats.unassigned_gec_voters || 0}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Latest Import Removed</span>
-                <span className={`font-semibold ${((gecStats.latest_import?.removed_records || 0) > 0) ? 'text-red-600' : 'text-gray-900'}`}>
-                  {gecStats.latest_import?.removed_records || 0}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Ambiguous DOBs</span>
-                <span className={`font-semibold ${gecStats.ambiguous_dob_count > 0 ? 'text-amber-600' : 'text-gray-900'}`}>
-                  {gecStats.ambiguous_dob_count || 0}
-                </span>
-              </div>
-              {!gecStats.total_voters && (
-                <div className="mt-2 p-3 bg-amber-50 border border-amber-100 rounded-lg flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-amber-700">No GEC voter data loaded. Upload the voter registration list to enable auto-vetting.</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400">Loading...</p>
-          )}
-        </div>
-
         {/* Reports Quick Access */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
@@ -232,7 +127,7 @@ export default function TeamDashboardPage() {
             {quickStats && (
               <>
                 <ReportStat label="Official Supporters" value={quickStats.official_supporters ?? quickStats.total_active} />
-                <ReportStat label="Matched To GEC" value={quickStats.matched_to_gec ?? quickStats.total_verified} />
+                <ReportStat label="Matched To Voter List" value={quickStats.matched_to_gec ?? quickStats.total_verified} />
                 <ReportStat label="Referral List Size" value={quickStats.referral_list_size ?? 0} />
                 <ReportStat label="Mapping Issues" value={quickStats.mapping_issues_list_size ?? 0} />
                 <ReportStat label="Purge List Size" value={quickStats.purge_list_size ?? quickStats.purged_voters} />
@@ -256,10 +151,9 @@ export default function TeamDashboardPage() {
       {/* Village breakdown */}
       {villageProgressRows.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Village Quota Progress</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Village Engagement Progress</h2>
           <p className="text-xs text-gray-500 mb-3">
-            Current Progress counts supporters approved during this quota period. The source columns break that out into
-            team-entered vs public-origin supporters, plus what is still pending in each queue.
+            Current progress counts approved supporter records during this reporting period.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[920px]">

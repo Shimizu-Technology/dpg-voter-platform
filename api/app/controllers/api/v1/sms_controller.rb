@@ -5,7 +5,7 @@ module Api
     class SmsController < ApplicationController
       include Authenticatable
       before_action :authenticate_request
-      before_action :require_coordinator_or_above!, only: [ :send_single, :blast, :event_notify, :blasts, :blast_status ]
+      before_action :require_coordinator_or_above!, only: [ :send_single, :blast, :blasts, :blast_status ]
 
       # GET /api/v1/sms/status
       # Check ClickSend account status + balance
@@ -14,7 +14,7 @@ module Api
         render json: {
           configured: ENV["CLICKSEND_USERNAME"].present? && ENV["CLICKSEND_API_KEY"].present?,
           balance: balance,
-          sender_id: ENV["CLICKSEND_SENDER_ID"] || "JT2026"
+          sender_id: ENV["CLICKSEND_SENDER_ID"] || "DPG"
         }
       end
 
@@ -52,9 +52,7 @@ module Api
 
         # Optional filters
         supporters = supporters.where(village_id: params[:village_id]) if params[:village_id].present?
-        supporters = supporters.where(motorcade_available: true) if params[:motorcade_available] == "true"
         supporters = supporters.where(registered_voter: true) if params[:registered_voter] == "true"
-        supporters = supporters.where(yard_sign: true) if params[:yard_sign] == "true"
 
         count = supporters.count
 
@@ -64,9 +62,7 @@ module Api
 
         filters = {
           "village_id" => params[:village_id],
-          "motorcade_available" => params[:motorcade_available],
-          "registered_voter" => params[:registered_voter],
-          "yard_sign" => params[:yard_sign]
+          "registered_voter" => params[:registered_voter]
         }
 
         blast = SmsBlast.create!(
@@ -133,24 +129,6 @@ module Api
         }
       end
 
-      # POST /api/v1/sms/event_notify
-      # Notify supporters about an event
-      def event_notify
-        event = Event.find(params[:event_id])
-        notification_type = params[:type] || "rsvp"
-
-        rsvps = event.event_rsvps.includes(:supporter)
-        rsvps = rsvps.where(rsvp_status: "confirmed") if notification_type == "reminder"
-
-        EventNotifyJob.perform_later(event_id: event.id, notification_type: notification_type)
-
-        render json: {
-          queued: true,
-          event: event.name,
-          type: notification_type,
-          total_targeted: rsvps.size
-        }, status: :accepted
-      end
     end
   end
 end

@@ -47,7 +47,7 @@ export default function TeamReportsPage() {
   const [registrationFollowUpFilter, setRegistrationFollowUpFilter] = useState('');
   const [supportFollowUpFilter, setSupportFollowUpFilter] = useState('');
   const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
-  const supportsBeckyFilters = SUPPORTER_REPORT_TYPES.has(selectedReport);
+  const supportsSupporterFilters = SUPPORTER_REPORT_TYPES.has(selectedReport);
 
   const buildReportParams = (reportType: string, includePreviewLimit = false) => {
     const params: Record<string, string | number> = {};
@@ -113,7 +113,7 @@ export default function TeamReportsPage() {
       {quickStats && (
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
           <MiniStat label="Official Supporters" value={quickStats.official_supporters ?? quickStats.total_active} />
-          <MiniStat label="Matched To GEC" value={quickStats.matched_to_gec ?? quickStats.total_verified} />
+          <MiniStat label="Matched To Voter List" value={quickStats.matched_to_gec ?? quickStats.total_verified} />
           <MiniStat label="Village Changes" value={quickStats.transfer_list_size ?? quickStats.transfers} />
           <MiniStat label="Referral List Size" value={quickStats.referral_list_size ?? 0} />
           <MiniStat label="Mapping Issues" value={quickStats.mapping_issues_list_size ?? 0} />
@@ -171,7 +171,7 @@ export default function TeamReportsPage() {
           ))}
         </select>
       </div>
-      {supportsBeckyFilters && (
+      {supportsSupporterFilters && (
         <div className="space-y-2">
           <div className="grid md:grid-cols-4 gap-3">
             <select
@@ -219,7 +219,7 @@ export default function TeamReportsPage() {
             </select>
           </div>
           <p className="text-xs text-gray-500">
-            Becky filters apply to supporter-based reports like Support List and Referral List. GEC-only reports continue to use geography filters only.
+            Supporter filters apply to supporter-based reports like Support List and Referral List. Voter-list reports continue to use geography filters only.
           </p>
         </div>
       )}
@@ -329,10 +329,10 @@ export default function TeamReportsPage() {
             {reportsList.gec_data_loaded ? (
               <>
                 <CheckCircle className="w-4 h-4 text-green-500" />
-                GEC voter data loaded (latest: {new Date(reportsList.latest_gec_list_date).toLocaleDateString()}). Purge List Size reflects currently removed GEC voters, not just the latest import.
+                Voter-list data loaded (latest: {new Date(reportsList.latest_gec_list_date).toLocaleDateString()}). Purge List Size reflects currently removed GEC voters, not just the latest import.
               </>
             ) : (
-              <><FileSpreadsheet className="w-4 h-4 text-amber-500" /> No GEC data loaded — purge and transfer reports will be empty</>
+              <><FileSpreadsheet className="w-4 h-4 text-amber-500" /> No voter-list data loaded — purge and transfer reports will be empty</>
             )}
           </div>
         </div>

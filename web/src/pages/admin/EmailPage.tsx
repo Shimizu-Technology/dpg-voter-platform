@@ -25,9 +25,7 @@ export default function EmailPage() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [villageId, setVillageId] = useState('');
-  const [motorcadeAvailable, setMotorcadeAvailable] = useState(false);
   const [registeredVoter, setRegisteredVoter] = useState(false);
-  const [yardSign, setYardSign] = useState(false);
   const [previewResult, setPreviewResult] = useState<EmailBlastResult | null>(null);
   const [sentResult, setSentResult] = useState<EmailBlastResult | null>(null);
 
@@ -53,9 +51,7 @@ export default function EmailPage() {
         subject,
         body,
         village_id: villageId ? Number(villageId) : undefined,
-        motorcade_available: motorcadeAvailable ? 'true' : undefined,
         registered_voter: registeredVoter ? 'true' : undefined,
-        yard_sign: yardSign ? 'true' : undefined,
         dry_run: 'true',
       }),
     onSuccess: (data) => {
@@ -70,9 +66,7 @@ export default function EmailPage() {
         subject,
         body,
         village_id: villageId ? Number(villageId) : undefined,
-        motorcade_available: motorcadeAvailable ? 'true' : undefined,
         registered_voter: registeredVoter ? 'true' : undefined,
-        yard_sign: yardSign ? 'true' : undefined,
       }),
     onSuccess: (data) => {
       setSentResult(data);
@@ -182,15 +176,7 @@ export default function EmailPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                    <input
-                      type="checkbox"
-                      checked={motorcadeAvailable}
-                      onChange={(e) => setMotorcadeAvailable(e.target.checked)}
-                      className="rounded border-[var(--border-soft)]"
-                    />
-                    Motorcade available only
-                  </label>
+                  
                   <label className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
                     <input
                       type="checkbox"
@@ -200,15 +186,7 @@ export default function EmailPage() {
                     />
                     Registered voters only
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                    <input
-                      type="checkbox"
-                      checked={yardSign}
-                      onChange={(e) => setYardSign(e.target.checked)}
-                      className="rounded border-[var(--border-soft)]"
-                    />
-                    Yard sign requests only
-                  </label>
+                  
                 </div>
               </div>
               <p className="text-xs text-[var(--text-secondary)] mt-2">
@@ -279,9 +257,7 @@ export default function EmailPage() {
                     <li>Have an email address on file</li>
                     <li>Opted in to email updates</li>
                     {villageId && <li>Are from the selected village</li>}
-                    {motorcadeAvailable && <li>Are available for motorcade</li>}
                     {registeredVoter && <li>Are registered voters</li>}
-                    {yardSign && <li>Requested yard signs</li>}
                   </ul>
                 </div>
               </div>

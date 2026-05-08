@@ -116,12 +116,10 @@ export const sendEventSms = (eventId: number, data: { message: string; dry_run?:
 export const sendEventEmail = (eventId: number, data: { subject: string; body: string; dry_run?: string }) =>
   api.post(`/events/${eventId}/send_email`, data).then(r => r.data);
 
-// War Room
 export const getWarRoom = () => api.get('/war_room').then(r => r.data);
 export const createWarRoomContactAttempt = (supporterId: number, data: JsonRecord) =>
   api.post(`/war_room/supporters/${supporterId}/contact_attempts`, { contact_attempt: data }).then(r => r.data);
 
-// Poll Watcher
 export const getPollWatcher = () => api.get('/poll_watcher').then(r => r.data);
 export const submitPollReport = (data: JsonRecord) => api.post('/poll_watcher/report', { report: data }).then(r => r.data);
 export const getPrecinctHistory = (id: number) => api.get(`/poll_watcher/precinct/${id}/history`).then(r => r.data);
@@ -142,7 +140,7 @@ export const trackScanBatchTelemetry = (telemetry: JsonRecord) =>
 export const getSmsStatus = () => api.get('/sms/status').then(r => r.data);
 export const sendTestSms = (phone: string, message: string) =>
   api.post('/sms/send', { phone, message }).then(r => r.data);
-export const sendSmsBlast = (data: { message: string; village_id?: number; motorcade_available?: string; registered_voter?: string; yard_sign?: string; dry_run?: string }) =>
+export const sendSmsBlast = (data: { message: string; village_id?: number; registered_voter?: string; dry_run?: string }) =>
   api.post('/sms/blast', data).then(r => r.data);
 export const sendEventNotify = (eventId: number, type: string) =>
   api.post('/sms/event_notify', { event_id: eventId, type }).then(r => r.data);
@@ -151,7 +149,7 @@ export const getSmsBlastStatus = (id: number) => api.get(`/sms/blasts/${id}`).th
 
 // Email
 export const getEmailStatus = () => api.get('/email/status').then(r => r.data);
-export const sendEmailBlast = (data: { subject: string; body: string; village_id?: number; motorcade_available?: string; registered_voter?: string; yard_sign?: string; dry_run?: string }) =>
+export const sendEmailBlast = (data: { subject: string; body: string; village_id?: number; registered_voter?: string; dry_run?: string }) =>
   api.post('/email/blast', data).then(r => r.data);
 
 // Users (admin)
@@ -169,7 +167,6 @@ export const updateSettings = (data: JsonRecord) => api.patch('/settings', data)
 // Campaign Info (public)
 export const getCampaignInfo = () => api.get('/campaign_info').then(r => r.data);
 
-// GEC Voter List
 export const getGecStats = () => api.get('/gec_voters/stats').then(r => r.data);
 export const getGecVoters = (params?: QueryParams) => api.get('/gec_voters', { params }).then(r => r.data);
 export const getGecImports = () => api.get('/gec_voters/imports').then(r => r.data);

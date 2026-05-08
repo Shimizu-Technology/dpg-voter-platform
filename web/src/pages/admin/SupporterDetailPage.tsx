@@ -50,7 +50,6 @@ interface SupporterDetail {
   needs_election_day_ride: boolean;
   referred_by_name: string | null;
   yard_sign: boolean;
-  motorcade_available: boolean;
   opt_in_email: boolean;
   opt_in_text: boolean;
   verification_status: string;
@@ -155,7 +154,6 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   support_follow_up_status: 'Support follow-up progress',
   support_follow_up_notes: 'Support follow-up notes',
   yard_sign: 'Yard sign',
-  motorcade_available: 'Motorcade available',
   opt_in_email: 'Opt-in email',
   opt_in_text: 'Opt-in text',
   created_at: 'Created at',
@@ -244,7 +242,6 @@ const PRIMARY_AUDIT_FIELD_ORDER = [
   'needs_election_day_ride',
   'referred_by_name',
   'yard_sign',
-  'motorcade_available',
   'opt_in_text',
   'opt_in_email',
   'dob',
@@ -588,7 +585,6 @@ export default function SupporterDetailPage() {
       needs_election_day_ride: supporter.needs_election_day_ride,
       referred_by_name: supporter.referred_by_name || '',
       yard_sign: supporter.yard_sign,
-      motorcade_available: supporter.motorcade_available,
       opt_in_email: supporter.opt_in_email,
       opt_in_text: supporter.opt_in_text,
     };
@@ -886,24 +882,8 @@ export default function SupporterDetailPage() {
                   />
                   Self-reported registered voter
                 </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(currentForm.yard_sign)}
-                    onChange={(e) => updateDraft({ yard_sign: e.target.checked })}
-                    disabled={!isEditing}
-                  />
-                  Yard sign
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(currentForm.motorcade_available)}
-                    onChange={(e) => updateDraft({ motorcade_available: e.target.checked })}
-                    disabled={!isEditing}
-                  />
-                  Motorcade
-                </label>
+                
+                
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -976,8 +956,6 @@ export default function SupporterDetailPage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 {detailFlagChips([
                   { label: 'Self-reported registered voter', active: Boolean(currentForm.self_reported_registered_voter), tone: 'blue' },
-                  { label: 'Yard sign', active: Boolean(currentForm.yard_sign), tone: 'amber' },
-                  { label: 'Motorcade', active: Boolean(currentForm.motorcade_available), tone: 'indigo' },
                   { label: 'Registration help', active: Boolean(currentForm.needs_voter_registration_help), tone: 'amber' },
                   { label: 'Absentee help', active: Boolean(currentForm.needs_absentee_ballot_help), tone: 'amber' },
                   { label: 'Homebound help', active: Boolean(currentForm.needs_homebound_voting_help), tone: 'amber' },
@@ -990,15 +968,13 @@ export default function SupporterDetailPage() {
                 ))}
                 {detailFlagChips([
                   { label: 'Self-reported registered voter', active: Boolean(currentForm.self_reported_registered_voter), tone: 'blue' },
-                  { label: 'Yard sign', active: Boolean(currentForm.yard_sign), tone: 'amber' },
-                  { label: 'Motorcade', active: Boolean(currentForm.motorcade_available), tone: 'indigo' },
                   { label: 'Registration help', active: Boolean(currentForm.needs_voter_registration_help), tone: 'amber' },
                   { label: 'Absentee help', active: Boolean(currentForm.needs_absentee_ballot_help), tone: 'amber' },
                   { label: 'Homebound help', active: Boolean(currentForm.needs_homebound_voting_help), tone: 'amber' },
                   { label: 'Ride to polls', active: Boolean(currentForm.needs_election_day_ride), tone: 'amber' },
                   { label: 'Volunteer', active: Boolean(currentForm.wants_to_volunteer), tone: 'green' },
                 ]).length === 0 && (
-                  <span className="text-sm text-[var(--text-secondary)]">No campaign flags selected.</span>
+                  <span className="text-sm text-[var(--text-secondary)]">No voter-help flags selected.</span>
                 )}
               </div>
               <div className="mt-3 flex flex-wrap gap-2 border-t border-[var(--border-soft)] pt-3">
@@ -1014,7 +990,7 @@ export default function SupporterDetailPage() {
                   { label: 'Text updates', active: Boolean(currentForm.opt_in_text), tone: 'blue' },
                   { label: 'Email updates', active: Boolean(currentForm.opt_in_email), tone: 'blue' },
                 ]).length === 0 && (
-                  <span className="text-sm text-[var(--text-secondary)]">No campaign updates selected.</span>
+                  <span className="text-sm text-[var(--text-secondary)]">No party updates selected.</span>
                 )}
               </div>
             </>
@@ -1214,7 +1190,7 @@ export default function SupporterDetailPage() {
               <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
                 <p className="text-sm font-semibold text-green-800">Registered via follow-up</p>
                 <p className="mt-1 text-sm text-green-700">
-                  This supporter was not matched in the current imported GEC list, but staff marked them as registered after campaign follow-up.
+                  This supporter was not matched in the current imported GEC list, but staff marked them as registered after party follow-up.
                 </p>
               </div>
             )}
@@ -1284,7 +1260,7 @@ export default function SupporterDetailPage() {
               )}
             </div>
             <div>
-              <span className="text-sm text-[var(--text-secondary)]">Campaign requests:</span>
+              <span className="text-sm text-[var(--text-secondary)]">Voter-help requests:</span>
               <div className="mt-2 flex flex-wrap gap-2">
                 {supportRequestBadges(supporter).map((badge) => (
                   <span key={badge} className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">

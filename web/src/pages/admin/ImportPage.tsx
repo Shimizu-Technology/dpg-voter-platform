@@ -241,7 +241,7 @@ export default function ImportPage() {
   const hasVillageSource = Boolean(villageId || columnMapping.village);
   const currentSheet = preview?.sheets.find(s => s.index === selectedSheet);
   const rawHeaders = currentSheet?.headers.raw_headers || [];
-  const reviewQueuePath = location.pathname.startsWith('/data') ? '/data/vetting' : '/admin/vetting';
+  const reviewQueuePath = location.pathname.startsWith('/data') ? '/data/supporters' : '/admin/supporters';
   const activeRowLabel = activeRows.length === 1 ? 'supporter' : 'supporters';
   const createdLabel = importResult?.created === 1 ? 'supporter submission' : 'supporter submissions';
 

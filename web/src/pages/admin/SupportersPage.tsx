@@ -42,7 +42,6 @@ interface SupporterItem {
   needs_election_day_ride?: boolean;
   referred_by_name?: string | null;
   yard_sign: boolean;
-  motorcade_available: boolean;
   opt_in_email: boolean;
   opt_in_text: boolean;
   verification_status: string;
@@ -752,9 +751,7 @@ export default function SupportersPage() {
                   {s.yard_sign && (
                     <span className="app-chip bg-amber-100 text-amber-700">Yard Sign</span>
                   )}
-                  {s.motorcade_available && (
-                    <span className="app-chip bg-cyan-100 text-cyan-700">Motorcade</span>
-                  )}
+                  
                   {registrationFollowUpResultLabel(s) && (
                     <span className={`app-chip ${registrationFollowUpResultClass(s)}`}>{registrationFollowUpResultLabel(s)}</span>
                   )}
@@ -764,7 +761,7 @@ export default function SupportersPage() {
                   {supportRequestBadges(s).map((badge) => (
                     <span key={`${s.id}-${badge}`} className="app-chip bg-yellow-100 text-yellow-800">{badge}</span>
                   ))}
-                  {!s.yard_sign && !s.motorcade_available && !registrationFollowUpResultLabel(s) && !supportFollowUpResultLabel(s) && supportRequestBadges(s).length === 0 && (
+                  {!registrationFollowUpResultLabel(s) && !supportFollowUpResultLabel(s) && supportRequestBadges(s).length === 0 && (
                     <span className="text-xs text-[var(--text-muted)]">No extra flags</span>
                   )}
                 </div>
@@ -849,9 +846,7 @@ export default function SupportersPage() {
                       {s.yard_sign && (
                         <span className="app-chip bg-amber-100 text-amber-700">Yard</span>
                       )}
-                      {s.motorcade_available && (
-                        <span className="app-chip bg-cyan-100 text-cyan-700">Motorcade</span>
-                      )}
+                      
                       {registrationFollowUpResultLabel(s) && (
                         <span className={`app-chip ${registrationFollowUpResultClass(s)}`}>{registrationFollowUpResultLabel(s)}</span>
                       )}
@@ -861,7 +856,7 @@ export default function SupportersPage() {
                       {supportRequestBadges(s).map((badge) => (
                         <span key={`${s.id}-${badge}`} className="app-chip bg-yellow-100 text-yellow-800">{badge}</span>
                       ))}
-                      {!s.yard_sign && !s.motorcade_available && !registrationFollowUpResultLabel(s) && !supportFollowUpResultLabel(s) && supportRequestBadges(s).length === 0 && (
+                      {!registrationFollowUpResultLabel(s) && !supportFollowUpResultLabel(s) && supportRequestBadges(s).length === 0 && (
                         <span className="text-xs text-[var(--text-muted)]">—</span>
                       )}
                     </div>

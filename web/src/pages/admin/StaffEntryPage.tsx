@@ -30,7 +30,6 @@ type StaffForm = {
   needs_voter_registration_help: boolean;
   needs_election_day_ride: boolean;
   yard_sign: boolean;
-  motorcade_available: boolean;
   opt_in_email: boolean;
   opt_in_text: boolean;
 };
@@ -47,7 +46,6 @@ type ExtractedScanData = Partial<{
   village_id: number | string;
   registered_voter: boolean;
   yard_sign: boolean;
-  motorcade_available: boolean;
 }>;
 
 type SaveFeedback = {
@@ -56,7 +54,7 @@ type SaveFeedback = {
 };
 
 const SUPPORT_NEED_OPTIONS = [
-  { key: 'wants_to_volunteer', label: 'Get involved in the campaign' },
+  { key: 'wants_to_volunteer', label: 'Get involved with the party' },
   { key: 'needs_absentee_ballot_help', label: 'Absentee ballot help' },
   { key: 'needs_homebound_voting_help', label: 'Homebound voting help' },
   { key: 'needs_voter_registration_help', label: 'Register to vote help' },
@@ -87,7 +85,6 @@ const emptyForm = {
   needs_voter_registration_help: false,
   needs_election_day_ride: false,
   yard_sign: false,
-  motorcade_available: false,
   opt_in_email: false,
   opt_in_text: false,
 };
@@ -191,7 +188,6 @@ export default function StaffEntryPage() {
           filled.add('registered_voter_status');
         }
         if (data.yard_sign != null) { updates.yard_sign = data.yard_sign; filled.add('yard_sign'); }
-        if (data.motorcade_available != null) { updates.motorcade_available = data.motorcade_available; filled.add('motorcade_available'); }
 
         // Match village
         if (data.village_id) {
@@ -573,10 +569,7 @@ export default function StaffEntryPage() {
             <input type="checkbox" checked={form.yard_sign} onChange={e => updateField('yard_sign', e.target.checked)} className="w-5 h-5 rounded text-primary" />
             <span className="text-[var(--text-primary)]">Yard Sign</span>
           </label>
-          <label className="flex items-center gap-3">
-            <input type="checkbox" checked={form.motorcade_available} onChange={e => updateField('motorcade_available', e.target.checked)} className="w-5 h-5 rounded text-primary" />
-            <span className="text-[var(--text-primary)]">Available for Motorcade</span>
-          </label>
+          
         </div>
 
         {/* Communication Opt-In */}
@@ -590,7 +583,7 @@ export default function StaffEntryPage() {
             <input type="checkbox" checked={form.opt_in_email} onChange={e => updateField('opt_in_email', e.target.checked)} className="w-5 h-5 rounded text-primary" />
             <span className="text-[var(--text-primary)]">Email Updates</span>
           </label>
-          <p className="text-xs text-[var(--text-muted)]">Supporter consents to receive campaign communications.</p>
+          <p className="text-xs text-[var(--text-muted)]">Supporter consents to receive party communications.</p>
         </div>
 
         {/* Submit */}

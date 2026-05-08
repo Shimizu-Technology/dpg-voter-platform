@@ -1,5 +1,4 @@
 import type { SessionResponse } from '../hooks/useSession';
-import { isRouteAllowedInDeployment } from './deploymentMode';
 
 const LAST_ROUTE_STORAGE_PREFIX = 'campaign-tracker:last-route:';
 
@@ -10,11 +9,6 @@ type PermissionKey =
   | 'can_create_staff_supporters'
   | 'can_import_supporters'
   | 'can_access_duplicates'
-  | 'can_access_events'
-  | 'can_access_qr'
-  | 'can_access_leaderboard'
-  | 'can_access_poll_watcher'
-  | 'can_access_war_room'
   | 'can_send_sms'
   | 'can_send_email'
   | 'can_manage_users'
@@ -22,7 +16,6 @@ type PermissionKey =
   | 'can_manage_data_configuration'
   | 'can_access_audit_logs'
   | 'can_access_reports'
-  | 'can_review_public'
   | 'can_upload_gec';
 
 type PermissionRule = {
@@ -32,35 +25,25 @@ type PermissionRule = {
 
 const PERMISSION_RULES: PermissionRule[] = [
   { prefix: '/admin/supporters/new', permission: 'can_create_staff_supporters' },
-  { prefix: '/admin/scan', permission: 'can_create_staff_supporters' },
   { prefix: '/admin/import', permission: 'can_import_supporters' },
   { prefix: '/admin/supporters', permission: 'can_view_supporters' },
   { prefix: '/admin/reports', permission: 'can_access_reports' },
   { prefix: '/admin/duplicates', permission: 'can_access_duplicates' },
-  { prefix: '/admin/events', permission: 'can_access_events' },
-  { prefix: '/admin/qr', permission: 'can_access_qr' },
-  { prefix: '/admin/leaderboard', permission: 'can_access_leaderboard' },
-  { prefix: '/admin/poll-watcher', permission: 'can_access_poll_watcher' },
-  { prefix: '/admin/war-room', permission: 'can_access_war_room' },
   { prefix: '/admin/sms/settings', permission: 'can_manage_configuration' },
   { prefix: '/admin/sms', permission: 'can_send_sms' },
   { prefix: '/admin/email', permission: 'can_send_email' },
   { prefix: '/admin/users', permission: 'can_manage_users' },
   { prefix: '/admin/districts', permission: 'can_manage_configuration' },
-  { prefix: '/admin/quotas', permission: 'can_manage_configuration' },
   { prefix: '/admin/precincts', permission: 'can_manage_configuration' },
   { prefix: '/admin/outreach', permission: 'can_view_supporters' },
   { prefix: '/admin/audit-logs', permission: 'can_access_audit_logs' },
   { prefix: '/data/users', permission: 'can_manage_users' },
   { prefix: '/data/districts', permission: 'can_manage_data_configuration' },
-  { prefix: '/data/quotas', permission: 'can_manage_data_configuration' },
   { prefix: '/data/precincts', permission: 'can_manage_data_configuration' },
   { prefix: '/data/campaign-settings', permission: 'can_manage_configuration' },
   { prefix: '/data/supporters', permission: 'can_view_supporters' },
   { prefix: '/data/reports', permission: 'can_access_reports' },
   { prefix: '/data/import', permission: 'can_import_supporters' },
-  { prefix: '/data/public-review', permission: 'can_review_public' },
-  { prefix: '/data/gec', permission: 'can_upload_gec' },
 ];
 
 function splitRoute(route: string) {
@@ -98,8 +81,6 @@ export function canonicalizeWorkspaceRoute(route: string) {
   if (pathname.startsWith('/team/')) {
     return `/data/${pathname.slice('/team/'.length)}${search}`;
   }
-  if (pathname === '/admin/vetting') return `/data/vetting${search}`;
-
   return `${pathname}${search}`;
 }
 
@@ -123,9 +104,6 @@ export function isRouteAllowedForSession(route: string, session: SessionLike) {
     return false;
   }
 
-  if (!isRouteAllowedInDeployment(pathname)) {
-    return false;
-  }
 
   const permission = getPermissionForPath(pathname);
   if (!permission) return true;

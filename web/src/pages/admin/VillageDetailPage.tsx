@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { getVillage } from '../../lib/api';
 import { ChevronLeft, MapPin, Info } from 'lucide-react';
-import { useSession } from '../../hooks/useSession';
 import WorkspacePage from '../../components/WorkspacePage';
 
 interface PrecinctDetail {
@@ -53,7 +52,6 @@ function supporterLabel(count: number) {
 
 export default function VillageDetailPage() {
   const { id } = useParams();
-  const { data: sessionData } = useSession();
   const returnTo = `/admin/villages/${id}`;
   const { data, isLoading } = useQuery({
     queryKey: ['village', id],
@@ -65,7 +63,6 @@ export default function VillageDetailPage() {
   const v: VillageDetail | undefined = data?.village;
   if (!v) return <div className="p-8 text-center text-[var(--text-muted)]">Village not found</div>;
 
-  const canAccessDataTeam = sessionData?.permissions?.can_access_data_team ?? false;
   const officialSupporters = v.official_supporters_count ?? v.supporter_count ?? 0;
   const matchedToGec = v.matched_to_gec_count ?? v.verified_count ?? 0;
   const currentPeriodProgress = v.current_period_progress ?? 0;
@@ -129,27 +126,25 @@ export default function VillageDetailPage() {
           <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <p>
             <strong>Official Supporters</strong> is the all-time approved active supporter count for this village.
-            <strong> Matched To GEC</strong> shows how many of those official supporters have a current voter-list match.
+            <strong> Matched To Voter List</strong> shows how many of those official supporters have a current voter-list match.
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
         <MetricCard label="Official Supporters" value={officialSupporters} tone="green" />
-        <MetricCard label="Matched To GEC" value={matchedToGec} tone="slate" />
+        <MetricCard label="Matched To Voter List" value={matchedToGec} tone="slate" />
         <MetricCard label="Team Approved" value={v.team_approved_count || 0} tone="purple" />
         <MetricCard label="Public Approved" value={v.public_approved_count || 0} tone="blue" />
         <MetricCard
           label="Team Pending"
           value={v.team_pending_count || 0}
           tone="amber"
-          link={canAccessDataTeam && (v.team_pending_count || 0) > 0 ? `/data/vetting?village_id=${id}&source_group=team&return_to=${encodeURIComponent(returnTo)}` : undefined}
         />
         <MetricCard
           label="Public Pending"
           value={v.public_pending_count || 0}
           tone="amber"
-          link={canAccessDataTeam && (v.public_pending_count || 0) > 0 ? `/data/public-review?village_id=${id}&return_to=${encodeURIComponent(returnTo)}` : undefined}
         />
       </div>
 

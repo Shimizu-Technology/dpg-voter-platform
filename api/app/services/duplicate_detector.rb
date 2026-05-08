@@ -318,7 +318,7 @@ class DuplicateDetector
     # - text fields copy into blank slots
     # - authoritative voter lookup only fills nil
     # - self-reported/preferences preserve any affirmative signal
-    mergeable = %w[email registered_voter self_reported_registered_voter motorcade_available yard_sign opt_in_email opt_in_text]
+    mergeable = %w[email registered_voter self_reported_registered_voter opt_in_email opt_in_text]
     mergeable.each do |field|
       into_val = into.send(field)
       source_val = source.send(field)

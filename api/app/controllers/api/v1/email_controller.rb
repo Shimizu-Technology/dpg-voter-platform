@@ -27,9 +27,7 @@ module Api
 
         # Optional filters
         supporters = supporters.where(village_id: params[:village_id]) if params[:village_id].present?
-        supporters = supporters.where(motorcade_available: true) if params[:motorcade_available] == "true"
         supporters = supporters.where(registered_voter: true) if params[:registered_voter] == "true"
-        supporters = supporters.where(yard_sign: true) if params[:yard_sign] == "true"
 
         count = supporters.count
 
@@ -52,9 +50,7 @@ module Api
           body: body,
           filters: {
             "village_id" => params[:village_id],
-            "motorcade_available" => params[:motorcade_available],
-            "registered_voter" => params[:registered_voter],
-            "yard_sign" => params[:yard_sign]
+            "registered_voter" => params[:registered_voter]
           }
         )
 

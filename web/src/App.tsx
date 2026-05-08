@@ -1,54 +1,39 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Link, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Shield } from 'lucide-react';
 import AdminLayout from './components/AdminLayout';
 import AnalyticsTracker from './components/AnalyticsTracker';
+import PublicHeadManager from './components/PublicHeadManager';
 import RoutePersistenceManager from './components/RoutePersistenceManager';
 import TeamLayout from './components/TeamLayout';
 import { useSession } from './hooks/useSession';
 import { resolvePreferredRoute } from './lib/workspaceRouting';
-import { Shield } from 'lucide-react';
-import PublicHeadManager from './components/PublicHeadManager';
-import { isRouteAllowedInDeployment } from './lib/deploymentMode';
 
-// Eagerly loaded (public pages — fast initial load)
+// Public pages
 import LandingPage from './pages/LandingPage';
 import SignupPage from './pages/SignupPage';
 import StaffPortalPage from './pages/StaffPortalPage';
 import ThankYouPage from './pages/ThankYouPage';
 
-// Lazy loaded (admin pages — loaded on demand)
+// Core DPG workspace pages
 const DashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
 const SupportersPage = lazy(() => import('./pages/admin/SupportersPage'));
 const SupporterDetailPage = lazy(() => import('./pages/admin/SupporterDetailPage'));
 const StaffEntryPage = lazy(() => import('./pages/admin/StaffEntryPage'));
 const VillageDetailPage = lazy(() => import('./pages/admin/VillageDetailPage'));
-const EventsPage = lazy(() => import('./pages/admin/EventsPage'));
-const EventDetailPage = lazy(() => import('./pages/admin/EventDetailPage'));
-const CheckInPage = lazy(() => import('./pages/admin/CheckInPage'));
-const QRCodePage = lazy(() => import('./pages/admin/QRCodePage'));
-const LeaderboardPage = lazy(() => import('./pages/admin/LeaderboardPage'));
-const PollWatcherPage = lazy(() => import('./pages/admin/PollWatcherPage'));
-const WarRoomPage = lazy(() => import('./pages/admin/WarRoomPage'));
 const SmsPage = lazy(() => import('./pages/admin/SmsPage'));
 const SmsSettingsPage = lazy(() => import('./pages/admin/SmsSettingsPage'));
 const EmailPage = lazy(() => import('./pages/admin/EmailPage'));
 const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
 const DistrictsPage = lazy(() => import('./pages/admin/DistrictsPage'));
-const QuotaSettingsPage = lazy(() => import('./pages/admin/QuotaSettingsPage'));
 const PrecinctSettingsPage = lazy(() => import('./pages/admin/PrecinctSettingsPage'));
 const DuplicatesPage = lazy(() => import('./pages/admin/DuplicatesPage'));
 const ImportPage = lazy(() => import('./pages/admin/ImportPage'));
-const ScanFormPage = lazy(() => import('./pages/admin/ScanFormPage'));
 const AuditLogsPage = lazy(() => import('./pages/admin/AuditLogsPage'));
 const OutreachPage = lazy(() => import('./pages/admin/OutreachPage'));
-
-// Team (data team) pages
 const TeamDashboardPage = lazy(() => import('./pages/team/TeamDashboardPage'));
-const TeamVettingPage = lazy(() => import('./pages/team/TeamVettingPage'));
 const TeamReportsPage = lazy(() => import('./pages/team/TeamReportsPage'));
-const TeamPublicReviewPage = lazy(() => import('./pages/team/TeamPublicReviewPage'));
-const TeamGecPage = lazy(() => import('./pages/team/TeamGecPage'));
 
 function LazyFallback() {
   return (
@@ -68,40 +53,22 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <AdminLayout>{children}</AdminLayout>;
 }
 
-function DeploymentRoute({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
+type PermissionKey =
+  | 'can_manage_users'
+  | 'can_manage_configuration'
+  | 'can_manage_data_configuration'
+  | 'can_send_sms'
+  | 'can_send_email'
+  | 'can_edit_supporters'
+  | 'can_view_supporters'
+  | 'can_create_staff_supporters'
+  | 'can_import_supporters'
+  | 'can_access_reports'
+  | 'can_access_duplicates'
+  | 'can_access_audit_logs'
+  | 'can_access_data_team';
 
-  if (!isRouteAllowedInDeployment(location.pathname)) {
-    return <Navigate to={location.pathname.startsWith('/data') ? '/data' : '/admin'} replace />;
-  }
-
-  return <>{children}</>;
-}
-
-function PermissionRoute({
-  permission,
-  children,
-}: {
-  permission:
-    | 'can_manage_users'
-    | 'can_manage_configuration'
-    | 'can_manage_data_configuration'
-    | 'can_send_sms'
-    | 'can_send_email'
-    | 'can_edit_supporters'
-    | 'can_view_supporters'
-    | 'can_create_staff_supporters'
-    | 'can_import_supporters'
-    | 'can_access_events'
-    | 'can_access_qr'
-    | 'can_access_leaderboard'
-    | 'can_access_war_room'
-    | 'can_access_poll_watcher'
-    | 'can_access_duplicates'
-    | 'can_access_audit_logs'
-    | 'can_access_data_team';
-  children: React.ReactNode;
-}) {
+function PermissionRoute({ permission, children }: { permission: PermissionKey; children: React.ReactNode }) {
   const { data, isLoading } = useSession();
   const location = useLocation();
 
@@ -144,366 +111,59 @@ export default function App() {
         <AnalyticsTracker />
         <RoutePersistenceManager />
         <Suspense fallback={<LazyFallback />}>
-        <Routes>
-          {/* Public — no auth required */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/signup/:leaderCode" element={<SignupPage />} />
-          <Route path="/staff" element={<StaffPortalPage />} />
-          <Route path="/thank-you" element={<ThankYouPage />} />
+          <Routes>
+            {/* Public — no auth required */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/signup/:leaderCode" element={<SignupPage />} />
+            <Route path="/staff" element={<StaffPortalPage />} />
+            <Route path="/thank-you" element={<ThankYouPage />} />
 
-          {/* Admin — requires Clerk auth */}
-          <Route path="/admin" element={<AdminRoute><DashboardPage /></AdminRoute>} />
-          <Route
-            path="/admin/supporters"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_view_supporters">
-                  <SupportersPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/supporters/:id"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_view_supporters">
-                  <SupporterDetailPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/supporters/new"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_create_staff_supporters">
-                  <StaffEntryPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/scan"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_create_staff_supporters">
-                  <DeploymentRoute><ScanFormPage /></DeploymentRoute>
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/import"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_import_supporters">
-                  <ImportPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/reports"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_reports">
-                  <TeamReportsPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/duplicates"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_duplicates">
-                  <DuplicatesPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route path="/admin/vetting" element={<Navigate to="/data/vetting" replace />} />
-          <Route
-            path="/admin/villages/:id"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_view_supporters">
-                  <VillageDetailPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/events"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_events">
-                  <DeploymentRoute><EventsPage /></DeploymentRoute>
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/events/:id"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_events">
-                  <DeploymentRoute><EventDetailPage /></DeploymentRoute>
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/events/:id/checkin"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_events">
-                  <DeploymentRoute><CheckInPage /></DeploymentRoute>
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/qr"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_qr">
-                  <DeploymentRoute><QRCodePage /></DeploymentRoute>
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/leaderboard"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_leaderboard">
-                  <DeploymentRoute><LeaderboardPage /></DeploymentRoute>
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/poll-watcher"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_poll_watcher">
-                  <DeploymentRoute><PollWatcherPage /></DeploymentRoute>
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/war-room"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_war_room">
-                  <DeploymentRoute><WarRoomPage /></DeploymentRoute>
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/sms"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_send_sms">
-                  <SmsPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/sms/settings"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_manage_configuration">
-                  <SmsSettingsPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/email"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_send_email">
-                  <EmailPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/users"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_manage_users">
-                  <UsersPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/districts"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_manage_configuration">
-                  <DistrictsPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/quotas"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_manage_configuration">
-                  <DeploymentRoute><QuotaSettingsPage /></DeploymentRoute>
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/precincts"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_manage_configuration">
-                  <PrecinctSettingsPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/outreach"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_view_supporters">
-                  <OutreachPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/audit-logs"
-            element={
-              <AdminRoute>
-                <PermissionRoute permission="can_access_audit_logs">
-                  <AuditLogsPage />
-                </PermissionRoute>
-              </AdminRoute>
-            }
-          />
-          {/* Data Ops routes */}
-          <Route path="/data" element={<TeamLayout><TeamDashboardPage /></TeamLayout>} />
-          <Route path="/data/supporters" element={<TeamLayout><SupportersPage /></TeamLayout>} />
-          <Route
-            path="/data/supporters/:id"
-            element={
-              <TeamLayout>
-                <PermissionRoute permission="can_view_supporters">
-                  <SupporterDetailPage />
-                </PermissionRoute>
-              </TeamLayout>
-            }
-          />
-          <Route path="/data/vetting" element={<TeamLayout><DeploymentRoute><TeamVettingPage /></DeploymentRoute></TeamLayout>} />
-          <Route
-            path="/data/reports"
-            element={
-              <TeamLayout>
-                <PermissionRoute permission="can_access_reports">
-                  <TeamReportsPage />
-                </PermissionRoute>
-              </TeamLayout>
-            }
-          />
-          <Route path="/data/public-review" element={<TeamLayout><DeploymentRoute><TeamPublicReviewPage /></DeploymentRoute></TeamLayout>} />
-          <Route path="/data/gec" element={<TeamLayout><DeploymentRoute><TeamGecPage /></DeploymentRoute></TeamLayout>} />
-          <Route path="/data/scan" element={<TeamLayout><DeploymentRoute><ScanFormPage /></DeploymentRoute></TeamLayout>} />
-          <Route path="/data/entry" element={<TeamLayout><StaffEntryPage /></TeamLayout>} />
-          <Route
-            path="/data/import"
-            element={
-              <TeamLayout>
-                <PermissionRoute permission="can_import_supporters">
-                  <ImportPage />
-                </PermissionRoute>
-              </TeamLayout>
-            }
-          />
-          <Route path="/data/duplicates" element={<TeamLayout><DuplicatesPage /></TeamLayout>} />
-          <Route path="/data/audit-logs" element={<TeamLayout><AuditLogsPage /></TeamLayout>} />
-          <Route
-            path="/data/users"
-            element={
-              <TeamLayout>
-                <PermissionRoute permission="can_manage_users">
-                  <UsersPage />
-                </PermissionRoute>
-              </TeamLayout>
-            }
-          />
-          <Route
-            path="/data/districts"
-            element={
-              <TeamLayout>
-                <PermissionRoute permission="can_manage_data_configuration">
-                  <DistrictsPage />
-                </PermissionRoute>
-              </TeamLayout>
-            }
-          />
-          <Route
-            path="/data/quotas"
-            element={
-              <TeamLayout>
-                <PermissionRoute permission="can_manage_data_configuration">
-                  <DeploymentRoute><QuotaSettingsPage /></DeploymentRoute>
-                </PermissionRoute>
-              </TeamLayout>
-            }
-          />
-          <Route
-            path="/data/precincts"
-            element={
-              <TeamLayout>
-                <PermissionRoute permission="can_manage_data_configuration">
-                  <PrecinctSettingsPage />
-                </PermissionRoute>
-              </TeamLayout>
-            }
-          />
-          <Route
-            path="/data/campaign-settings"
-            element={
-              <TeamLayout>
-                <PermissionRoute permission="can_manage_configuration">
-                  <SmsSettingsPage />
-                </PermissionRoute>
-              </TeamLayout>
-            }
-          />
+            {/* Admin — requires Clerk auth */}
+            <Route path="/admin" element={<AdminRoute><DashboardPage /></AdminRoute>} />
+            <Route path="/admin/supporters" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupportersPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/supporters/:id" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupporterDetailPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/supporters/new" element={<AdminRoute><PermissionRoute permission="can_create_staff_supporters"><StaffEntryPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/import" element={<AdminRoute><PermissionRoute permission="can_import_supporters"><ImportPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/reports" element={<AdminRoute><PermissionRoute permission="can_access_reports"><TeamReportsPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/duplicates" element={<AdminRoute><PermissionRoute permission="can_access_duplicates"><DuplicatesPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/villages/:id" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><VillageDetailPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/sms" element={<AdminRoute><PermissionRoute permission="can_send_sms"><SmsPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/sms/settings" element={<AdminRoute><PermissionRoute permission="can_manage_configuration"><SmsSettingsPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/email" element={<AdminRoute><PermissionRoute permission="can_send_email"><EmailPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/users" element={<AdminRoute><PermissionRoute permission="can_manage_users"><UsersPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/districts" element={<AdminRoute><PermissionRoute permission="can_manage_configuration"><DistrictsPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/precincts" element={<AdminRoute><PermissionRoute permission="can_manage_configuration"><PrecinctSettingsPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/outreach" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><OutreachPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/audit-logs" element={<AdminRoute><PermissionRoute permission="can_access_audit_logs"><AuditLogsPage /></PermissionRoute></AdminRoute>} />
 
-          {/* Legacy /team aliases (backward compatibility) */}
-          <Route path="/team" element={<Navigate to="/data" replace />} />
-          <Route path="/team/supporters" element={<Navigate to="/data/supporters" replace />} />
-          <Route path="/team/vetting" element={<Navigate to="/data/vetting" replace />} />
-          <Route path="/team/reports" element={<Navigate to="/data/reports" replace />} />
-          <Route path="/team/public-review" element={<Navigate to="/data/public-review" replace />} />
-          <Route path="/team/gec" element={<Navigate to="/data/gec" replace />} />
-          <Route path="/team/scan" element={<Navigate to="/data/scan" replace />} />
-          <Route path="/team/entry" element={<Navigate to="/data/entry" replace />} />
-          <Route path="/team/import" element={<Navigate to="/data/import" replace />} />
-          <Route path="/team/duplicates" element={<Navigate to="/data/duplicates" replace />} />
-          <Route path="/team/audit-logs" element={<Navigate to="/data/audit-logs" replace />} />
-          <Route path="/team/users" element={<Navigate to="/data/users" replace />} />
-          <Route path="/team/districts" element={<Navigate to="/data/districts" replace />} />
-          <Route path="/team/quotas" element={<Navigate to="/data/quotas" replace />} />
-          <Route path="/team/precincts" element={<Navigate to="/data/precincts" replace />} />
-          <Route path="/team/campaign-settings" element={<Navigate to="/data/campaign-settings" replace />} />
-        </Routes>
+            {/* Data Ops routes */}
+            <Route path="/data" element={<TeamLayout><TeamDashboardPage /></TeamLayout>} />
+            <Route path="/data/supporters" element={<TeamLayout><SupportersPage /></TeamLayout>} />
+            <Route path="/data/supporters/:id" element={<TeamLayout><PermissionRoute permission="can_view_supporters"><SupporterDetailPage /></PermissionRoute></TeamLayout>} />
+            <Route path="/data/reports" element={<TeamLayout><PermissionRoute permission="can_access_reports"><TeamReportsPage /></PermissionRoute></TeamLayout>} />
+            <Route path="/data/entry" element={<TeamLayout><StaffEntryPage /></TeamLayout>} />
+            <Route path="/data/import" element={<TeamLayout><PermissionRoute permission="can_import_supporters"><ImportPage /></PermissionRoute></TeamLayout>} />
+            <Route path="/data/duplicates" element={<TeamLayout><DuplicatesPage /></TeamLayout>} />
+            <Route path="/data/audit-logs" element={<TeamLayout><AuditLogsPage /></TeamLayout>} />
+            <Route path="/data/users" element={<TeamLayout><PermissionRoute permission="can_manage_users"><UsersPage /></PermissionRoute></TeamLayout>} />
+            <Route path="/data/districts" element={<TeamLayout><PermissionRoute permission="can_manage_data_configuration"><DistrictsPage /></PermissionRoute></TeamLayout>} />
+            <Route path="/data/precincts" element={<TeamLayout><PermissionRoute permission="can_manage_data_configuration"><PrecinctSettingsPage /></PermissionRoute></TeamLayout>} />
+            <Route path="/data/campaign-settings" element={<TeamLayout><PermissionRoute permission="can_manage_configuration"><SmsSettingsPage /></PermissionRoute></TeamLayout>} />
+
+            {/* Legacy /team aliases */}
+            <Route path="/team" element={<Navigate to="/data" replace />} />
+            <Route path="/team/supporters" element={<Navigate to="/data/supporters" replace />} />
+            <Route path="/team/reports" element={<Navigate to="/data/reports" replace />} />
+            <Route path="/team/entry" element={<Navigate to="/data/entry" replace />} />
+            <Route path="/team/import" element={<Navigate to="/data/import" replace />} />
+            <Route path="/team/duplicates" element={<Navigate to="/data/duplicates" replace />} />
+            <Route path="/team/audit-logs" element={<Navigate to="/data/audit-logs" replace />} />
+            <Route path="/team/users" element={<Navigate to="/data/users" replace />} />
+            <Route path="/team/districts" element={<Navigate to="/data/districts" replace />} />
+            <Route path="/team/precincts" element={<Navigate to="/data/precincts" replace />} />
+            <Route path="/team/campaign-settings" element={<Navigate to="/data/campaign-settings" replace />} />
+          </Routes>
         </Suspense>
       </BrowserRouter>
     </QueryClientProvider>

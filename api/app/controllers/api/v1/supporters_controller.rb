@@ -295,7 +295,6 @@ module Api
         supporters = supporters.team_input if params[:pipeline] == "team"
         supporters = supporters.public_origin if params[:pipeline] == "public"
         supporters = supporters.quota_eligible if params[:pipeline] == "quota"
-        supporters = supporters.where(motorcade_available: true) if params[:motorcade_available] == "true"
         supporters = supporters.where(opt_in_email: true) if params[:opt_in_email] == "true"
         supporters = supporters.where(opt_in_text: true) if params[:opt_in_text] == "true"
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
@@ -401,7 +400,7 @@ module Api
         headers = [ "First Name", "Last Name", "Phone", "Village", "Precinct", "Street Address", "Email", "DOB",
                     "Self-Reported Voter Status", "Votes Elsewhere Note", "Needs Registration Help", "Needs Absentee Help",
                     "Needs Homebound Help", "Needs Ride", "Wants To Volunteer", "Referred By", "Household Group",
-                    "Yard Sign", "Motorcade Available", "Opt-In Email", "Opt-In Text",
+"Opt-In Email", "Opt-In Text",
                     "Verification Status", "Turnout Status", "Source", "Date Signed Up" ]
 
         rows = []
@@ -418,8 +417,6 @@ module Api
             s.wants_to_volunteer ? "Yes" : "No",
             s.referred_by_name,
             s.household_group_id.present? ? "Yes" : "No",
-            s.yard_sign ? "Yes" : "No",
-            s.motorcade_available ? "Yes" : "No",
             s.opt_in_email ? "Yes" : "No",
             s.opt_in_text ? "Yes" : "No",
             s.verification_status&.humanize,
@@ -992,7 +989,6 @@ module Api
         supporters = supporters.team_input if params[:pipeline] == "team"
         supporters = supporters.public_origin if params[:pipeline] == "public"
         supporters = supporters.quota_eligible if params[:pipeline] == "quota"
-        supporters = supporters.where(motorcade_available: true) if params[:motorcade_available] == "true"
         supporters = supporters.where(opt_in_email: true) if params[:opt_in_email] == "true"
         supporters = supporters.where(opt_in_text: true) if params[:opt_in_text] == "true"
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
@@ -1026,7 +1022,6 @@ module Api
           :village_id, :precinct_id, :registered_voter, :self_reported_registered_voter, :registered_voter_status,
           :registered_voter_location_note, :wants_to_volunteer, :needs_absentee_ballot_help,
           :needs_homebound_voting_help, :needs_voter_registration_help, :needs_election_day_ride, :referred_by_name,
-          :yard_sign, :motorcade_available,
           :opt_in_email, :opt_in_text,
           household_members: [
             :first_name, :middle_name, :last_name, :dob,
@@ -1045,7 +1040,7 @@ module Api
           :village_id, :submitted_village_id, :precinct_id, :registered_voter, :self_reported_registered_voter, :registered_voter_status,
           :registered_voter_location_note, :wants_to_volunteer, :needs_absentee_ballot_help,
           :needs_homebound_voting_help, :needs_voter_registration_help, :needs_election_day_ride, :referred_by_name,
-          :yard_sign, :motorcade_available, :household_primary,
+          :household_primary,
           :opt_in_email, :opt_in_text, :status
         )
       end
@@ -1254,7 +1249,6 @@ module Api
           needs_election_day_ride: supporter.needs_election_day_ride,
           referred_by_name: supporter.referred_by_name,
           yard_sign: supporter.yard_sign,
-          motorcade_available: supporter.motorcade_available,
           opt_in_email: supporter.opt_in_email,
           opt_in_text: supporter.opt_in_text,
           verification_status: supporter.verification_status,
@@ -1439,7 +1433,6 @@ module Api
         supporter.entered_by_user_id = entered_by_user_id if staff_entry_mode? && entered_by_user_id.present?
         supporter.registered_voter = false if supporter.registered_voter.nil?
         supporter.yard_sign = false if supporter.yard_sign.nil?
-        supporter.motorcade_available = false if supporter.motorcade_available.nil?
         supporter.wants_to_volunteer = false if supporter.wants_to_volunteer.nil?
         supporter.needs_absentee_ballot_help = false if supporter.needs_absentee_ballot_help.nil?
         supporter.needs_homebound_voting_help = false if supporter.needs_homebound_voting_help.nil?
@@ -1469,7 +1462,6 @@ module Api
           "needs_election_day_ride" => member_attributes["needs_election_day_ride"],
           "referred_by_name" => primary_attributes["referred_by_name"],
           "yard_sign" => false,
-          "motorcade_available" => false,
           "opt_in_email" => false,
           "opt_in_text" => false
         }
@@ -1736,7 +1728,7 @@ module Api
       end
 
       def duplicate_merge_audit_fields
-        %w[email registered_voter self_reported_registered_voter registered_voter_status motorcade_available yard_sign opt_in_email opt_in_text]
+        %w[email registered_voter self_reported_registered_voter registered_voter_status opt_in_email opt_in_text]
       end
 
       def apply_index_sort(scope)

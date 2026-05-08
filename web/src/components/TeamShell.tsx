@@ -8,26 +8,20 @@ import { formatRoleLabel } from '../lib/roles';
 import {
   LayoutDashboard,
   Users,
-  ShieldCheck,
   Shield,
   Upload,
   FileSpreadsheet,
-  UserCheck,
-  Camera,
   ClipboardPlus,
   ScrollText,
   Copy,
   Menu,
   X,
   Home,
-  Database,
   MapPin,
-  Target,
   Settings,
 } from 'lucide-react';
 import WorkspaceBrandPanel from './WorkspaceBrandPanel';
 import { publicSiteConfig } from '../lib/publicSite';
-import { filterNavItemsForDeployment } from '../lib/deploymentMode';
 
 interface NavItem {
   to: string;
@@ -48,8 +42,6 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   useCampaignUpdates(handleEvent, true);
 
-  const counts = sessionData?.counts;
-
   const navGroups: NavGroup[] = [
     {
       label: 'Overview',
@@ -61,17 +53,13 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
     {
       label: 'Data Entry',
       items: [
-        { to: '/data/scan', label: 'Scan Blue Form', icon: Camera },
         { to: '/data/entry', label: 'Manual Entry', icon: ClipboardPlus },
         { to: '/data/import', label: 'Excel Import', icon: Upload },
-        { to: '/data/gec', label: 'GEC Voter List', icon: Database },
       ],
     },
     {
       label: 'Review',
       items: [
-        { to: '/data/vetting', label: 'Supporter Review Queue', icon: ShieldCheck, badge: counts?.pending_vetting || 0 },
-        { to: '/data/public-review', label: 'Public Signups', icon: UserCheck, badge: counts?.public_signups_pending || 0 },
         { to: '/data/duplicates', label: 'Duplicates', icon: Copy },
       ],
     },
@@ -91,14 +79,13 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
             items: [
               ...(sessionData?.permissions?.can_manage_users ? [ { to: '/data/users', label: 'Users', icon: Shield } ] : []),
               ...(sessionData?.permissions?.can_manage_data_configuration ? [ { to: '/data/districts', label: 'Districts', icon: MapPin } ] : []),
-              ...(sessionData?.permissions?.can_manage_data_configuration ? [ { to: '/data/quotas', label: 'Quotas', icon: Target } ] : []),
               ...(sessionData?.permissions?.can_manage_data_configuration ? [ { to: '/data/precincts', label: 'Precincts', icon: MapPin } ] : []),
               ...(sessionData?.permissions?.can_manage_configuration ? [ { to: '/data/campaign-settings', label: 'SMS & Social Settings', icon: Settings } ] : []),
             ],
           },
         ]
       : []),
-  ].map((group) => ({ ...group, items: filterNavItemsForDeployment(group.items) })).filter(g => g.items.length > 0);
+  ].filter(g => g.items.length > 0);
 
   const isActive = (to: string) => {
     if (to === '/data') return location.pathname === '/data';
