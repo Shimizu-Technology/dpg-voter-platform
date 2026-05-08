@@ -153,7 +153,7 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   registration_outreach_notes: 'Registration follow-up notes',
   support_follow_up_status: 'Support follow-up progress',
   support_follow_up_notes: 'Support follow-up notes',
-  yard_sign: 'Yard sign',
+  yard_sign: 'Follow-up requested',
   opt_in_email: 'Opt-in email',
   opt_in_text: 'Opt-in text',
   created_at: 'Created at',
@@ -337,7 +337,7 @@ function verificationStatusDetail(supporter: Pick<SupporterDetail, 'verification
     return 'This supporter needs voter-check follow-up before staff should treat the match as confirmed.';
   }
   if (supporter.verification_status === 'unverified' && !supporter.registered_voter) {
-    return 'This supporter was not found in the current GEC voter list.';
+    return 'This supporter was not found in the current voter list.';
   }
   return 'This supporter still needs voter-check review.';
 }
@@ -408,7 +408,7 @@ function supporterStatusDetail(supporter: Pick<SupporterDetail, 'source' | 'revi
 
 function activitySourceLabel(supporter: Pick<SupporterDetail, 'source' | 'attribution_method'>) {
   if (supporter.source === 'public_signup' || supporter.source === 'qr_signup') return 'Public signup';
-  if (supporter.attribution_method === 'staff_scan') return 'Blue form scan';
+  if (supporter.attribution_method === 'staff_scan') return 'Staff scan';
   if (supporter.source === 'staff_entry') return 'Staff entry';
   if (supporter.source === 'bulk_import') return 'Excel import';
   return supporter.source === 'referral' ? 'Referral' : 'Supporter record';
@@ -492,7 +492,7 @@ function turnoutStatusClass(status?: SupporterDetail['turnout_status']) {
 
 function turnoutSourceLabel(source?: string | null) {
   if (!source) return null;
-  if (source === 'poll_watcher') return 'Poll watcher';
+  if (source === 'poll_watcher') return 'Field observer';
   if (source === 'admin') return 'Admin';
   return source.replaceAll('_', ' ');
 }
@@ -1172,7 +1172,7 @@ export default function SupporterDetailPage() {
 
             {canEdit && (
               <p className="text-xs text-[var(--text-secondary)]">
-                Supporter approval and voter check are tracked separately. Supporter status controls whether this record belongs in the official supporter list, while voter check shows whether the person matched the current GEC voter list.
+                Supporter approval and voter check are tracked separately. Supporter status controls whether this record belongs in the official supporter list, while voter check shows whether the person matched the current voter list.
               </p>
             )}
           </div>

@@ -395,7 +395,7 @@ if env_truthy?("SEED_DEMO_SUPPORTERS")
 
     fake_first_names = %w[Maria Jose Juan Ana Carlos Rosa Antonio Elena Miguel Carmen
       Francisco Isabel Luis Paula Roberto Sofia David Clara Jorge Teresa
-      Kevin Jennifer Michael Sarah James Jennifer Tina Joshua Patricia].freeze
+      Kevin Jennifer Michael Sarah James Jennifer Maria Jose Patricia].freeze
     fake_last_names = %w[Cruz Santos Reyes Flores Garcia Torres Rodriguez Martinez
       Lopez Hernandez Perez Ramirez Aguon Aflague Camacho Pangelinan
       Guerrero Mendiola Taitano San Nicolas Manibusan Blas Borja].freeze

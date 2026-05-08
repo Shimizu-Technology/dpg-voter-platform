@@ -219,7 +219,7 @@ module Authenticatable
     return if can_access_war_room?
 
     render_api_error(
-      message: "War room access required",
+      message: "Admin access required",
       status: :forbidden,
       code: "war_room_access_required"
     )
@@ -229,7 +229,7 @@ module Authenticatable
     return if can_access_poll_watcher?
 
     render_api_error(
-      message: "Poll watcher access required",
+      message: "Field observer access required",
       status: :forbidden,
       code: "poll_watcher_access_required"
     )

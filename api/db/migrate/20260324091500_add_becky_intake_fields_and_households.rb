@@ -1,4 +1,4 @@
-class AddBeckyIntakeFieldsAndHouseholds < ActiveRecord::Migration[8.1]
+class AddVoterHelpIntakeFieldsAndHouseholds < ActiveRecord::Migration[8.1]
   def up
     create_table :household_groups do |t|
       t.bigint :village_id, null: false

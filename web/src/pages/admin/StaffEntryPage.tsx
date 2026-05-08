@@ -567,7 +567,7 @@ export default function StaffEntryPage() {
         <div className="space-y-3 py-2">
           <label className="flex items-center gap-3">
             <input type="checkbox" checked={form.yard_sign} onChange={e => updateField('yard_sign', e.target.checked)} className="w-5 h-5 rounded text-primary" />
-            <span className="text-[var(--text-primary)]">Yard Sign</span>
+            <span className="text-[var(--text-primary)]">Follow-up requested</span>
           </label>
           
         </div>

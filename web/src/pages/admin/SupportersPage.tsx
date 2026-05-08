@@ -129,7 +129,7 @@ function sourceLabel(supporter: Pick<SupporterItem, 'source' | 'attribution_meth
   if (supporter.source === 'qr_signup' || supporter.source === 'public_signup') {
     return 'Public Signup';
   }
-  if (supporter.attribution_method === 'staff_scan') return 'Blue Form Scan';
+  if (supporter.attribution_method === 'staff_scan') return 'Staff Scan';
   if (supporter.source === 'bulk_import') return 'Excel Import';
   return 'Staff Entry';
 }
@@ -749,7 +749,7 @@ export default function SupportersPage() {
                 )}
                 <div className="flex items-center gap-2 pt-1">
                   {s.yard_sign && (
-                    <span className="app-chip bg-amber-100 text-amber-700">Yard Sign</span>
+                    <span className="app-chip bg-amber-100 text-amber-700">Follow-up requested</span>
                   )}
                   
                   {registrationFollowUpResultLabel(s) && (

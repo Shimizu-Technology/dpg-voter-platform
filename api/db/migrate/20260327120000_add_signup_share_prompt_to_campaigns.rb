@@ -4,7 +4,7 @@ class AddSignupSharePromptToCampaigns < ActiveRecord::Migration[8.1]
   end
 
   DEFAULT_SIGNUP_SHARE_PROMPT = <<~TEXT.squish.freeze
-    Know other Josh & Tina supporters? Finish your signup, then share this form with them too.
+    Know other the Democratic Party of Guam supporters? Finish your signup, then share this form with them too.
   TEXT
 
   def up

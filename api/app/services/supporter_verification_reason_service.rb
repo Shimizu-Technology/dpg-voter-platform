@@ -128,7 +128,7 @@ class SupporterVerificationReasonService
     when "low_confidence_match"
       "This supporter was flagged because the best GEC match was low confidence and needs manual review."
     when "no_gec_match"
-      "This supporter was not found in the current GEC voter list."
+      "This supporter was not found in the current voter list."
     when "manual_staff_flag"
       "This supporter was flagged manually by staff for voter-check follow-up."
     when "needs_manual_review"

@@ -4,7 +4,7 @@ class BackfillThankYouReminderDefaults < ActiveRecord::Migration[8.1]
   end
 
   DEFAULT_SHARE_PROMPT = <<~TEXT.squish.freeze
-    Know other Josh & Tina supporters? Please share this link with them so we can get
+    Know other the Democratic Party of Guam supporters? Please share this link with them so we can get
     their names included and keep them connected with the campaign.
   TEXT
 

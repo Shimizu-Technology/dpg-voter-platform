@@ -133,7 +133,7 @@ export default function EmailPage() {
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="e.g., Join us for the Motorcade this Saturday!"
+                placeholder="e.g., Join us for the community meeting this Saturday!"
                 className="app-input"
                 maxLength={200}
               />

@@ -35,7 +35,7 @@ class GecVettingService
 
     if matches.empty?
       apply_unregistered!
-      return Result.new(status: :unregistered, matches: [], match_count: 0, details: "No match found in GEC voter list")
+      return Result.new(status: :unregistered, matches: [], match_count: 0, details: "No match found in voter list")
     end
 
     best = matches.first

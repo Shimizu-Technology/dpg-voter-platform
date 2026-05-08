@@ -20,6 +20,6 @@ class PollWatcherPrecinctAssignment < ApplicationRecord
   def user_is_poll_watcher
     return if user&.poll_watcher?
 
-    errors.add(:user, "must be a poll watcher")
+    errors.add(:user, "must be a field observer")
   end
 end

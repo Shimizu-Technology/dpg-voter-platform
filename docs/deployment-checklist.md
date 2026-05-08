@@ -16,8 +16,8 @@
 - [ ] `npm --prefix web run build`
 - [ ] `RAILS_ENV=test bundle exec rails zeitwerk:check`
 - [ ] `RAILS_ENV=test bundle exec rails db:prepare`
-- [ ] Source scan has no Josh/Tina/proprietary workflow terms.
-- [ ] Built `web/dist` scan has no Josh/Tina/proprietary workflow terms.
+- [ ] Source scan has no other-campaign or proprietary workflow terms.
+- [ ] Built `web/dist` scan has no other-campaign or proprietary workflow terms.
 - [ ] Rails route scan has no deferred election-day/proprietary modules.
 
 ## Monday testing scope

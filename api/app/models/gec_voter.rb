@@ -42,7 +42,7 @@ class GecVoter < ApplicationRecord
     list_date.present? ? scope.for_list_date(list_date) : scope
   end
 
-  # Find potential matches for a supporter against the GEC voter list.
+  # Find potential matches for a supporter against the voter list.
   # Returns array of hashes: { gec_voter:, confidence:, match_type:, match_count: }
   #
   # Confidence tiers (adapts to whether full DOB or birth_year_only is available):

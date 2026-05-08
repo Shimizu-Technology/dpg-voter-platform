@@ -19,7 +19,7 @@ class CampaignBroadcast
       })
     end
 
-    # Poll watcher submitted a report
+    # Field observer submitted a report
     def poll_report(report)
       precinct = report.precinct
       village = precinct.village
