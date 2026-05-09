@@ -41,7 +41,6 @@ interface SupporterItem {
   needs_voter_registration_help?: boolean;
   needs_election_day_ride?: boolean;
   referred_by_name?: string | null;
-  yard_sign: boolean;
   opt_in_email: boolean;
   opt_in_text: boolean;
   verification_status: string;
@@ -748,10 +747,6 @@ export default function SupportersPage() {
                   </div>
                 )}
                 <div className="flex items-center gap-2 pt-1">
-                  {s.yard_sign && (
-                    <span className="app-chip bg-amber-100 text-amber-700">Follow-up requested</span>
-                  )}
-                  
                   {registrationFollowUpResultLabel(s) && (
                     <span className={`app-chip ${registrationFollowUpResultClass(s)}`}>{registrationFollowUpResultLabel(s)}</span>
                   )}
@@ -843,10 +838,6 @@ export default function SupportersPage() {
                   <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">{renderPrecinctAssignControl(s)}</td>
                   <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">
                     <div className="flex items-center gap-1.5 whitespace-nowrap">
-                      {s.yard_sign && (
-                        <span className="app-chip bg-amber-100 text-amber-700">Yard</span>
-                      )}
-                      
                       {registrationFollowUpResultLabel(s) && (
                         <span className={`app-chip ${registrationFollowUpResultClass(s)}`}>{registrationFollowUpResultLabel(s)}</span>
                       )}

@@ -397,7 +397,7 @@ module Api
                     "Self-Reported Voter Status", "Votes Elsewhere Note", "Needs Registration Help", "Needs Absentee Help",
                     "Needs Homebound Help", "Needs Ride", "Wants To Volunteer", "Referred By", "Household Group",
 "Opt-In Email", "Opt-In Text",
-                    "Verification Status", "Turnout Status", "Source", "Date Signed Up" ]
+                    "Verification Status", "Source", "Date Signed Up" ]
 
         rows = []
         supporters.find_each do |s|
@@ -416,7 +416,6 @@ module Api
             s.opt_in_email ? "Yes" : "No",
             s.opt_in_text ? "Yes" : "No",
             s.verification_status&.humanize,
-            s.turnout_status&.humanize,
             s.source&.humanize,
             s.created_at&.strftime("%m/%d/%Y")
           ]
@@ -1208,7 +1207,6 @@ module Api
           needs_voter_registration_help: supporter.needs_voter_registration_help,
           needs_election_day_ride: supporter.needs_election_day_ride,
           referred_by_name: supporter.referred_by_name,
-          yard_sign: supporter.yard_sign,
           opt_in_email: supporter.opt_in_email,
           opt_in_text: supporter.opt_in_text,
           verification_status: supporter.verification_status,
@@ -1246,10 +1244,6 @@ module Api
           support_follow_up_status: supporter.support_follow_up_status,
           support_follow_up_notes: supporter.support_follow_up_notes,
           support_follow_up_date: supporter.support_follow_up_date&.iso8601,
-          turnout_status: supporter.turnout_status,
-          turnout_source: supporter.turnout_source,
-          turnout_note: supporter.turnout_note,
-          turnout_updated_at: supporter.turnout_updated_at&.iso8601,
           created_at: supporter.created_at&.iso8601
         }
       end
@@ -1293,10 +1287,6 @@ module Api
           support_follow_up_status: supporter.support_follow_up_status,
           support_follow_up_notes: supporter.support_follow_up_notes,
           support_follow_up_date: supporter.support_follow_up_date&.iso8601,
-          turnout_status: supporter.turnout_status,
-          turnout_source: supporter.turnout_source,
-          turnout_note: supporter.turnout_note,
-          turnout_updated_at: supporter.turnout_updated_at&.iso8601,
           status: supporter.status,
           created_at: supporter.created_at&.iso8601
         }
@@ -1306,8 +1296,6 @@ module Api
         reason_payload = SupporterVerificationReasonService.new(supporter, allow_match_lookup: true).payload || {}
 
         supporter_json(supporter, reason_payload: reason_payload).merge(
-          turnout_updated_by_user_id: supporter.turnout_updated_by_user_id,
-          turnout_updated_by_user_name: supporter.turnout_updated_by_user&.name,
           block_name: supporter.block&.name,
           household_members: supporter.household_members.map do |member|
             {
@@ -1378,7 +1366,6 @@ module Api
         supporter.household_primary = household_group.present? && household_primary
         supporter.entered_by_user_id = entered_by_user_id if staff_entry_mode? && entered_by_user_id.present?
         supporter.registered_voter = false if supporter.registered_voter.nil?
-        supporter.yard_sign = false if supporter.yard_sign.nil?
         supporter.wants_to_volunteer = false if supporter.wants_to_volunteer.nil?
         supporter.needs_absentee_ballot_help = false if supporter.needs_absentee_ballot_help.nil?
         supporter.needs_homebound_voting_help = false if supporter.needs_homebound_voting_help.nil?
@@ -1407,7 +1394,6 @@ module Api
           "needs_voter_registration_help" => member_attributes["needs_voter_registration_help"],
           "needs_election_day_ride" => member_attributes["needs_election_day_ride"],
           "referred_by_name" => primary_attributes["referred_by_name"],
-          "yard_sign" => false,
           "opt_in_email" => false,
           "opt_in_text" => false
         }
@@ -1601,11 +1587,6 @@ module Api
             verified_by_user_id: current_user.id,
             verified_at: Time.current,
             verification_reason: "manual_staff_verified",
-            turnout_status: gec_voter&.turnout_status || supporter.turnout_status,
-            turnout_note: gec_voter&.turnout_note,
-            turnout_source: gec_voter&.turnout_source,
-            turnout_updated_at: gec_voter&.turnout_updated_at,
-            turnout_updated_by_user_id: gec_voter&.turnout_updated_by_user_id,
             verification_reason_metadata: {
               "gec_village_name" => gec_voter&.village_name,
               "confidence" => best_match&.dig(:confidence)&.to_s,

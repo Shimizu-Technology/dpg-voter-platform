@@ -1,4 +1,4 @@
-const CACHE_NAME = 'campaign-tracker-v1';
+const CACHE_NAME = 'dpg-voter-platform-v1';
 const OFFLINE_URL = '/offline.html';
 
 self.addEventListener('install', (event) => {

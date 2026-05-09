@@ -1,6 +1,6 @@
 import type { SessionResponse } from '../hooks/useSession';
 
-const LAST_ROUTE_STORAGE_PREFIX = 'campaign-tracker:last-route:';
+const LAST_ROUTE_STORAGE_PREFIX = 'dpg-voter-platform:last-route:';
 
 type SessionLike = Pick<SessionResponse, 'user' | 'permissions'>;
 

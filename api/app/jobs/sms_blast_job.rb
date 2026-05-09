@@ -70,7 +70,6 @@ class SmsBlastJob < ApplicationJob
       .where(opt_in_text: true)
     supporters = supporters.where(village_id: filters["village_id"]) if filters["village_id"].present?
     supporters = supporters.where(registered_voter: true) if filters["registered_voter"] == "true"
-    supporters = supporters.where(yard_sign: true) if filters["yard_sign"] == "true"
     supporters
   end
 end

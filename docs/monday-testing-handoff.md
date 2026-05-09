@@ -69,3 +69,10 @@ These are intentionally not part of Monday starter testing unless DPG separately
 - Test records persist in the isolated DPG database.
 - Staff can search, edit, import, and export basic supporter/contact data.
 - No other campaign names, assets, or proprietary workflows are visible.
+
+## May 9 Clean-Room Cleanup Update
+
+- Active yard-sign/follow-up flag surfaces were removed from staff entry, supporter lists, blast filters, and API payloads.
+- Inherited election-day turnout display/API surfaces were hidden from the DPG Monday build until DPG defines its own turnout workflow.
+- Duplicate merge no longer touches event RSVP records, avoiding the inherited event-model runtime risk.
+- Remaining static `campaign-tracker` cache/routing metadata was renamed to DPG-specific keys.

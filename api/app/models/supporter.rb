@@ -105,7 +105,6 @@ class Supporter < ApplicationRecord
       .where("supporters.submitted_village_id <> supporters.village_id")
   }
   scope :with_household, -> { where.not(household_group_id: nil) }
-  scope :yard_sign, -> { where(yard_sign: true) }
   scope :registered_voter_status_is, ->(status) { where(registered_voter_status: status) }
   # Legacy broad campaign-help scope retained for existing list/report usage.
   # This still includes voter registration help; new support-track follow-up

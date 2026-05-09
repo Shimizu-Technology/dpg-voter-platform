@@ -33,7 +33,6 @@ interface DashboardSummary {
   total_supporters: number;
   total_registered_voters: number;
   total_villages: number;
-  observed_elsewhere_count?: number;
 }
 
 interface DashboardPayload {

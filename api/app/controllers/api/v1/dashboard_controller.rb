@@ -90,7 +90,6 @@ module Api
             total_registered_voters: all_villages.sum { |v| v.registered_voters.to_i },
             total_villages: official_village_scope.count,
             total_precincts: global_total_precincts,
-            observed_elsewhere_count: Supporter.working_supporters.where(turnout_status: "observed_elsewhere").count,
             today_signups: Supporter.working_supporters.verified_today.count,
             today_total_signups: Supporter.working_supporters.today.count,
             week_signups: Supporter.working_supporters.verified_this_week.count,

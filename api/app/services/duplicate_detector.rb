@@ -301,16 +301,6 @@ class DuplicateDetector
   end
 
   private_class_method def self.merge_supporters!(source, into:)
-    # Transfer event RSVPs — preserve attended=true if either record attended
-    source.event_rsvps.each do |rsvp|
-      existing = into.event_rsvps.find_by(event_id: rsvp.event_id)
-      if existing
-        existing.update!(attended: true) if rsvp.attended && !existing.attended
-      else
-        rsvp.update!(supporter_id: into.id)
-      end
-    end
-
     # Transfer contact attempts
     source.supporter_contact_attempts.update_all(supporter_id: into.id)
 
