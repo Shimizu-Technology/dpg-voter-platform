@@ -10,6 +10,8 @@ import {
   Users,
   ClipboardCheck,
   ClipboardPlus,
+  MessageSquare,
+  Mail,
   Shield,
   MapPin,
   ScrollText,
@@ -18,6 +20,7 @@ import {
   Menu,
   X,
   Home,
+  Settings,
   Database,
   Copy,
 } from 'lucide-react';
@@ -64,6 +67,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       label: 'Outreach',
       items: [
         ...(permissions?.can_view_supporters ? [ { to: '/admin/outreach', label: 'Voter Help Follow-Up', icon: ClipboardCheck } ] : []),
+        ...(permissions?.can_send_sms ? [ { to: '/admin/sms', label: 'SMS Blasts', icon: MessageSquare } ] : []),
+        ...(permissions?.can_send_email ? [ { to: '/admin/email', label: 'Email Blasts', icon: Mail } ] : []),
       ],
     },
     {
@@ -80,6 +85,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         ...(permissions?.can_manage_users ? [ { to: '/admin/users', label: 'Users', icon: Shield } ] : []),
         ...(permissions?.can_manage_configuration ? [ { to: '/admin/districts', label: 'Districts', icon: MapPin } ] : []),
         ...(permissions?.can_manage_configuration ? [ { to: '/admin/precincts', label: 'Precincts', icon: MapPin } ] : []),
+        ...(permissions?.can_manage_configuration ? [ { to: '/admin/sms/settings', label: 'SMS & Public Settings', icon: Settings } ] : []),
       ],
     },
   ].filter(g => g.items.length > 0);

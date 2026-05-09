@@ -70,6 +70,18 @@ export const getOutreachSupporters = (params?: QueryParams) =>
   api.get('/supporters/outreach', { params }).then(r => r.data);
 export const updateOutreachStatus = (id: number, data: JsonRecord) =>
   api.patch(`/supporters/${id}/outreach_status`, data).then(r => r.data);
+
+// SMS/email outreach
+export const getSmsStatus = () => api.get('/sms/status').then(r => r.data);
+export const sendTestSms = (phone: string, message: string) =>
+  api.post('/sms/send', { phone, message }).then(r => r.data);
+export const sendSmsBlast = (data: { message: string; village_id?: number; registered_voter?: string; dry_run?: string }) =>
+  api.post('/sms/blast', data).then(r => r.data);
+export const getSmsBlasts = () => api.get('/sms/blasts').then(r => r.data);
+export const getSmsBlastStatus = (id: number) => api.get(`/sms/blasts/${id}`).then(r => r.data);
+export const getEmailStatus = () => api.get('/email/status').then(r => r.data);
+export const sendEmailBlast = (data: { subject: string; body: string; village_id?: number; registered_voter?: string; dry_run?: string }) =>
+  api.post('/email/blast', data).then(r => r.data);
 // Import
 export const uploadImportPreview = (file: File) => {
   const form = new FormData();

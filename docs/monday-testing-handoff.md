@@ -15,7 +15,7 @@ This app is the Democratic Party of Guam voter engagement platform. It is a DPG-
 7. Duplicate review
 8. Voter-help follow-up flags
 9. Reports/export basics
-10. SMS/email settings visibility only unless live sending is explicitly approved
+10. SMS/email outreach pages and settings visibility; preview/dry-run is safe, but live sending remains disabled unless `DPG_LIVE_OUTREACH_ENABLED=true` is explicitly approved
 
 ## Smoke test script
 
@@ -46,8 +46,9 @@ This app is the Democratic Party of Guam voter engagement platform. It is a DPG-
 ### Roles/settings
 - Confirm Users/Roles page loads.
 - Confirm Districts/Precincts page loads.
-- Confirm SMS and Email settings pages load.
-- Do not send a live blast unless approved by Leon/DPG.
+- Confirm SMS, Email, and SMS/Public Settings pages load.
+- Run dry-run/preview only for SMS/email recipient counts.
+- Do not send a live blast unless approved by Leon/DPG and the DPG sender/domain setup is confirmed.
 
 ## Known intentionally deferred modules
 

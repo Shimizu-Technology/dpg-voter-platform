@@ -9,6 +9,8 @@ type PermissionKey =
   | 'can_create_staff_supporters'
   | 'can_import_supporters'
   | 'can_access_duplicates'
+  | 'can_send_sms'
+  | 'can_send_email'
   | 'can_manage_users'
   | 'can_manage_configuration'
   | 'can_manage_data_configuration'
@@ -27,6 +29,9 @@ const PERMISSION_RULES: PermissionRule[] = [
   { prefix: '/admin/supporters', permission: 'can_view_supporters' },
   { prefix: '/admin/reports', permission: 'can_access_reports' },
   { prefix: '/admin/duplicates', permission: 'can_access_duplicates' },
+  { prefix: '/admin/sms/settings', permission: 'can_manage_configuration' },
+  { prefix: '/admin/sms', permission: 'can_send_sms' },
+  { prefix: '/admin/email', permission: 'can_send_email' },
   { prefix: '/admin/users', permission: 'can_manage_users' },
   { prefix: '/admin/districts', permission: 'can_manage_configuration' },
   { prefix: '/admin/precincts', permission: 'can_manage_configuration' },
@@ -35,6 +40,7 @@ const PERMISSION_RULES: PermissionRule[] = [
   { prefix: '/data/users', permission: 'can_manage_users' },
   { prefix: '/data/districts', permission: 'can_manage_data_configuration' },
   { prefix: '/data/precincts', permission: 'can_manage_data_configuration' },
+  { prefix: '/data/campaign-settings', permission: 'can_manage_configuration' },
   { prefix: '/data/supporters', permission: 'can_view_supporters' },
   { prefix: '/data/reports', permission: 'can_access_reports' },
   { prefix: '/data/import', permission: 'can_import_supporters' },

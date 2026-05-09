@@ -227,6 +227,14 @@ module Authenticatable
     current_user&.admin? || current_user&.data_team?
   end
 
+  def can_send_sms?
+    current_user&.admin? || current_user&.coordinator?
+  end
+
+  def can_send_email?
+    current_user&.admin? || current_user&.coordinator?
+  end
+
   def can_edit_supporters?
     current_user&.admin? || current_user&.data_team? || current_user&.coordinator?
   end

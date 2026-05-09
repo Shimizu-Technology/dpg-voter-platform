@@ -12,7 +12,7 @@ class ClicksendClient
     def send_sms(to:, body:, from: nil)
       username = ENV["CLICKSEND_USERNAME"]
       api_key  = ENV["CLICKSEND_API_KEY"]
-      from   ||= ENV["CLICKSEND_SENDER_ID"] || "JT2026"
+      from   ||= ENV["DPG_CLICKSEND_SENDER_ID"].presence || ENV["CLICKSEND_SENDER_ID"].presence || "DPG"
 
       if username.blank? || api_key.blank?
         Rails.logger.error("[ClicksendClient] Missing credentials — SMS not sent")
@@ -86,7 +86,7 @@ class ClicksendClient
     def send_batch(phones_and_bodies, from: nil)
       username = ENV["CLICKSEND_USERNAME"]
       api_key  = ENV["CLICKSEND_API_KEY"]
-      from   ||= ENV["CLICKSEND_SENDER_ID"] || "JT2026"
+      from   ||= ENV["DPG_CLICKSEND_SENDER_ID"].presence || ENV["CLICKSEND_SENDER_ID"].presence || "DPG"
 
       if username.blank? || api_key.blank?
         Rails.logger.error("[ClicksendClient] Missing credentials — batch not sent")

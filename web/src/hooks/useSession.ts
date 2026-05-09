@@ -24,6 +24,8 @@ export interface SessionResponse {
     can_manage_users: boolean;
     can_manage_configuration: boolean;
     can_manage_data_configuration: boolean;
+    can_send_sms: boolean;
+    can_send_email: boolean;
     can_edit_supporters: boolean;
     can_view_supporters: boolean;
     can_create_staff_supporters: boolean;

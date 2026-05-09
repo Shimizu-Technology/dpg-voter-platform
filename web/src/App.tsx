@@ -22,6 +22,9 @@ const SupportersPage = lazy(() => import('./pages/admin/SupportersPage'));
 const SupporterDetailPage = lazy(() => import('./pages/admin/SupporterDetailPage'));
 const StaffEntryPage = lazy(() => import('./pages/admin/StaffEntryPage'));
 const VillageDetailPage = lazy(() => import('./pages/admin/VillageDetailPage'));
+const SmsPage = lazy(() => import('./pages/admin/SmsPage'));
+const SmsSettingsPage = lazy(() => import('./pages/admin/SmsSettingsPage'));
+const EmailPage = lazy(() => import('./pages/admin/EmailPage'));
 const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
 const DistrictsPage = lazy(() => import('./pages/admin/DistrictsPage'));
 const PrecinctSettingsPage = lazy(() => import('./pages/admin/PrecinctSettingsPage'));
@@ -54,6 +57,8 @@ type PermissionKey =
   | 'can_manage_users'
   | 'can_manage_configuration'
   | 'can_manage_data_configuration'
+  | 'can_send_sms'
+  | 'can_send_email'
   | 'can_edit_supporters'
   | 'can_view_supporters'
   | 'can_create_staff_supporters'
@@ -123,6 +128,9 @@ export default function App() {
             <Route path="/admin/reports" element={<AdminRoute><PermissionRoute permission="can_access_reports"><TeamReportsPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/duplicates" element={<AdminRoute><PermissionRoute permission="can_access_duplicates"><DuplicatesPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/villages/:id" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><VillageDetailPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/sms" element={<AdminRoute><PermissionRoute permission="can_send_sms"><SmsPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/sms/settings" element={<AdminRoute><PermissionRoute permission="can_manage_configuration"><SmsSettingsPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/email" element={<AdminRoute><PermissionRoute permission="can_send_email"><EmailPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/users" element={<AdminRoute><PermissionRoute permission="can_manage_users"><UsersPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/districts" element={<AdminRoute><PermissionRoute permission="can_manage_configuration"><DistrictsPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/precincts" element={<AdminRoute><PermissionRoute permission="can_manage_configuration"><PrecinctSettingsPage /></PermissionRoute></AdminRoute>} />
@@ -141,6 +149,7 @@ export default function App() {
             <Route path="/data/users" element={<TeamLayout><PermissionRoute permission="can_manage_users"><UsersPage /></PermissionRoute></TeamLayout>} />
             <Route path="/data/districts" element={<TeamLayout><PermissionRoute permission="can_manage_data_configuration"><DistrictsPage /></PermissionRoute></TeamLayout>} />
             <Route path="/data/precincts" element={<TeamLayout><PermissionRoute permission="can_manage_data_configuration"><PrecinctSettingsPage /></PermissionRoute></TeamLayout>} />
+            <Route path="/data/campaign-settings" element={<TeamLayout><PermissionRoute permission="can_manage_configuration"><SmsSettingsPage /></PermissionRoute></TeamLayout>} />
 
             {/* Legacy /team aliases */}
             <Route path="/team" element={<Navigate to="/data" replace />} />
@@ -153,6 +162,7 @@ export default function App() {
             <Route path="/team/users" element={<Navigate to="/data/users" replace />} />
             <Route path="/team/districts" element={<Navigate to="/data/districts" replace />} />
             <Route path="/team/precincts" element={<Navigate to="/data/precincts" replace />} />
+            <Route path="/team/campaign-settings" element={<Navigate to="/data/campaign-settings" replace />} />
           </Routes>
         </Suspense>
       </BrowserRouter>
