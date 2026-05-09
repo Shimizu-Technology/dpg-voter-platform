@@ -43,7 +43,7 @@ export const createSupporter = (
   data: JsonRecord,
   leaderCode?: string,
   entryMode?: 'staff',
-  entryChannel?: 'manual' | 'scan'
+  entryChannel?: 'manual'
 ) => {
   const params = new URLSearchParams();
   if (leaderCode) params.set('leader_code', leaderCode);
@@ -96,54 +96,6 @@ export const exportSupporters = (params?: QueryParams) =>
   });
 
 
-// Events
-export const getEvents = (params?: QueryParams) => api.get('/events', { params }).then(r => r.data);
-export const getEvent = (id: number) => api.get(`/events/${id}`).then(r => r.data);
-export const createEvent = (data: JsonRecord) => api.post('/events', { event: data }).then(r => r.data);
-export const checkInAttendee = (eventId: number, supporterId: number) =>
-  api.post(`/events/${eventId}/check_in`, { supporter_id: supporterId }).then(r => r.data);
-export const getEventAttendees = (eventId: number, search?: string) =>
-  api.get(`/events/${eventId}/attendees`, { params: { search } }).then(r => r.data);
-export const sendEventSms = (eventId: number, data: { message: string; dry_run?: string }) =>
-  api.post(`/events/${eventId}/send_sms`, data).then(r => r.data);
-export const sendEventEmail = (eventId: number, data: { subject: string; body: string; dry_run?: string }) =>
-  api.post(`/events/${eventId}/send_email`, data).then(r => r.data);
-
-export const getWarRoom = () => api.get('/war_room').then(r => r.data);
-export const createWarRoomContactAttempt = (supporterId: number, data: JsonRecord) =>
-  api.post(`/war_room/supporters/${supporterId}/contact_attempts`, { contact_attempt: data }).then(r => r.data);
-
-export const getPollWatcher = () => api.get('/poll_watcher').then(r => r.data);
-export const submitPollReport = (data: JsonRecord) => api.post('/poll_watcher/report', { report: data }).then(r => r.data);
-export const getPrecinctHistory = (id: number) => api.get(`/poll_watcher/precinct/${id}/history`).then(r => r.data);
-export const getPollWatcherStrikeList = (params: QueryParams) =>
-  api.get('/poll_watcher/strike_list', { params }).then(r => r.data);
-export const updateStrikeListTurnout = (voterId: number, data: JsonRecord) =>
-  api.patch(`/poll_watcher/strike_list/${voterId}/turnout`, { turnout: data }).then(r => r.data);
-
-// Form Scanner (OCR)
-export const scanForm = (image: string) =>
-  api.post('/scan', { image }).then(r => r.data);
-export const scanBatchForm = (image: string, defaultVillageId: number) =>
-  api.post('/scan/batch', { image, default_village_id: defaultVillageId }).then(r => r.data);
-export const trackScanBatchTelemetry = (telemetry: JsonRecord) =>
-  api.post('/scan/telemetry', { telemetry }).then(r => r.data);
-
-// SMS
-export const getSmsStatus = () => api.get('/sms/status').then(r => r.data);
-export const sendTestSms = (phone: string, message: string) =>
-  api.post('/sms/send', { phone, message }).then(r => r.data);
-export const sendSmsBlast = (data: { message: string; village_id?: number; registered_voter?: string; dry_run?: string }) =>
-  api.post('/sms/blast', data).then(r => r.data);
-export const sendEventNotify = (eventId: number, type: string) =>
-  api.post('/sms/event_notify', { event_id: eventId, type }).then(r => r.data);
-export const getSmsBlasts = () => api.get('/sms/blasts').then(r => r.data);
-export const getSmsBlastStatus = (id: number) => api.get(`/sms/blasts/${id}`).then(r => r.data);
-
-// Email
-export const getEmailStatus = () => api.get('/email/status').then(r => r.data);
-export const sendEmailBlast = (data: { subject: string; body: string; village_id?: number; registered_voter?: string; dry_run?: string }) =>
-  api.post('/email/blast', data).then(r => r.data);
 
 // Users (admin)
 export const getUsers = () => api.get('/users').then(r => r.data);
@@ -296,21 +248,4 @@ export const downloadReport = (reportType: string, params?: QueryParams) =>
     window.URL.revokeObjectURL(url);
   });
 
-// Vetting Queue
-export const getVettingQueue = (params?: QueryParams) => api.get('/supporters/vetting_queue', { params }).then(r => r.data);
-export const revetSupporter = (id: number) => api.patch(`/supporters/${id}/revet`).then(r => r.data);
-export const bulkRevetSupporters = (payload: { supporter_ids?: number[]; apply_current_filters?: boolean } & QueryParams) =>
-  api.post('/supporters/bulk_revet', payload).then(r => r.data);
-
-// Public Review
-export const getPublicReview = (params?: QueryParams) => api.get('/supporters/public_review', { params }).then(r => r.data);
-export const rejectPublicReview = (id: number) => api.patch(`/supporters/${id}/reject_public_review`).then(r => r.data);
-export const approveSupporter = (id: number) => api.patch(`/supporters/${id}/approve_supporter`).then(r => r.data);
-export const rejectSupporterReview = (id: number) => api.patch(`/supporters/${id}/reject_supporter`).then(r => r.data);
-
 export default api;
-
-// Campaign Cycles
-export const getCampaignCycles = (params?: QueryParams) => api.get('/campaign_cycles', { params }).then(r => r.data);
-export const createCampaignCycle = (data: Record<string, unknown>) => api.post('/campaign_cycles', data).then(r => r.data);
-export const updateCampaignCycle = (id: number, data: Record<string, unknown>) => api.patch(`/campaign_cycles/${id}`, data).then(r => r.data);

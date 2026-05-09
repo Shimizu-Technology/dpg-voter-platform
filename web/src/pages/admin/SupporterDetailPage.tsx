@@ -98,7 +98,6 @@ interface SupporterDetail {
     review_status: string;
     public_review_status: string;
   }>;
-  reliability_score: number | null;
 }
 
 interface AuditLogItem {
@@ -487,7 +486,6 @@ function turnoutStatusClass(status?: SupporterDetail['turnout_status']) {
 
 function turnoutSourceLabel(source?: string | null) {
   if (!source) return null;
-  if (source === 'poll_watcher') return 'Field observer';
   if (source === 'admin') return 'Admin';
   return source.replaceAll('_', ' ');
 }

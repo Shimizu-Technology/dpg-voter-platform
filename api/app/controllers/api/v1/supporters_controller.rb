@@ -12,9 +12,9 @@ module Api
 
       include Authenticatable
       include AuditLoggable
-      before_action :authenticate_request, only: [ :index, :check_duplicate, :export, :show, :update, :verify, :bulk_verify, :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :outreach, :outreach_status, :public_review, :accept_to_quota, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
+      before_action :authenticate_request, only: [ :index, :check_duplicate, :export, :show, :update, :verify, :bulk_verify, :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :outreach, :outreach_status, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
       before_action :require_supporter_access!, only: [ :index, :check_duplicate, :export, :show, :outreach, :outreach_status ]
-      before_action :require_data_ops_access!, only: [ :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :public_review, :accept_to_quota, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
+      before_action :require_data_ops_access!, only: [ :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
       before_action :require_chief_or_above!, only: [ :verify, :bulk_verify ]
 
       # POST /api/v1/supporters (public signup — no auth required)
@@ -290,11 +290,8 @@ module Api
         supporters = supporters.where(registered_voter: true) if params[:registered_voter] == "true"
         supporters = apply_support_need_filter(supporters, params[:support_need])
         supporters = supporters.with_household if params[:has_household] == "true"
-        # Pipeline filter: team input, public-origin official supporters, or
-        # matched-to-GEC supporters for legacy quota views.
         supporters = supporters.team_input if params[:pipeline] == "team"
         supporters = supporters.public_origin if params[:pipeline] == "public"
-        supporters = supporters.quota_eligible if params[:pipeline] == "quota"
         supporters = supporters.where(opt_in_email: true) if params[:opt_in_email] == "true"
         supporters = supporters.where(opt_in_text: true) if params[:opt_in_text] == "true"
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
@@ -356,8 +353,7 @@ module Api
             :precinct,
             :block,
             :referred_from_village,
-            household_group: [ supporters: :village ],
-            event_rsvps: :event
+            household_group: [ supporters: :village ]
           )
         ).find(params[:id])
         audit_logs = supporter.audit_logs.includes(:actor_user).recent.limit(50)
@@ -709,38 +705,6 @@ module Api
         }
       end
 
-      # PATCH /api/v1/supporters/:id/accept_to_quota
-      # Approve a public submission into the main supporter review queue.
-      def accept_to_quota
-        supporter = scope_supporters(Supporter).find(params[:id])
-
-        unless supporter.public_review_status == "pending" && Supporter::PUBLIC_SOURCES.include?(supporter.source)
-          return render_api_error(
-            message: "Public submission has already been reviewed",
-            status: :unprocessable_entity,
-            code: "public_submission_already_reviewed"
-          )
-        end
-
-        old_public_review_status = supporter.public_review_status
-        supporter.update!(
-          intake_status: "accepted",
-          public_review_status: "approved",
-          public_reviewed_at: Time.current,
-          public_reviewed_by_user_id: current_user.id,
-          review_status: "pending",
-          reviewed_at: nil,
-          reviewed_by_user_id: nil
-        )
-
-        log_audit!(supporter, action: "accepted_to_quota", changed_data: {
-          "public_review_status" => [ old_public_review_status, "approved" ]
-        }, normalize: true)
-
-        CampaignBroadcast.supporter_updated(supporter, action: "public_review_approved")
-        render json: { supporter: supporter_json(supporter), message: "Public submission approved and sent to supporter review" }
-      end
-
       # PATCH /api/v1/supporters/:id/reject_public_review
       def reject_public_review
         supporter = scope_supporters(Supporter).find(params[:id])
@@ -796,8 +760,7 @@ module Api
         supporter.update!(
           review_status: "approved",
           reviewed_at: Time.current,
-          reviewed_by_user_id: current_user.id,
-          quota_period_id: current_quota_period_id_for_approval
+          reviewed_by_user_id: current_user.id
         )
 
         log_audit!(supporter, action: "supporter_review_approved", changed_data: {
@@ -984,11 +947,8 @@ module Api
         supporters = supporters.where(registered_voter: true) if params[:registered_voter] == "true"
         supporters = apply_support_need_filter(supporters, params[:support_need])
         supporters = supporters.with_household if params[:has_household] == "true"
-        # Pipeline filter: team input, public-origin official supporters, or
-        # matched-to-GEC supporters for legacy quota views.
         supporters = supporters.team_input if params[:pipeline] == "team"
         supporters = supporters.public_origin if params[:pipeline] == "public"
-        supporters = supporters.quota_eligible if params[:pipeline] == "quota"
         supporters = supporters.where(opt_in_email: true) if params[:opt_in_email] == "true"
         supporters = supporters.where(opt_in_text: true) if params[:opt_in_text] == "true"
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
@@ -1258,7 +1218,6 @@ module Api
           intake_status: supporter.intake_status,
           review_status: supporter.review_status,
           public_review_status: supporter.public_review_status,
-          quota_period_id: supporter.quota_period_id,
           reviewed_at: supporter.reviewed_at&.iso8601,
           reviewed_by_user_id: supporter.reviewed_by_user_id,
           public_reviewed_at: supporter.public_reviewed_at&.iso8601,
@@ -1275,7 +1234,6 @@ module Api
           verification_reason_detail: reason_payload[:verification_reason_detail],
           verification_reason_metadata: reason_payload[:verification_reason_metadata],
           verification_reason_derived: reason_payload[:verification_reason_derived],
-          reliability_score: supporter.reliability_score,
           potential_duplicate: supporter.potential_duplicate,
           duplicate_of_id: supporter.duplicate_of_id,
           duplicate_notes: supporter.duplicate_notes,
@@ -1362,18 +1320,6 @@ module Api
               registered_voter_status: member.registered_voter_status,
               review_status: member.review_status,
               public_review_status: member.public_review_status
-            }
-          end,
-          events_invited_count: supporter.event_rsvps.size,
-          events_attended_count: supporter.event_rsvps.count(&:attended),
-          event_history: supporter.event_rsvps.sort_by(&:created_at).reverse.first(20).map do |rsvp|
-            {
-              event_id: rsvp.event_id,
-              event_name: rsvp.event&.name,
-              event_date: rsvp.event&.date&.to_s,
-              rsvp_status: rsvp.rsvp_status,
-              attended: rsvp.attended,
-              checked_in_at: rsvp.checked_in_at&.iso8601
             }
           end
         )
@@ -1705,10 +1651,6 @@ module Api
         }
       end
 
-      def current_quota_period_id_for_approval
-        CampaignCycle.current_quota_period&.id
-      end
-
       # Alias for backward compatibility with callers
       def normalized_changed_data(changed_data)
         normalize_changed_data(changed_data)
@@ -1720,8 +1662,6 @@ module Api
           "Supporter created"
         when "updated"
           "Supporter updated"
-        when "accepted_to_quota"
-          "Sent to supporter review"
         else
           action.to_s.humanize
         end

@@ -6,7 +6,7 @@ class Supporter < ApplicationRecord
   REGISTERED_VOTER_STATUSES = %w[yes no not_sure].freeze
   SUPPORT_FOLLOW_UP_STATUSES = %w[in_progress completed declined].freeze
   TURNOUT_STATUSES = %w[unknown not_yet_voted voted observed_elsewhere].freeze
-  TURNOUT_SOURCES = %w[poll_watcher war_room data_team admin_override].freeze
+  TURNOUT_SOURCES = %w[data_team admin_override].freeze
   VERIFICATION_STATUSES = %w[unverified verified flagged].freeze
   VERIFICATION_REASONS = %w[
     matched_current_gec
@@ -23,7 +23,6 @@ class Supporter < ApplicationRecord
   belongs_to :village
   belongs_to :submitted_village, class_name: "Village", optional: true
   belongs_to :referred_from_village, class_name: "Village", optional: true
-  belongs_to :quota_period, optional: true
   belongs_to :precinct, optional: true
   belongs_to :gec_voter, optional: true
   belongs_to :block, optional: true
@@ -37,8 +36,6 @@ class Supporter < ApplicationRecord
   belongs_to :duplicate_of, class_name: "Supporter", foreign_key: :duplicate_of_id, optional: true
   has_many :duplicates, class_name: "Supporter", foreign_key: :duplicate_of_id, dependent: :nullify
 
-  has_many :event_rsvps, dependent: :destroy
-  has_many :events, through: :event_rsvps
   has_many :audit_logs, as: :auditable, dependent: :destroy
   has_many :supporter_contact_attempts, dependent: :destroy
 
@@ -103,7 +100,6 @@ class Supporter < ApplicationRecord
   scope :working_supporters, -> { official_supporters }
   scope :team_input, -> { official_supporters.where(source: TEAM_SOURCES) }
   scope :public_signups, -> { pending_public_review }
-  scope :quota_eligible, -> { official_supporters.verified }
   scope :submitted_village_referrals, -> {
     where.not(submitted_village_id: nil)
       .where("supporters.submitted_village_id <> supporters.village_id")
@@ -160,21 +156,6 @@ class Supporter < ApplicationRecord
     else
       none
     end
-  end
-
-  # Engagement metrics
-  def events_invited_count
-    event_rsvps.count
-  end
-
-  def events_attended_count
-    event_rsvps.where(attended: true).count
-  end
-
-  def reliability_score
-    invited = events_invited_count
-    return nil if invited == 0
-    ((events_attended_count.to_f / invited) * 100).round(1)
   end
 
   def submitted_village_referral?

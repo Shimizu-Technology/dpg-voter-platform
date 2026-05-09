@@ -98,8 +98,6 @@ type PermissionKey =
   | 'can_manage_users'
   | 'can_manage_configuration'
   | 'can_manage_data_configuration'
-  | 'can_send_sms'
-  | 'can_send_email'
   | 'can_edit_supporters'
   | 'can_view_supporters'
   | 'can_create_staff_supporters'
@@ -116,8 +114,6 @@ const PERMISSION_KEYS: PermissionKey[] = [
   'can_manage_users',
   'can_manage_configuration',
   'can_manage_data_configuration',
-  'can_send_sms',
-  'can_send_email',
   'can_edit_supporters',
   'can_view_supporters',
   'can_create_staff_supporters',
@@ -135,8 +131,6 @@ const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_manage_users: 'Manage users',
   can_manage_configuration: 'Manage configuration',
   can_manage_data_configuration: 'Manage data configuration',
-  can_send_sms: 'Send SMS',
-  can_send_email: 'Send email',
   can_edit_supporters: 'Edit supporters',
   can_view_supporters: 'View supporters',
   can_create_staff_supporters: 'Create staff supporters',
@@ -168,8 +162,6 @@ const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
   ],
   district_coordinator: [
     'can_manage_users',
-    'can_send_sms',
-    'can_send_email',
     'can_edit_supporters',
     'can_view_supporters',
     'can_create_staff_supporters',
@@ -186,8 +178,6 @@ const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     'can_create_staff_supporters',
     'can_import_supporters',
         ],
-  poll_watcher: [
-    ],
 };
 
 function roleLabel(role: string) {
@@ -198,7 +188,7 @@ function roleLabel(role: string) {
 function roleAssignmentType(role: string): 'none' | 'district' | 'village' {
   if (role === 'campaign_admin' || role === 'data_team') return 'none';
   if (role === 'district_coordinator') return 'district';
-  return 'village'; // village_chief, block_leader, poll_watcher
+  return 'village'; // village_chief, block_leader
 }
 
 function AssignmentDropdown({

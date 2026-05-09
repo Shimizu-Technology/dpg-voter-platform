@@ -33,8 +33,6 @@ module Api
             can_manage_users: can_manage_users?,
             can_manage_configuration: can_manage_configuration?,
             can_manage_data_configuration: can_manage_data_configuration?,
-            can_send_sms: can_send_sms?,
-            can_send_email: can_send_email?,
             can_edit_supporters: can_edit_supporters?,
             can_view_supporters: can_view_supporters?,
             can_create_staff_supporters: can_create_staff_supporters?,

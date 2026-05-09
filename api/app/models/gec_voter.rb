@@ -3,7 +3,7 @@
 class GecVoter < ApplicationRecord
   STATUSES = %w[active removed].freeze
   TURNOUT_STATUSES = %w[unknown not_yet_voted voted observed_elsewhere].freeze
-  TURNOUT_SOURCES = %w[poll_watcher data_team admin_override].freeze
+  TURNOUT_SOURCES = %w[data_team admin_override].freeze
 
   belongs_to :village, optional: true
   belongs_to :precinct, optional: true

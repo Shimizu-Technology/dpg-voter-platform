@@ -185,16 +185,6 @@ module Authenticatable
     )
   end
 
-  def require_events_access!
-    return if can_access_events?
-
-    render_api_error(
-      message: "Events access required",
-      status: :forbidden,
-      code: "events_access_required"
-    )
-  end
-
   def require_qr_access!
     return if can_access_qr?
 
@@ -212,26 +202,6 @@ module Authenticatable
       message: "Leaderboard access required",
       status: :forbidden,
       code: "leaderboard_access_required"
-    )
-  end
-
-  def require_war_room_access!
-    return if can_access_war_room?
-
-    render_api_error(
-      message: "Admin access required",
-      status: :forbidden,
-      code: "war_room_access_required"
-    )
-  end
-
-  def require_poll_watcher_access!
-    return if can_access_poll_watcher?
-
-    render_api_error(
-      message: "Field observer access required",
-      status: :forbidden,
-      code: "poll_watcher_access_required"
     )
   end
 
@@ -257,14 +227,6 @@ module Authenticatable
     current_user&.admin? || current_user&.data_team?
   end
 
-  def can_send_sms?
-    current_user&.admin? || current_user&.coordinator?
-  end
-
-  def can_send_email?
-    current_user&.admin? || current_user&.coordinator?
-  end
-
   def can_edit_supporters?
     current_user&.admin? || current_user&.data_team? || current_user&.coordinator?
   end
@@ -277,24 +239,12 @@ module Authenticatable
     can_view_supporters?
   end
 
-  def can_access_events?
-    current_user&.admin? || current_user&.coordinator? || current_user&.chief? || current_user&.leader?
-  end
-
   def can_access_qr?
     current_user&.admin? || current_user&.coordinator? || current_user&.chief? || current_user&.leader?
   end
 
   def can_access_leaderboard?
     current_user&.admin? || current_user&.coordinator? || current_user&.chief? || current_user&.leader?
-  end
-
-  def can_access_war_room?
-    current_user&.admin? || current_user&.coordinator? || current_user&.chief?
-  end
-
-  def can_access_poll_watcher?
-    current_user&.admin? || current_user&.coordinator? || current_user&.poll_watcher?
   end
 
   def can_access_duplicates?
@@ -354,7 +304,7 @@ module Authenticatable
 
   def manageable_roles_for_current_user
     return User::ROLES if current_user&.admin?
-    return [ "village_chief", "block_leader", "poll_watcher" ] if current_user&.coordinator?
+    return [ "village_chief", "block_leader" ] if current_user&.coordinator?
 
     []
   end

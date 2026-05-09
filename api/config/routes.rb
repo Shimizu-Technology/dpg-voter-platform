@@ -59,19 +59,6 @@ Rails.application.routes.draw do
       get "reports/:report_type", to: "reports#show"
 
 
-
-
-      # SMS
-      get "sms/status", to: "sms#status"
-      post "sms/send", to: "sms#send_single"
-      post "sms/blast", to: "sms#blast"
-      get "sms/blasts", to: "sms#blasts"
-      get "sms/blasts/:id", to: "sms#blast_status"
-
-      # Email
-      get "email/status", to: "email#status"
-      post "email/blast", to: "email#blast"
-
     end
   end
 

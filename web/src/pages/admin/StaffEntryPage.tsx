@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getVillages, createSupporter, scanForm, checkDuplicate } from '../../lib/api';
+import { getVillages, createSupporter, checkDuplicate } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
-import { Check, AlertTriangle, Loader2, Camera, ScanLine } from 'lucide-react';
+import { Check, AlertTriangle, Loader2 } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
 
 interface Village {
@@ -33,20 +33,6 @@ type StaffForm = {
   opt_in_email: boolean;
   opt_in_text: boolean;
 };
-
-type ExtractedScanData = Partial<{
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  print_name: string;
-  contact_number: string;
-  email: string;
-  dob: string;
-  street_address: string;
-  village_id: number | string;
-  registered_voter: boolean;
-  yard_sign: boolean;
-}>;
 
 type SaveFeedback = {
   name: string;
@@ -128,89 +114,8 @@ export default function StaffEntryPage() {
     }, 500);
   }, [villages]);
 
-  // OCR Scanner
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [scanning, setScanning] = useState(false);
-  const [scanError, setScanError] = useState('');
-  const [scannedFields, setScannedFields] = useState<Set<string>>(new Set());
-  const [scanAssistedEntry, setScanAssistedEntry] = useState(false);
-
-  const handleScan = async (file: File) => {
-    setScanning(true);
-    setScanError('');
-    setScannedFields(new Set());
-
-    try {
-      // Convert to base64
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
-
-      const result = await scanForm(base64);
-
-      if (result.success && result.extracted) {
-        const data = result.extracted as ExtractedScanData;
-        const filled = new Set<string>();
-
-        // Auto-fill form with extracted data
-        const updates: StaffForm = { ...emptyForm };
-        if (data.first_name) { updates.first_name = data.first_name; filled.add('first_name'); }
-        if (data.middle_name) { updates.middle_name = data.middle_name; filled.add('middle_name'); }
-        if (data.last_name) { updates.last_name = data.last_name; filled.add('last_name'); }
-        // Legacy: if OCR returns print_name but not first/last, try to split
-        if (data.print_name && !data.first_name && !data.last_name) {
-          const parts = data.print_name.includes(',')
-            ? data.print_name.split(',').map((s) => s.trim())
-            : data.print_name.trim().split(/\s+/);
-          if (data.print_name.includes(',')) {
-            updates.last_name = parts[0] || '';
-            updates.first_name = parts[1]?.split(/\s+/)[0] || '';
-            updates.middle_name = parts[1]?.split(/\s+/).slice(1).join(' ') || '';
-          } else if (parts.length >= 2) {
-            updates.first_name = parts[0];
-            updates.middle_name = parts.slice(1, -1).join(' ');
-            updates.last_name = parts[parts.length - 1];
-          } else {
-            updates.last_name = parts[0] || '';
-          }
-          filled.add('first_name');
-          filled.add('middle_name');
-          filled.add('last_name');
-        }
-        if (data.contact_number) { updates.contact_number = data.contact_number; filled.add('contact_number'); }
-        if (data.email) { updates.email = data.email; filled.add('email'); }
-        if (data.dob) { updates.dob = data.dob; filled.add('dob'); }
-        if (data.street_address) { updates.street_address = data.street_address; filled.add('street_address'); }
-        if (data.registered_voter != null) {
-          updates.registered_voter_status = data.registered_voter ? 'yes' : 'no';
-          filled.add('registered_voter_status');
-        }
-        if (data.yard_sign != null) { updates.yard_sign = data.yard_sign; filled.add('yard_sign'); }
-
-        // Match village
-        if (data.village_id) {
-          updates.village_id = String(data.village_id);
-          filled.add('village_id');
-        }
-
-        setForm(updates);
-        setScannedFields(filled);
-        setScanAssistedEntry(true);
-      } else {
-        setScanError(result.error || 'Could not extract form data');
-      }
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setScanError(error?.response?.data?.error || 'Scan failed — try again');
-    } finally {
-      setScanning(false);
-    }
-  };
-
   const submit = useMutation({
-    mutationFn: (data: Record<string, unknown>) => createSupporter(data, undefined, 'staff', scanAssistedEntry ? 'scan' : 'manual'),
+    mutationFn: (data: Record<string, unknown>) => createSupporter(data, undefined, 'staff', 'manual'),
     onSuccess: (response) => {
       const savedSupporter = response?.supporter as { first_name?: string; middle_name?: string; last_name?: string; verification_status?: string } | undefined;
       const savedName = [savedSupporter?.first_name, savedSupporter?.middle_name, savedSupporter?.last_name].filter(Boolean).join(' ').trim() || 'Supporter';
@@ -226,8 +131,6 @@ export default function StaffEntryPage() {
         ...emptyForm,
         village_id: form.village_id,
       });
-      setScannedFields(new Set());
-      setScanAssistedEntry(false);
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['supporters'] });
       queryClient.invalidateQueries({ queryKey: ['vetting-queue'] });
@@ -260,8 +163,6 @@ export default function StaffEntryPage() {
       return next;
     });
     if (saveFeedback) setSaveFeedback(null);
-    // Clear scan highlight when user edits
-    setScannedFields(prev => { const next = new Set(prev); next.delete(field); return next; });
   };
 
   const successTone = (status: string) => {
@@ -293,10 +194,10 @@ export default function StaffEntryPage() {
     return `Voter check: ${status.replace(/_/g, ' ')}`;
   };
 
-  const inputClass = (field: string) =>
-    `w-full px-3 py-3 border rounded-lg text-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-      scannedFields.has(field) ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200' : 'border-[var(--border-soft)]'
-    }`;
+  const inputClass = (field?: string) => {
+    void field;
+    return 'w-full px-3 py-3 border border-[var(--border-soft)] rounded-lg text-lg focus:ring-2 focus:ring-primary focus:border-transparent';
+  };
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -310,49 +211,9 @@ export default function StaffEntryPage() {
                 {successCount} entered
               </span>
             )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleScan(file);
-                e.target.value = '';
-              }}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={scanning}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 transition-all"
-            >
-              {scanning ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Scanning...</>
-              ) : (
-                <><Camera className="w-4 h-4" /> Scan Form</>
-              )}
-            </button>
           </div>
         </div>
       </div>
-
-      {/* Scan Results */}
-      {scannedFields.size > 0 && (
-        <div>
-          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg flex items-center gap-2">
-            <ScanLine className="w-5 h-5" />
-            <span>Scanned {scannedFields.size} fields — <strong>review and confirm</strong> before saving</span>
-          </div>
-        </div>
-      )}
-      {scanError && (
-        <div className="mt-4">
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" /> {scanError}
-          </div>
-        </div>
-      )}
 
       {/* Success Feedback */}
       {saveFeedback && (

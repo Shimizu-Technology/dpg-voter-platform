@@ -17,6 +17,6 @@ class CampaignChannel < ApplicationCable::Channel
   def realtime_access_allowed?
     return false unless current_user
 
-    current_user.admin? || current_user.coordinator? || current_user.chief? || current_user.poll_watcher?
+    current_user.admin? || current_user.coordinator? || current_user.chief?
   end
 end

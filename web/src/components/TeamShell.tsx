@@ -81,7 +81,6 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
               ...(sessionData?.permissions?.can_manage_users ? [ { to: '/data/users', label: 'Users', icon: Shield } ] : []),
               ...(sessionData?.permissions?.can_manage_data_configuration ? [ { to: '/data/districts', label: 'Districts', icon: MapPin } ] : []),
               ...(sessionData?.permissions?.can_manage_data_configuration ? [ { to: '/data/precincts', label: 'Precincts', icon: MapPin } ] : []),
-              ...(sessionData?.permissions?.can_manage_configuration ? [ { to: '/data/campaign-settings', label: 'SMS & Social Settings', icon: Settings } ] : []),
             ],
           },
         ]
