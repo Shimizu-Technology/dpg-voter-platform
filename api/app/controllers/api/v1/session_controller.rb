@@ -27,10 +27,8 @@ module Api
             flagged_supporters: scope_supporters(Supporter.pending_supporter_review.flagged).count,
             public_signups_pending: scope_supporters(Supporter.active.public_signups).count,
             official_supporters: scope_supporters(Supporter.working_supporters).count,
-            matched_to_gec: scope_supporters(Supporter.working_supporters.verified).count,
-            quota_eligible: scope_supporters(Supporter.quota_eligible).count
+            matched_to_gec: scope_supporters(Supporter.working_supporters.verified).count
           },
-          current_period: current_period_summary,
           permissions: {
             can_manage_users: can_manage_users?,
             can_manage_configuration: can_manage_configuration?,
@@ -40,11 +38,6 @@ module Api
             can_edit_supporters: can_edit_supporters?,
             can_view_supporters: can_view_supporters?,
             can_create_staff_supporters: can_create_staff_supporters?,
-            can_access_events: can_access_events?,
-            can_access_qr: can_access_qr?,
-            can_access_leaderboard: can_access_leaderboard?,
-            can_access_war_room: can_access_war_room?,
-            can_access_poll_watcher: can_access_poll_watcher?,
             can_access_duplicates: can_access_duplicates?,
             can_access_audit_logs: can_access_audit_logs?,
             can_access_data_team: can_access_data_team?,
@@ -60,28 +53,6 @@ module Api
       end
 
       private
-
-      def current_period_summary
-        cycle = CampaignCycle.current.order(start_date: :desc, id: :desc).first
-        return nil unless cycle
-
-        period = cycle.current_period
-        return nil unless period
-
-        {
-          id: period.id,
-          name: period.name,
-          due_date: period.due_date,
-          quota_target: period.effective_quota_target,
-          official_count: period.total_assigned,
-          matched_count: period.matched_count,
-          eligible_count: period.eligible_count,
-          days_until_due: period.days_until_due,
-          overdue: period.overdue?,
-          due_soon: period.due_soon?,
-          status: period.status
-        }
-      end
     end
   end
 end

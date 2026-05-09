@@ -38,29 +38,11 @@ module Api
             code: "village_access_required"
           )
         end
-        campaign = Campaign.active.first
-        current_period = CampaignCycle.current_quota_period
-        quota = village.quotas.where(campaign: campaign).first
         official_supporters_count = village.supporters.official_supporters.count
         matched_to_gec_count = village.supporters.official_supporters.verified.count
         total_count = village.supporters.active.count
         team_pending_count = village.supporters.pending_supporter_review.where(source: Supporter::TEAM_SOURCES).count
         public_pending_count = village.supporters.active.public_signups.count
-        period_target = if current_period
-          current_period.effective_village_targets(village_ids: [ village.id ])[village.id].to_i
-        else
-          quota&.target_count.to_i
-        end
-        current_period_progress = if current_period
-          current_period.credited_supporters.where(village_id: village.id).count
-        else
-          0
-        end
-        current_period_matched_count = if current_period
-          current_period.matched_supporters.where(village_id: village.id).count
-        else
-          0
-        end
         precinct_supporter_counts = village.supporters.official_supporters.where.not(precinct_id: nil).group(:precinct_id).count
         unassigned_precinct_count = village.supporters.official_supporters.where(precinct_id: nil).count
         latest_gec_list_date = GecVoter.active.maximum(:gec_list_date)
@@ -74,12 +56,6 @@ module Api
             registered_voters: village.registered_voters,
             official_supporters_count: official_supporters_count,
             matched_to_gec_count: matched_to_gec_count,
-            current_period_progress: current_period_progress,
-            current_period_target: period_target,
-            current_period_matched_count: current_period_matched_count,
-            current_period_name: current_period&.name,
-            current_period_due_date: current_period&.due_date,
-            current_period_progress_pct: period_target.positive? ? (current_period_progress * 100.0 / period_target).round(1) : 0,
             team_approved_count: village.supporters.team_input.count,
             public_approved_count: village.supporters.official_supporters.public_origin.count,
             team_pending_count: team_pending_count,
@@ -90,7 +66,6 @@ module Api
             total_count: total_count,
             unverified_count: pending_review_count,
             supporter_count: official_supporters_count,
-            quota_target: period_target,
             precincts: village.precincts.order(:number).map { |p|
               {
                 id: p.id,

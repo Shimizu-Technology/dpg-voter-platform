@@ -1,46 +1,15 @@
-# Campaign Tracker Seed Data
+# DPG Voter Platform Seed Data
 # Source: GEC Precinct Breakdown as of January 25, 2026
 
 require "digest"
 
-puts "Seeding Campaign Tracker..."
+puts "Seeding DPG Voter Platform..."
 
 DEFAULT_BOOTSTRAP_ADMIN_EMAILS = [
   "shimizutechnology@gmail.com"
 ].freeze
 
-DISTRICT_DEFINITIONS = [
-  {
-    number: 1,
-    name: "District 1",
-    description: "Lagu 1 & 2",
-    villages: [ "Yigo", "Dededo" ]
-  },
-  {
-    number: 2,
-    name: "District 2",
-    description: "Kattan",
-    villages: [ "Tamuning", "Hagåtña", "Agana Heights", "Mongmong/Toto/Maite", "Barrigada" ]
-  },
-  {
-    number: 3,
-    name: "District 3",
-    description: "Luchan",
-    villages: [ "Mangilao", "Yona", "Chalan Pago/Ordot", "Sinajana" ]
-  },
-  {
-    number: 4,
-    name: "District 4",
-    description: "Haya 1",
-    villages: [ "Asan-Ma'ina", "Piti", "Sånta Rita-Sumai", "Hågat" ]
-  },
-  {
-    number: 5,
-    name: "District 5",
-    description: "Haya 2",
-    villages: [ "Humåtak", "Malesso'", "Inalåhan", "Talo'fo'fo'" ]
-  }
-].freeze
+DISTRICT_DEFINITIONS = [].freeze
 
 def env_csv(name)
   ENV.fetch(name, "")
@@ -78,7 +47,7 @@ district_lookup = DISTRICT_DEFINITIONS.each_with_object({}) do |definition, memo
   end
 end
 
-puts "  #{District.where(campaign_id: campaign.id).count} campaign districts seeded"
+puts "  #{District.where(campaign_id: campaign.id).count} DPG-defined districts seeded"
 
 # Villages + Precincts (official GEC data, Jan 25, 2026)
 VILLAGE_DATA = [
@@ -249,24 +218,13 @@ VILLAGE_DATA.each do |vdata|
     total_precincts += 1
   end
 
-  # Create a default quota (proportional to 10K goal)
-  village_voters = vdata[:precincts].sum { |p| p[:voters] }
-  target = (village_voters.to_f / 53628 * 10000).round
-  Quota.find_or_create_by!(village: village, campaign: campaign, period: "quarterly") do |q|
-    q.target_count = target
-    q.target_date = Date.new(2026, 7, 31) # Before Aug 1 primary
-    q.district = district
-  end
-  village.quotas.where(campaign: campaign).update_all(district_id: district&.id)
-
   total_villages += 1
 end
 
 puts "  #{total_villages} villages seeded"
 puts "  #{total_precincts} precincts seeded"
-puts "  #{Quota.count} quotas created"
 puts "  Total registered voters: #{Precinct.sum(:registered_voters)}"
-puts "  #{Village.where.not(district_id: nil).count} villages assigned to campaign districts"
+puts "  District assignments are intentionally left blank until DPG defines them"
 
 bootstrap_admin_emails = (DEFAULT_BOOTSTRAP_ADMIN_EMAILS + env_csv("BOOTSTRAP_ADMIN_EMAILS")).uniq
 bootstrap_role = ENV.fetch("BOOTSTRAP_ADMIN_ROLE", "campaign_admin")
@@ -301,84 +259,6 @@ unassigned_village = Village.find_or_create_by!(name: "Unassigned") do |v|
 end
 puts "  Unassigned village: #{unassigned_village.name}"
 
-# ============================================================
-# Campaign Cycle: Guam 2026 General Election
-# Guam Primary: August 1, 2026
-# Guam General Election: November 3, 2026
-# ============================================================
-puts "\nSeeding Campaign Cycle..."
-
-cycle = CampaignCycle.find_or_create_by!(name: "Guam 2026 General Election") do |c|
-  c.cycle_type = "general"
-  c.status = "archived"
-  c.start_date = Date.new(2026, 1, 1)
-  c.end_date = Date.new(2026, 11, 3)
-  c.monthly_quota_target = 6000
-  c.carry_forward_data = true
-  c.settings = {
-    "due_day" => 23,
-    "election_date" => "2026-11-03",
-    "primary_date" => "2026-08-01",
-    "notes" => "Guam General Election. Primary: Aug 1, 2026. General: Nov 3, 2026."
-  }
-end
-
-cycle.update!(
-  cycle_type: "general",
-  status: "archived",
-  start_date: Date.new(2026, 1, 1),
-  end_date: Date.new(2026, 11, 3),
-  monthly_quota_target: 6000,
-  carry_forward_data: true,
-  settings: {
-    "due_day" => 23,
-    "election_date" => "2026-11-03",
-    "primary_date" => "2026-08-01",
-    "notes" => "Guam General Election. Primary: Aug 1, 2026. General: Nov 3, 2026."
-  }
-)
-
-if cycle.quota_periods.empty?
-  cycle.generate_periods!
-  puts "  Generated #{cycle.quota_periods.count} quota periods"
-end
-
-# Primary cycle
-primary_cycle = CampaignCycle.find_or_create_by!(name: "Guam 2026 Primary Election") do |c|
-  c.cycle_type = "primary"
-  c.status = "active"
-  c.start_date = Date.new(2026, 1, 1)
-  c.end_date = Date.new(2026, 8, 1)
-  c.monthly_quota_target = 6000
-  c.carry_forward_data = true
-  c.settings = {
-    "due_day" => 23,
-    "election_date" => "2026-08-01",
-    "notes" => "Guam Primary Election — August 1, 2026."
-  }
-end
-
-primary_cycle.update!(
-  cycle_type: "primary",
-  status: "active",
-  start_date: Date.new(2026, 1, 1),
-  end_date: Date.new(2026, 8, 1),
-  monthly_quota_target: 6000,
-  carry_forward_data: true,
-  settings: {
-    "due_day" => 23,
-    "election_date" => "2026-08-01",
-    "notes" => "Guam Primary Election — August 1, 2026."
-  }
-)
-
-if primary_cycle.quota_periods.empty?
-  primary_cycle.generate_periods!
-end
-
-puts "  Campaign Cycle: #{cycle.name} (#{cycle.start_date} → #{cycle.end_date})"
-puts "  Status: #{cycle.status}, Periods: #{cycle.quota_periods.count}"
-puts "  Primary Cycle: #{primary_cycle.name} (#{primary_cycle.quota_periods.count} periods)"
 
 # ============================================================
 # Fake Supporter Data (~75 supporters for testing)

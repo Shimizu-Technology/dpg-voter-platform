@@ -19,21 +19,7 @@ export interface SessionResponse {
     public_signups_pending: number;
     official_supporters: number;
     matched_to_gec: number;
-    quota_eligible: number;
   };
-  current_period?: {
-    id: number;
-    name: string;
-    due_date: string;
-    quota_target: number;
-    official_count: number;
-    matched_count: number;
-    eligible_count: number;
-    days_until_due: number;
-    overdue: boolean;
-    due_soon: boolean;
-    status: string;
-  } | null;
   permissions: {
     can_manage_users: boolean;
     can_manage_configuration: boolean;
@@ -44,11 +30,6 @@ export interface SessionResponse {
     can_view_supporters: boolean;
     can_create_staff_supporters: boolean;
     can_import_supporters: boolean;
-    can_access_events: boolean;
-    can_access_qr: boolean;
-    can_access_leaderboard: boolean;
-    can_access_war_room: boolean;
-    can_access_poll_watcher: boolean;
     can_access_duplicates: boolean;
     can_access_audit_logs: boolean;
     can_access_data_team: boolean;

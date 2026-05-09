@@ -65,8 +65,8 @@ const ROLE_GUIDE: RoleGuideRow[] = [
   {
     role: 'campaign_admin',
     level: 'Level 1',
-    who: 'Campaign leadership / trusted admins',
-    can: 'Full system access across Data Ops and campaign tools, including setup, users, outreach, and election-day operations',
+    who: 'DPG leadership / trusted admins',
+    can: 'Full system access across Data Ops and DPG tools, including setup, users, outreach, and reports',
   },
   {
     role: 'data_team',
@@ -77,8 +77,8 @@ const ROLE_GUIDE: RoleGuideRow[] = [
   {
     role: 'district_coordinator',
     level: 'Level 3',
-    who: 'District managers',
-    can: 'Manage supporter activity and field operations for all villages in their assigned district',
+    who: 'DPG district coordinators',
+    can: 'Manage supporter activity for villages in an approved DPG-defined district',
   },
   {
     role: 'village_chief',
@@ -89,14 +89,8 @@ const ROLE_GUIDE: RoleGuideRow[] = [
   {
     role: 'block_leader',
     level: 'Level 5',
-    who: 'Street/block organizers',
-    can: 'Submit and track supporter activity for their assigned village',
-  },
-  {
-    role: 'poll_watcher',
-    level: 'Level 6',
-    who: 'Election day reporting staff',
-    can: 'Submit polling/turnout updates for their assigned village on election day',
+    who: 'Community organizers',
+    can: 'Submit and track supporter activity for their assigned area',
   },
 ];
 
@@ -110,11 +104,6 @@ type PermissionKey =
   | 'can_view_supporters'
   | 'can_create_staff_supporters'
   | 'can_import_supporters'
-  | 'can_access_events'
-  | 'can_access_qr'
-  | 'can_access_leaderboard'
-  | 'can_access_war_room'
-  | 'can_access_poll_watcher'
   | 'can_access_duplicates'
   | 'can_access_audit_logs'
   | 'can_access_data_team'
@@ -133,11 +122,6 @@ const PERMISSION_KEYS: PermissionKey[] = [
   'can_view_supporters',
   'can_create_staff_supporters',
   'can_import_supporters',
-  'can_access_events',
-  'can_access_qr',
-  'can_access_leaderboard',
-  'can_access_war_room',
-  'can_access_poll_watcher',
   'can_access_duplicates',
   'can_access_audit_logs',
   'can_access_data_team',
@@ -191,32 +175,19 @@ const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     'can_create_staff_supporters',
     'can_import_supporters',
     'can_access_reports',
-    'can_access_events',
-    'can_access_qr',
-    'can_access_leaderboard',
-    'can_access_war_room',
-    'can_access_poll_watcher',
-  ],
+            ],
   village_chief: [
     'can_view_supporters',
     'can_create_staff_supporters',
     'can_import_supporters',
-    'can_access_events',
-    'can_access_qr',
-    'can_access_leaderboard',
-    'can_access_war_room',
-  ],
+          ],
   block_leader: [
     'can_view_supporters',
     'can_create_staff_supporters',
     'can_import_supporters',
-    'can_access_events',
-    'can_access_qr',
-    'can_access_leaderboard',
-  ],
+        ],
   poll_watcher: [
-    'can_access_poll_watcher',
-  ],
+    ],
 };
 
 function roleLabel(role: string) {

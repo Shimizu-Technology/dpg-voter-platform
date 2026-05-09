@@ -7,10 +7,22 @@ import {
   Upload,
   ClipboardPlus,
   CheckCircle,
+  ShieldCheck,
   TrendingUp,
+  UserCheck,
   Users,
 } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
+
+interface VillageProgressRow {
+  villageId: number;
+  villageName: string;
+  progress: number;
+  teamApprovedCount: number;
+  publicApprovedCount: number;
+  teamPendingCount: number;
+  publicPendingCount: number;
+}
 
 export default function TeamDashboardPage() {
   const { data: session } = useSession();
@@ -24,34 +36,15 @@ export default function TeamDashboardPage() {
   const counts = session?.counts;
   const summary = dashboard?.summary;
   const quickStats = reportsInfo?.quick_stats;
-  const villageMeta = new Map<number, Record<string, unknown>>(
-    (dashboard?.villages || []).map((v: Record<string, unknown>) => [Number(v.id), v])
-  );
-  const villageProgressRows = Array.isArray(period?.village_breakdown) && period.village_breakdown.length > 0
-    ? period.village_breakdown.map((row: Record<string, unknown>) => {
-        const villageId = Number(row.village_id);
-        const meta = villageMeta.get(villageId) || {};
-        return {
-          villageId,
-          villageName: String(row.village_name || ''),
-          target: Number(row.target || 0),
-          progress: Number(row.eligible || 0),
-          teamApprovedCount: Number(meta.team_input_count || 0),
-          publicApprovedCount: Number(meta.public_approved_count || 0),
-          teamPendingCount: Number(meta.team_pending_count || 0),
-          publicPendingCount: Number(meta.public_signup_count || 0),
-        };
-      })
-    : (dashboard?.villages || []).map((row: Record<string, unknown>) => ({
-        villageId: Number(row.id),
-        villageName: String(row.name || ''),
-        target: Number(row.quota_target || 0),
-        progress: Number(row.total_count || 0),
-        teamApprovedCount: Number(row.team_input_count || 0),
-        publicApprovedCount: Number(row.public_approved_count || 0),
-        teamPendingCount: Number(row.team_pending_count || 0),
-        publicPendingCount: Number(row.public_signup_count || 0),
-      }));
+  const villageProgressRows: VillageProgressRow[] = (dashboard?.villages || []).map((row: Record<string, unknown>) => ({
+    villageId: Number(row.id),
+    villageName: String(row.name || ''),
+    progress: Number(row.total_count || 0),
+    teamApprovedCount: Number(row.team_input_count || 0),
+    publicApprovedCount: Number(row.public_approved_count || 0),
+    teamPendingCount: Number(row.team_pending_count || 0),
+    publicPendingCount: Number(row.public_signup_count || 0),
+  }));
 
   if (dashLoading) {
     return (
@@ -153,48 +146,31 @@ export default function TeamDashboardPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Village Engagement Progress</h2>
           <p className="text-xs text-gray-500 mb-3">
-            Current progress counts approved supporter records during this reporting period.
+            Current progress counts approved supporter records by village.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[920px]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Village</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Target</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Current Progress</th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Supporters</th>
                   <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Team Approved</th>
                   <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Public Approved</th>
                   <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Team Pending</th>
                   <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Public Pending</th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Progress</th>
                 </tr>
               </thead>
               <tbody>
-                {villageProgressRows.map((v) => {
-                  const pct = v.target > 0 ? Math.round((v.progress / v.target) * 100) : 0;
-                  return (
+                {villageProgressRows.map((v) => (
                     <tr key={v.villageId} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-2 px-3 font-medium text-gray-900">{v.villageName}</td>
-                      <td className="py-2 px-3 text-right text-gray-600">{v.target}</td>
                       <td className="py-2 px-3 text-right font-semibold text-green-700">{v.progress}</td>
                       <td className="py-2 px-3 text-right text-gray-600">{v.teamApprovedCount}</td>
                       <td className="py-2 px-3 text-right text-gray-600">{v.publicApprovedCount}</td>
                       <td className="py-2 px-3 text-right text-amber-700">{v.teamPendingCount}</td>
                       <td className="py-2 px-3 text-right text-amber-700">{v.publicPendingCount}</td>
-                      <td className="py-2 px-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${pct >= 100 ? 'bg-green-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-500'}`}
-                              style={{ width: `${Math.min(pct, 100)}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium text-gray-500 w-8 text-right">{pct}%</span>
-                        </div>
-                      </td>
                     </tr>
-                  );
-                })}
+                ))}
               </tbody>
             </table>
           </div>

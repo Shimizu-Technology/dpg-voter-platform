@@ -9,9 +9,9 @@
 #   - transfer_list: GEC voters whose village changed between list versions
 #   - referral_list: Supporters submitted under the wrong village
 #   - mapping_issues_list: GEC voters whose village became unmapped / unassigned
-#   - quota_summary: Totals by village with progress toward target
+#   - supporter_summary: Totals by village with supporter review status
 class ReportGenerator
-  REPORT_TYPES = %w[support_list purge_list transfer_list referral_list mapping_issues_list quota_summary].freeze
+  REPORT_TYPES = %w[support_list purge_list transfer_list referral_list mapping_issues_list supporter_summary].freeze
 
   def initialize(
     report_type:,
@@ -411,96 +411,57 @@ class ReportGenerator
     { package: package, filename: "village-mapping-issues-#{date_today}.xlsx" }
   end
 
-  # ── Quota Summary ─────────────────────────────────────────────
+  # ── Supporter Summary ─────────────────────────────────────────────
   # Per-village totals for the current period: target, approved count, progress
-  def generate_quota_summary
+  def generate_supporter_summary
     villages = filtered_villages
     village_ids = villages.map(&:id)
-    period = current_quota_period
-    campaign =
-      if period
-        nil
-      elsif @campaign_id
-        Campaign.find_by(id: @campaign_id) || raise(ArgumentError, "Campaign not found")
-      else
-        Campaign.active.first
-      end
 
-    # Pre-fetch all counts in bulk (single query each instead of N per village)
-    quota_targets =
-      if period
-        period.effective_village_targets(village_ids: village_ids)
-      elsif campaign
-        Quota.where(campaign_id: campaign.id, village_id: village_ids).group(:village_id).sum(:target_count)
-      else
-        {}
-      end
-    period_counts =
-      if period
-        period.credited_supporters.where(village_id: village_ids).group(:village_id).count
-      else
-        Supporter.working_supporters.where(village_id: village_ids).group(:village_id).count
-      end
-    matched_counts =
-      if period
-        period.matched_supporters.where(village_id: village_ids).group(:village_id).count
-      else
-        Supporter.working_supporters.verified.where(village_id: village_ids).group(:village_id).count
-      end
+    matched_counts = Supporter.working_supporters.verified.where(village_id: village_ids).group(:village_id).count
     total_counts = Supporter.working_supporters.where(village_id: village_ids).group(:village_id).count
     public_counts = Supporter.active.public_signups.where(village_id: village_ids).group(:village_id).count
     unreg_counts = Supporter.working_supporters.where(village_id: village_ids, registered_voter: false).group(:village_id).count
+    team_counts = Supporter.team_input.where(village_id: village_ids).group(:village_id).count
 
     package = Axlsx::Package.new
     wb = package.workbook
-    headers = [ "Village", "Quota Target", "Current Period Progress",
-                "Matched To GEC", "Total Official Supporters", "Public Signups",
-                "Unregistered", "Progress %", "Status" ]
+    headers = [ "Village", "Official Supporters", "Matched To GEC", "Team Submitted",
+                "Public Signups", "Unregistered", "Review Status" ]
 
-    wb.add_worksheet(name: "Quota Summary") do |sheet|
+    wb.add_worksheet(name: "Supporter Summary") do |sheet|
       sheet.add_row headers, style: header_style(wb)
 
-      grand_target = 0
-      grand_period = 0
-      grand_matched = 0
       grand_total = 0
+      grand_matched = 0
+      grand_team = 0
       grand_public = 0
       grand_unregistered = 0
 
       villages.each do |v|
-        target = quota_targets[v.id] || 0
-        current_period_count = period_counts[v.id] || 0
-        matched = matched_counts[v.id] || 0
         total = total_counts[v.id] || 0
+        matched = matched_counts[v.id] || 0
+        team = team_counts[v.id] || 0
         public_count = public_counts[v.id] || 0
         unregistered = unreg_counts[v.id] || 0
-        pct = target.positive? ? (current_period_count * 100.0 / target).round(1) : 0
-        status = pct >= 100 ? "Complete" : pct >= 75 ? "On Track" : pct >= 50 ? "Behind" : "Critical"
+        status = public_count.positive? ? "Needs Review" : "Current"
 
-        grand_target += target
-        grand_period += current_period_count
-        grand_matched += matched
         grand_total += total
+        grand_matched += matched
+        grand_team += team
         grand_public += public_count
         grand_unregistered += unregistered
 
-        sheet.add_row [ v.name, target, current_period_count, matched, total,
-                        public_count, unregistered, pct, status ]
+        sheet.add_row [ v.name, total, matched, team, public_count, unregistered, status ]
       end
 
-      # Grand total row — uses accumulated values (respects village_id filter)
-      grand_pct = grand_target.positive? ? (grand_period * 100.0 / grand_target).round(1) : 0
       total_style = wb.styles.add_style(b: true, border: { style: :thin, color: "000000" })
-      sheet.add_row [ "TOTAL", grand_target, grand_period,
-                      grand_matched, grand_total, grand_public, grand_unregistered,
-                      grand_pct,
-                      grand_pct >= 100 ? "Complete" : "In Progress" ],
+      sheet.add_row [ "TOTAL", grand_total, grand_matched, grand_team, grand_public, grand_unregistered, "" ],
                     style: total_style
 
-      sheet.column_widths 18, 14, 28, 14, 14, 14, 14, 12, 12
+      sheet.column_widths 18, 18, 16, 16, 16, 14, 14
     end
 
-    { package: package, filename: "quota-summary-#{date_today}.xlsx" }
+    { package: package, filename: "supporter-summary-#{date_today}.xlsx" }
   end
 
   # ── Preview Helpers ───────────────────────────────────────────
@@ -603,58 +564,32 @@ class ReportGenerator
     }
   end
 
-  def preview_quota_summary
+  def preview_supporter_summary
     villages = filtered_villages
     village_ids = villages.map(&:id)
-    period = current_quota_period
-    campaign =
-      if period
-        nil
-      elsif @campaign_id
-        Campaign.find_by(id: @campaign_id) || raise(ArgumentError, "Campaign not found")
-      else
-        Campaign.active.first
-      end
 
-    quota_targets =
-      if period
-        period.effective_village_targets(village_ids: village_ids)
-      elsif campaign
-        Quota.where(campaign_id: campaign.id, village_id: village_ids).group(:village_id).sum(:target_count)
-      else
-        {}
-      end
-    period_counts =
-      if period
-        period.credited_supporters.where(village_id: village_ids).group(:village_id).count
-      else
-        Supporter.working_supporters.where(village_id: village_ids).group(:village_id).count
-      end
-    matched_counts =
-      if period
-        period.matched_supporters.where(village_id: village_ids).group(:village_id).count
-      else
-        Supporter.working_supporters.verified.where(village_id: village_ids).group(:village_id).count
-      end
+    matched_counts = Supporter.working_supporters.verified.where(village_id: village_ids).group(:village_id).count
     total_counts = Supporter.working_supporters.where(village_id: village_ids).group(:village_id).count
     public_counts = Supporter.active.public_signups.where(village_id: village_ids).group(:village_id).count
     unreg_counts = Supporter.working_supporters.where(village_id: village_ids, registered_voter: false).group(:village_id).count
+    team_counts = Supporter.team_input.where(village_id: village_ids).group(:village_id).count
 
     rows = villages.limit(@preview_limit).map do |v|
-      target = quota_targets[v.id] || 0
-      current_period_count = period_counts[v.id] || 0
-      matched = matched_counts[v.id] || 0
       total = total_counts[v.id] || 0
       public_count = public_counts[v.id] || 0
-      unregistered = unreg_counts[v.id] || 0
-      pct = target.positive? ? (current_period_count * 100.0 / target).round(1) : 0
-      status = pct >= 100 ? "Complete" : pct >= 75 ? "On Track" : pct >= 50 ? "Behind" : "Critical"
-
-      [ v.name, target, current_period_count, matched, total, public_count, unregistered, pct, status ]
+      [
+        v.name,
+        total,
+        matched_counts[v.id] || 0,
+        team_counts[v.id] || 0,
+        public_count,
+        unreg_counts[v.id] || 0,
+        public_count.positive? ? "Needs Review" : "Current"
+      ]
     end
 
     {
-      columns: [ "Village", "Quota Target", "Current Period Progress", "Matched To GEC", "Total Official Supporters", "Pending Public Signups", "Unregistered", "Progress %", "Status" ],
+      columns: [ "Village", "Official Supporters", "Matched To GEC", "Team Submitted", "Public Signups", "Unregistered", "Review Status" ],
       rows: rows,
       total_count: villages.count
     }
@@ -669,9 +604,5 @@ class ReportGenerator
       sheet.add_row [ message ]
     end
     { package: package, filename: "#{name}-#{date_today}.xlsx" }
-  end
-
-  def current_quota_period
-    @current_quota_period ||= CampaignCycle.current_quota_period
   end
 end

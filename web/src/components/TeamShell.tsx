@@ -40,6 +40,7 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
   const { data: sessionData } = useSession();
   const { toasts, handleEvent, dismiss } = useRealtimeToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const counts = sessionData?.counts;
   useCampaignUpdates(handleEvent, true);
 
   const navGroups: NavGroup[] = [
@@ -75,7 +76,7 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
       sessionData?.permissions?.can_manage_configuration)
       ? [
           {
-            label: 'Campaign Setup',
+            label: 'DPG Setup',
             items: [
               ...(sessionData?.permissions?.can_manage_users ? [ { to: '/data/users', label: 'Users', icon: Shield } ] : []),
               ...(sessionData?.permissions?.can_manage_data_configuration ? [ { to: '/data/districts', label: 'Districts', icon: MapPin } ] : []),
@@ -131,12 +132,12 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
             compact
             workspaceName="Data Ops Workspace"
             workspaceDescription="Daily voter operations, imports, and supporter review."
-            badge="Internal campaign workspace"
+            badge="Internal DPG workspace"
           />
         </Link>
       </div>
 
-      {/* Quota Progress */}
+      {/* Supporter summary */}
       {counts?.official_supporters !== undefined && (
         <div className="mx-3 mb-4 rounded-[20px] border border-blue-100 bg-blue-50 p-3.5 shadow-sm">
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-600">Official Supporters</div>
@@ -166,7 +167,7 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-500 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900"
           >
             <Settings className="h-4 w-4 shrink-0 text-slate-400" />
-            <span>More Campaign Tools</span>
+            <span>More DPG Tools</span>
           </Link>
         </div>
       )}

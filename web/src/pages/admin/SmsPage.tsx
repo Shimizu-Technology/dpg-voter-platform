@@ -333,7 +333,7 @@ function BlastTab() {
 
 function TestTab() {
   const [phone, setPhone] = useState(DEFAULT_GUAM_PHONE_PREFIX);
-  const [message, setMessage] = useState('Test message from Campaign Tracker.');
+  const [message, setMessage] = useState('Test message from DPG Voter Platform.');
   const [result, setResult] = useState<SmsTestResult | null>(null);
 
   const mutation = useMutation({

@@ -57,7 +57,7 @@ export default function PrecinctSettingsPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: PrecinctUpdatePayload }) => updatePrecinct(id, payload),
+    mutationFn: ({ id, payload }: { id: number; payload: PrecinctUpdatePayload }) => updatePrecinct(id, { ...payload }),
     onSuccess: (_payload, vars) => {
       setDraftByPrecinct((prev) => {
         const next = { ...prev };

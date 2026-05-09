@@ -11,7 +11,7 @@ module Api
       # GET /api/v1/reports/:report_type
       # Generate and download an Excel report.
       # Params:
-      #   report_type: support_list | purge_list | transfer_list | referral_list | quota_summary
+      #   report_type: support_list | purge_list | transfer_list | referral_list | supporter_summary
       #   village_id (optional): filter to a specific village
       def show
         report_type = params[:report_type]
@@ -141,7 +141,6 @@ module Api
         available_report_types = allowed_report_types
         latest_gec = GecVoter.maximum(:gec_list_date)
         latest_import = GecImport.completed.latest.first
-        current_period = CampaignCycle.current_quota_period
         village_changes = GecVoter.transferred
           .where.not(village_name: GecImportService::UNASSIGNED_VILLAGE_NAME)
           .where.not(previous_village_name: GecImportService::UNASSIGNED_VILLAGE_NAME)
@@ -151,9 +150,6 @@ module Api
         quick_stats = {
           official_supporters: supporter_scope.count,
           matched_to_gec: supporter_scope.verified.count,
-          current_quota_progress: current_period&.total_assigned.to_i,
-          current_quota_target: current_period&.effective_quota_target.to_i,
-          quota_eligible: scope_supporters(Supporter.quota_eligible).count,
           total_verified: supporter_scope.verified.count,
           total_active: supporter_scope.count,
           public_signups: scope_supporters(Supporter.active.public_signups).count,
@@ -193,7 +189,7 @@ module Api
       private
 
       FULL_REPORT_TYPES = ReportGenerator::REPORT_TYPES
-      COORDINATOR_REPORT_TYPES = %w[support_list referral_list quota_summary].freeze
+      COORDINATOR_REPORT_TYPES = %w[support_list referral_list supporter_summary].freeze
 
       def report_name(type)
         case type
@@ -218,8 +214,8 @@ module Api
           "Official supporters submitted by one village but currently assigned to another"
         when "mapping_issues_list"
           "GEC voters whose latest village could not be mapped cleanly to an official village"
-        when "quota_summary"
-          "Per-village quota progress for the current period with official totals and status"
+        when "supporter_summary"
+          "Per-village supporter summary with official totals and review status"
         end
       end
 

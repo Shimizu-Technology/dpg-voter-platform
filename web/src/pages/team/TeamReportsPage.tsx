@@ -23,7 +23,7 @@ const reportIcons: Record<string, React.ComponentType<{ className?: string }>> =
   transfer_list: ArrowRightLeft,
   referral_list: GitBranch,
   mapping_issues_list: AlertTriangle,
-  quota_summary: BarChart3,
+  supporter_summary: BarChart3,
 };
 
 const reportDescriptions: Record<string, string> = {
@@ -32,7 +32,7 @@ const reportDescriptions: Record<string, string> = {
   transfer_list: 'GEC voters whose official village changed between list versions. Shows previous village, current village, and latest list date.',
   referral_list: 'Official supporters submitted under one village but matched to a different GEC village. Shows submitted village versus actual registration.',
   mapping_issues_list: 'GEC voters whose latest village could not be mapped cleanly to an official village. Shows previous village, current mapping, and latest list date.',
-  quota_summary: 'Per-village quota progress for the current period with approved counts, GEC matches, pending public signups, and overall status.',
+  supporter_summary: 'Per-village supporter summary with approved counts, GEC matches, pending public signups, and review status.',
 };
 
 const SUPPORTER_REPORT_TYPES = new Set(['support_list', 'referral_list']);

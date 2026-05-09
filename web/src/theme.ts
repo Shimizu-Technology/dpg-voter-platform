@@ -12,7 +12,7 @@ export const theme = {
     error: '#EF4444',
   },
   campaign: {
-    name: 'Campaign Tracker',
+    name: 'DPG Voter Platform',
     tagline: 'For Our Island. For Our Future.',
     slogan: '', // Can be set when Austin provides
   },

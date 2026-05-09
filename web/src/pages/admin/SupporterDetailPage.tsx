@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ChevronLeft, Pencil, Save, UserRound, X } from 'lucide-react';
-import { acceptToQuota, getSupporter, getVillages, updateSupporter, verifySupporter, updateOutreachStatus } from '../../lib/api';
+import { getSupporter, getVillages, updateSupporter, verifySupporter, updateOutreachStatus } from '../../lib/api';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
 import { assignPrecinctIdByLastName } from '../../lib/precinctAssignment';
-import { useSession } from '../../hooks/useSession';
 import WorkspacePage from '../../components/WorkspacePage';
 
 interface VillageOption {
@@ -99,8 +98,6 @@ interface SupporterDetail {
     review_status: string;
     public_review_status: string;
   }>;
-  events_invited_count: number;
-  events_attended_count: number;
   reliability_score: number | null;
 }
 
@@ -153,7 +150,6 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   registration_outreach_notes: 'Registration follow-up notes',
   support_follow_up_status: 'Support follow-up progress',
   support_follow_up_notes: 'Support follow-up notes',
-  yard_sign: 'Follow-up requested',
   opt_in_email: 'Opt-in email',
   opt_in_text: 'Opt-in text',
   created_at: 'Created at',
@@ -241,7 +237,6 @@ const PRIMARY_AUDIT_FIELD_ORDER = [
   'needs_voter_registration_help',
   'needs_election_day_ride',
   'referred_by_name',
-  'yard_sign',
   'opt_in_text',
   'opt_in_email',
   'dob',
@@ -525,7 +520,6 @@ export default function SupporterDetailPage() {
   const [searchParams] = useSearchParams();
   const supporterId = Number(id);
   const queryClient = useQueryClient();
-  const { data: sessionData } = useSession();
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['supporter', supporterId],
@@ -554,7 +548,6 @@ export default function SupporterDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<Partial<SupporterDetail> | null>(null);
   const canEdit = permissions?.can_edit ?? false;
-  const canReviewPublic = sessionData?.permissions?.can_review_public ?? false;
   const canMarkVerifiedVoter = supporter ? !isNoGecMatch(supporter) : false;
   const supporterDetailPath = (targetId: number) => {
     const basePath = location.pathname.startsWith('/data') ? '/data/supporters' : '/admin/supporters';
@@ -584,7 +577,6 @@ export default function SupporterDetailPage() {
       needs_voter_registration_help: supporter.needs_voter_registration_help,
       needs_election_day_ride: supporter.needs_election_day_ride,
       referred_by_name: supporter.referred_by_name || '',
-      yard_sign: supporter.yard_sign,
       opt_in_email: supporter.opt_in_email,
       opt_in_text: supporter.opt_in_text,
     };
@@ -613,19 +605,6 @@ export default function SupporterDetailPage() {
     },
   });
 
-  const acceptMutation = useMutation({
-    mutationFn: () => acceptToQuota(supporterId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supporter', supporterId] });
-      queryClient.invalidateQueries({ queryKey: ['supporters'] });
-      queryClient.invalidateQueries({ queryKey: ['public-review'] });
-      queryClient.invalidateQueries({ queryKey: ['vetting-queue'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['reports-list'] });
-      queryClient.invalidateQueries({ queryKey: ['session'] });
-      refetch();
-    },
-  });
 
   useEffect(() => {
     if (!isEditing || !isDirty) return;
@@ -1033,22 +1012,6 @@ export default function SupporterDetailPage() {
             <p className="text-sm text-[var(--text-secondary)]">
               {supporterStatusDetail(supporter)}
             </p>
-
-            {isPendingPublicSignup(supporter) && canReviewPublic && (
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!window.confirm('Approve this public signup and send it to the supporter review queue?')) return;
-                    acceptMutation.mutate();
-                  }}
-                  disabled={acceptMutation.isPending}
-                  className="min-h-[40px] px-3.5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {acceptMutation.isPending ? 'Sending...' : 'Send to Supporter Review'}
-                </button>
-              </div>
-            )}
           </div>
         </section>
 
@@ -1441,23 +1404,6 @@ export default function SupporterDetailPage() {
           </section>
         )}
 
-        <section className="app-card p-4">
-          <h2 className="font-semibold text-[var(--text-primary)] mb-2">Engagement Snapshot</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-            <div className="border rounded-xl p-3">
-              <div className="text-xl font-bold">{supporter.events_invited_count}</div>
-              <div className="text-xs text-[var(--text-secondary)]">Invited</div>
-            </div>
-            <div className="border rounded-xl p-3">
-              <div className="text-xl font-bold">{supporter.events_attended_count}</div>
-              <div className="text-xs text-[var(--text-secondary)]">Attended</div>
-            </div>
-            <div className="border rounded-xl p-3">
-              <div className="text-xl font-bold">{supporter.reliability_score ?? '—'}</div>
-              <div className="text-xs text-[var(--text-secondary)]">Reliability</div>
-            </div>
-          </div>
-        </section>
 
         <section className="app-card p-4">
           <div className="mb-3">

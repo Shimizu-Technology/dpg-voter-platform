@@ -22,6 +22,7 @@ import {
   Home,
   Settings,
   Database,
+  Copy,
 } from 'lucide-react';
 import WorkspaceBrandPanel from './WorkspaceBrandPanel';
 import { publicSiteConfig } from '../lib/publicSite';
@@ -136,9 +137,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         <Link to="/admin" className="block" onClick={() => setSidebarOpen(false)}>
           <WorkspaceBrandPanel
             compact
-            workspaceName="Campaign Operations"
-            workspaceDescription="Leadership, outreach, and internal campaign tools."
-            badge="Internal campaign workspace"
+            workspaceName="DPG Operations"
+            workspaceDescription="Leadership, outreach, and voter engagement tools."
+            badge="Internal DPG workspace"
           />
         </Link>
       </div>
@@ -229,7 +230,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       {/* Main content */}
       <div className="lg:pl-[240px]">
         {/* Real-time toast notifications */}
-        {!isWarRoomRoute && toasts.length > 0 && (
+        {toasts.length > 0 && (
           <div className="fixed top-16 left-2 right-2 sm:left-auto sm:right-4 z-50 space-y-2 max-w-sm sm:max-w-md">
             {toasts.map(toast => (
               <div

@@ -185,7 +185,14 @@ export default function ImportPage() {
     mutationFn: () => confirmImport({
       import_key: preview!.import_key,
       village_id: villageId ? Number(villageId) : undefined,
-      rows: rows.filter(r => !r._skip),
+      rows: rows.filter(r => !r._skip).map((row) => {
+        const sanitized: Record<string, unknown> = { ...row };
+        delete sanitized._row;
+        delete sanitized._skip;
+        delete sanitized._issues;
+        delete sanitized._duplicate_matches;
+        return sanitized;
+      }),
     }),
     onSuccess: (data) => {
       captureAnalyticsEvent('supporter_import_confirmed', {
@@ -826,9 +833,9 @@ export default function ImportPage() {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Import Complete!</h2>
+            <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Import Complete</h2>
             <p className="text-[var(--text-secondary)] mb-6">
-              <strong>{importResult.created}</strong> {createdLabel} sent to review for <strong>{importResult.village}</strong>
+              <strong>{importResult.created}</strong> {createdLabel} sent to review
               {importResult.skipped > 0 && <> · {importResult.skipped} skipped due to errors</>}
             </p>
             {importResult.errors.length > 0 && (

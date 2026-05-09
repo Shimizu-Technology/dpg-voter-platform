@@ -266,15 +266,15 @@ function AuthorizedContent({ children }: { children: React.ReactNode }) {
           <div className="w-full space-y-5">
             <WorkspaceBrandPanel
               centered
-              workspaceName="Campaign Operations"
-              workspaceDescription="Leadership tools, outreach, and campaign administration."
+              workspaceName="DPG Operations"
+              workspaceDescription="Leadership tools, outreach, and DPG administration."
               badge="Staff workspace"
             />
             <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-[0_24px_60px_-32px_rgba(15,42,91,0.35)]">
               <div className="mb-4 text-5xl">🚫</div>
               <h1 className="mb-2 text-2xl font-bold text-gray-900">Access Denied</h1>
               <p className="mb-6 text-gray-500">
-            Your account is not authorized to access this application. Please contact the campaign admin to request access.
+            Your account is not authorized to access this application. Please contact the DPG admin to request access.
               </p>
               <button
                 onClick={() => signOut({ redirectUrl: '/admin' })}
@@ -322,12 +322,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="w-full space-y-5">
               <WorkspaceBrandPanel
                 centered
-                workspaceName="Campaign Operations"
-                workspaceDescription="Leadership tools, outreach, and internal campaign administration."
+                workspaceName="DPG Operations"
+                workspaceDescription="Leadership tools, outreach, and internal DPG administration."
                 badge="Staff workspace"
               />
               <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-[0_24px_60px_-32px_rgba(15,42,91,0.35)]">
-                <h1 className="mb-2 text-2xl font-bold text-gray-900">Campaign Operations Sign In</h1>
+                <h1 className="mb-2 text-2xl font-bold text-gray-900">DPG Operations Sign In</h1>
                 <p className="mb-6 text-gray-500">Sign in to access the staff dashboard</p>
                 <SignInButton mode="modal">
                   <button className="w-full rounded-xl bg-primary py-3 text-lg font-bold text-white transition-all hover:bg-primary-dark">
@@ -335,7 +335,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   </button>
                 </SignInButton>
                 <p className="mt-4 text-xs text-gray-400">
-                  Contact your campaign admin for an account
+                  Contact your DPG admin for an account
                 </p>
                 <Link
                   to="/"

@@ -1,6 +1,6 @@
 {
-  "name": "Campaign Tracker",
-  "short_name": "Campaign",
+  "name": "DPG Voter Platform",
+  "short_name": "DPG Voter",
   "description": "Voter engagement signup, outreach, and election operations platform.",
   "start_url": "/",
   "display": "standalone",

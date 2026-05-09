@@ -29,7 +29,7 @@ export default function StaffPortalPage() {
               <WorkspaceBrandPanel
                 centered
                 workspaceName="Staff Portal"
-                workspaceDescription="Sign in to reach Campaign Operations or the Data Ops Workspace."
+                workspaceDescription="Sign in to reach DPG Operations or the Data Ops Workspace."
                 badge="Internal campaign workspace"
               />
               <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-[0_24px_60px_-32px_rgba(15,42,91,0.35)]">
@@ -41,7 +41,7 @@ export default function StaffPortalPage() {
                   </button>
                 </SignInButton>
                 <p className="mt-4 text-xs text-gray-400">
-                  Contact your campaign admin for an account
+                  Contact your DPG admin for an account
                 </p>
                 <Link
                   to="/"

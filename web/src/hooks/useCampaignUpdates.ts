@@ -4,7 +4,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { subscribeToCampaign, type CampaignEvent, type CampaignEventType } from '../lib/cable';
 
 /**
- * Hook that subscribes to real-time campaign updates and
+ * Hook that subscribes to real-time DPG updates and
  * automatically invalidates the relevant TanStack Query caches.
  *
  * Usage: just call useCampaignUpdates() in any admin page.
@@ -20,48 +20,35 @@ export function useCampaignUpdates(onEvent?: (event: CampaignEvent) => void, ena
       new_supporter: [
         'dashboard',
         'supporters',
-        'war_room',
-        'leaderboard',
         'session',
         'village',
-        'quotas',
-        'quota-period',
         'vetting-supporters',
         'vetting-queue',
         'public-review',
         'reports-list',
-        'current-cycle',
       ],
-      poll_report: ['war_room', 'poll_watcher', 'dashboard', 'village'],
-      event_check_in: ['events', 'war_room', 'dashboard'],
+      poll_report: ['dashboard', 'village'],
+      event_check_in: ['dashboard'],
       supporter_updated: [
         'supporters',
         'dashboard',
         'session',
         'village',
-        'quotas',
-        'quota-period',
         'vetting-supporters',
         'vetting-queue',
         'public-review',
         'reports-list',
-        'current-cycle',
         'duplicates',
-        'war_room',
       ],
       stats_update: [
         'dashboard',
-        'war_room',
         'session',
         'supporters',
         'village',
-        'quotas',
-        'quota-period',
         'vetting-supporters',
         'vetting-queue',
         'public-review',
         'reports-list',
-        'current-cycle',
       ],
     };
 

@@ -33,9 +33,6 @@ export const deleteDistrict = (id: number) => api.delete(`/districts/${id}`).the
 export const assignVillagesToDistrict = (id: number, villageIds: number[]) =>
   api.patch(`/districts/${id}/assign_villages`, { village_ids: villageIds }).then(r => r.data);
 export const getVillage = (id: number) => api.get(`/villages/${id}`).then(r => r.data);
-export const getQuotas = () => api.get('/quotas').then(r => r.data);
-export const updateVillageQuota = (villageId: number, targetCount: number, changeNote?: string) =>
-  api.patch(`/quotas/${villageId}`, { quota: { target_count: targetCount, change_note: changeNote } }).then(r => r.data);
 export const getPrecincts = (params?: QueryParams) => api.get('/precincts', { params }).then(r => r.data);
 export const updatePrecinct = (id: number, data: JsonRecord) =>
   api.patch(`/precincts/${id}`, { precinct: data }).then(r => r.data);
@@ -98,10 +95,6 @@ export const exportSupporters = (params?: QueryParams) =>
     return { downloaded: true };
   });
 
-// Leaderboard
-export const getLeaderboard = () => api.get('/leaderboard').then(r => r.data);
-export const getQrCodeAssignees = () => api.get('/qr_codes/assignees').then(r => r.data);
-export const generateQrCode = (data: JsonRecord) => api.post('/qr_codes/generate', data).then(r => r.data);
 
 // Events
 export const getEvents = (params?: QueryParams) => api.get('/events', { params }).then(r => r.data);
@@ -311,7 +304,6 @@ export const bulkRevetSupporters = (payload: { supporter_ids?: number[]; apply_c
 
 // Public Review
 export const getPublicReview = (params?: QueryParams) => api.get('/supporters/public_review', { params }).then(r => r.data);
-export const acceptToQuota = (id: number) => api.patch(`/supporters/${id}/accept_to_quota`).then(r => r.data);
 export const rejectPublicReview = (id: number) => api.patch(`/supporters/${id}/reject_public_review`).then(r => r.data);
 export const approveSupporter = (id: number) => api.patch(`/supporters/${id}/approve_supporter`).then(r => r.data);
 export const rejectSupporterReview = (id: number) => api.patch(`/supporters/${id}/reject_supporter`).then(r => r.data);
@@ -320,14 +312,5 @@ export default api;
 
 // Campaign Cycles
 export const getCampaignCycles = (params?: QueryParams) => api.get('/campaign_cycles', { params }).then(r => r.data);
-export const getCurrentCycle = () => api.get('/campaign_cycles/current').then(r => r.data);
 export const createCampaignCycle = (data: Record<string, unknown>) => api.post('/campaign_cycles', data).then(r => r.data);
 export const updateCampaignCycle = (id: number, data: Record<string, unknown>) => api.patch(`/campaign_cycles/${id}`, data).then(r => r.data);
-
-// Quota Periods
-export const getQuotaPeriod = (id: number) => api.get(`/quota_periods/${id}`).then(r => r.data);
-export const updateQuotaPeriod = (id: number, data: Record<string, unknown>) => api.patch(`/quota_periods/${id}`, data).then(r => r.data);
-export const submitQuotaPeriod = (id: number) => api.post(`/quota_periods/${id}/submit`).then(r => r.data);
-export const getVillageQuotas = (periodId: number) => api.get(`/quota_periods/${periodId}/village_quotas`).then(r => r.data);
-export const updateVillageQuotas = (periodId: number, quotas: Array<{ village_id: number; target: number }>) =>
-  api.patch(`/quota_periods/${periodId}/village_quotas`, { village_quotas: quotas }).then(r => r.data);
