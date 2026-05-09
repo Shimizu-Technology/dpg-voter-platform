@@ -24,7 +24,7 @@ Verified locally after latest cleanup:
 - [x] `RAILS_ENV=test bundle exec rails zeitwerk:check`
 - [x] `RAILS_ENV=test bundle exec rails db:prepare`
 - [x] Source scan has no active Josh/Tina/quota/war-room/poll-watcher/yard-sign/event-rsvp residue in Monday-facing source.
-- [ ] Built `web/dist` scan has no other-campaign or proprietary workflow terms.
+- [x] Built `web/dist` scan has no other-campaign or proprietary workflow terms.
 - [x] Rails route scan has no deferred election-day/proprietary modules. Only duplicate-review `scan_duplicates` remains, which is expected.
 
 ## Monday testing scope
