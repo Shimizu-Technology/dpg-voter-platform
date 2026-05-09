@@ -1369,7 +1369,7 @@ module Api
         supporter.source = source
         supporter.attribution_method = attribution_method
         supporter.intake_status = intake_status
-        supporter.review_status = "pending"
+        supporter.review_status = Supporter::PUBLIC_SOURCES.include?(source) ? "pending" : "approved"
         supporter.public_review_status = public_review_status
         supporter.status = "active"
         supporter.leader_code = leader_code
