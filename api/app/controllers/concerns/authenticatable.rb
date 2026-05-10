@@ -47,6 +47,7 @@ module Authenticatable
       end
 
       @current_user ||= find_or_link_user_by_email(clerk_id: clerk_id, token_email: token_email, token_name: token_name)
+      @current_user ||= bootstrap_admin_user(clerk_id: clerk_id, token_email: token_email, token_name: token_name)
 
       if @current_user && token_name.present? && @current_user.name != token_name
         @current_user.update(name: token_name)
@@ -370,6 +371,34 @@ module Authenticatable
       name: token_name || user.name
     )
     user
+  end
+
+  def bootstrap_admin_user(clerk_id:, token_email:, token_name:)
+    email = token_email.to_s.strip.downcase
+    return nil if email.blank?
+    return nil unless bootstrap_admin_emails.include?(email)
+
+    role = ENV.fetch("BOOTSTRAP_ADMIN_ROLE", "campaign_admin")
+    role = "campaign_admin" unless User::ROLES.include?(role)
+
+    user = User.find_or_initialize_by(email: email)
+    user.clerk_id = clerk_id
+    user.name = token_name.presence || user.name.presence || default_name_for_email(email)
+    user.role = role
+    user.save!
+    user
+  end
+
+  def bootstrap_admin_emails
+    ENV.fetch("BOOTSTRAP_ADMIN_EMAILS", "")
+      .split(",")
+      .map { |email| email.strip.downcase }
+      .reject(&:blank?)
+      .uniq
+  end
+
+  def default_name_for_email(email)
+    email.split("@").first.tr("._", " ").split.map(&:capitalize).join(" ")
   end
 
   def extract_token_email(decoded)
