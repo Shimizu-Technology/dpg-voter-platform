@@ -63,7 +63,7 @@ interface OutreachCounts {
 const QUEUE_VIEWS = [
   { value: 'open', label: 'All Open Follow-Up', countKey: 'open', icon: Clock3 },
   { value: 'registration_priority', label: 'Registration Priority', countKey: 'registration_priority', icon: AlertCircle },
-  { value: 'support_requests', label: 'Campaign Help Requests', countKey: 'support_requests', icon: Users },
+  { value: 'support_requests', label: 'Voter Help Requests', countKey: 'support_requests', icon: Users },
   { value: 'registered_follow_up', label: 'Registered Via Follow-Up', countKey: 'registered_follow_up', icon: CheckCircle2 },
   { value: 'completed', label: 'Resolved Outcomes', countKey: 'completed', icon: ClipboardCheck },
 ] as const;
@@ -283,7 +283,7 @@ export default function OutreachPage() {
         <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
           <ClipboardCheck className="w-5 h-5 text-primary" /> Follow-Up Queue
         </h1>
-        <p className="text-gray-500 text-sm mt-1">One queue for approved supporters who still need registration follow-up, campaign-help follow-up, or both.</p>
+        <p className="text-gray-500 text-sm mt-1">One queue for approved supporters who still need registration follow-up, voter-help follow-up, or both.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -557,7 +557,7 @@ export default function OutreachPage() {
                         <div className="space-y-3 rounded-xl border border-amber-100 bg-amber-50/60 p-3">
                           <div>
                             <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Registration follow-up</div>
-                            <div className="mt-1 text-xs text-amber-900">Track registration outreach separately from any campaign-help requests.</div>
+                            <div className="mt-1 text-xs text-amber-900">Track registration outreach separately from any voter-help requests.</div>
                           </div>
                           <div>
                             <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">Result</label>
@@ -587,7 +587,7 @@ export default function OutreachPage() {
                       {supporter.needs_support_follow_up && (
                         <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
                           <div>
-                            <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Campaign-help follow-up</div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Voter-help follow-up</div>
                             <div className="mt-1 text-xs text-blue-900">Use this track for volunteer, absentee, homebound, and ride-to-polls requests.</div>
                           </div>
                           <div>
@@ -609,7 +609,7 @@ export default function OutreachPage() {
                               value={draft.supportNotes}
                               onChange={(e) => updateDraft(supporter.id, { supportNotes: e.target.value })}
                               rows={3}
-                              placeholder="Add campaign-help follow-up notes..."
+                              placeholder="Add voter-help follow-up notes..."
                               className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
                             />
                           </div>

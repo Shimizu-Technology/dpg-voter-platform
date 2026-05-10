@@ -211,72 +211,103 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f8fc]">
-      <div className="bg-primary px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.24em] text-white">
-        {publicSite.heroEyebrow}
+    <div className="min-h-screen overflow-hidden bg-[#f7fbfc]">
+      <div className="relative bg-[#123d70] px-4 py-3 text-center text-[10px] font-bold uppercase leading-5 tracking-[0.2em] text-white shadow-sm sm:text-[11px] sm:tracking-[0.28em]">
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.08),transparent,rgba(128,199,232,0.22))]" />
+        <span className="relative">{publicSite.topBar}</span>
       </div>
 
-      <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-5 md:px-6">
-          <Link to="/" className="mb-4 inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-primary">
-            <ArrowLeft className="h-4 w-4" />
-            Back to home
+      <header className="relative border-b border-[#dce8ef] bg-white/90 backdrop-blur-xl">
+        <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-[#83c8e8] to-transparent" />
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
+          <Link to="/" className="min-w-0">
+            <PublicWordmark size="sm" />
           </Link>
+          <Link to="/" className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-full border border-[#cfe0e8] bg-white/80 px-4 text-sm font-bold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-[#83c8e8] hover:bg-[#f2fbff] hover:text-[#123d70] md:px-5">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back to home</span>
+            <span className="sr-only sm:hidden">Back to home</span>
+          </Link>
+        </div>
+      </header>
 
-          <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-6">
-            <div className="space-y-4">
-              <PublicWordmark size="md" />
-              <div>
-                <h1 className="text-[2rem] font-extrabold tracking-tight text-slate-950 md:text-5xl">
-                  {publicSite.signupHeroTitle}
-                </h1>
-                <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
-                  {publicSite.signupHeroDescription}
-                </p>
-              </div>
+      <section className="relative border-b border-[#dce8ef]">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_10%,rgba(131,200,232,0.32),transparent_28%),radial-gradient(circle_at_88%_4%,rgba(213,163,50,0.18),transparent_30%),linear-gradient(180deg,#f7fbfc_0%,#eef6fb_100%)]" />
+        <div className="mx-auto grid w-full max-w-6xl gap-8 overflow-hidden px-4 py-8 md:px-6 md:py-14 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
+          <div className="max-w-[calc(100vw-2rem)] space-y-6 md:max-w-none">
+            <div className="inline-flex max-w-full rounded-full border border-[#d8ecf4] bg-white/80 px-4 py-2 text-center text-[11px] font-bold uppercase leading-5 tracking-[0.16em] text-[#123d70] shadow-sm md:text-sm">
+              {publicSite.heroEyebrow}
             </div>
 
-            <div className="hidden overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_24px_60px_-32px_rgba(15,42,91,0.35)] lg:block">
-              <div className="bg-linear-to-r from-primary via-[#2c66bb] to-[#84bde7] px-5 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/80">
+            <div className="space-y-4">
+              <h1 className="max-w-3xl text-balance text-[2.45rem] leading-[0.96] font-black tracking-[-0.045em] text-[#071326] sm:text-[3rem] md:text-6xl">
+                {publicSite.signupHeroTitle}
+              </h1>
+              <p className="max-w-2xl text-lg leading-8 text-slate-600 md:text-xl md:leading-9">
+                {publicSite.signupHeroDescription}
+              </p>
+            </div>
+          </div>
+
+          <div className="relative hidden lg:block">
+            <div className="absolute -left-4 top-8 hidden h-24 w-24 rounded-full bg-[#83c8e8]/30 blur-2xl md:block" />
+            <div className="absolute -right-3 bottom-5 hidden h-32 w-32 rounded-full bg-[#d5a332]/20 blur-2xl md:block" />
+            <div className="relative overflow-hidden rounded-[34px] border border-white bg-white/86 p-5 shadow-[0_28px_80px_-42px_rgba(18,61,112,0.7)] backdrop-blur">
+              <div className="rounded-[28px] bg-[linear-gradient(135deg,#123d70_0%,#2468ad_58%,#84c7e8_100%)] p-5 text-white">
+                <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/75">
                   {publicSite.signupHeroKicker}
                 </p>
-                <p className="mt-2 text-xl font-bold text-white">
-                  {publicSite.signupNetworkTitle}
+                <div className="mt-5 rounded-[24px] bg-white/95 p-5 shadow-inner shadow-[#123d70]/10">
+                  <p className="mb-4 text-xl font-black leading-tight text-[#123d70]">
+                    {publicSite.signupNetworkTitle}
+                  </p>
+                  <img
+                    src={publicSite.wordmark.imageSrc || publicSite.signupNetworkImageSrc}
+                    srcSet={publicSite.wordmark.imageSrcSet}
+                    sizes="(min-width: 1024px) 430px, 100vw"
+                    alt={publicSite.wordmark.imageAlt || publicSite.signupNetworkImageAlt}
+                    className="mx-auto h-32 w-full object-contain md:h-40"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 rounded-[26px] border border-[#dce8ef] bg-[#f7fbfc] p-5">
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b17812]">
+                  {publicSite.featurePanelKicker}
+                </p>
+                <p className="mt-3 text-base font-semibold leading-8 text-slate-700 md:text-lg">
+                  {publicSite.featurePanelText}
                 </p>
               </div>
-              <img
-                src={publicSite.signupNetworkImageSrc}
-                alt={publicSite.signupNetworkImageAlt}
-                className="h-40 w-full bg-white object-contain p-4 md:h-56"
-              />
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
+      <div className="relative mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_8%_0%,rgba(131,200,232,0.18),transparent_32%),linear-gradient(180deg,#eef6fb_0%,#f7fbfc_42%,#ffffff_100%)]" />
         {leaderCode && (
-          <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm font-medium text-primary">
+          <div className="mb-5 rounded-2xl border border-[#b9dff1] bg-[#eef9fe] px-4 py-3 text-center text-sm font-bold text-[#123d70]">
             You were invited by an organizer.
           </div>
         )}
 
-        <div className="mb-5 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm lg:hidden">
-          <div className="flex items-center gap-3">
-            <div className="flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[18px] border border-slate-200 bg-white p-2">
+        <div className="mb-5 rounded-[26px] border border-[#dce8ef] bg-white/90 p-4 shadow-sm lg:hidden">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#eef9fe] p-2">
               <img
                 src={publicSite.signupNetworkImageSrc}
+                srcSet={publicSite.signupNetworkImageSrcSet}
+                sizes="64px"
                 alt={publicSite.signupNetworkImageAlt}
                 className="h-full w-full object-contain"
               />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-                {publicSite.signupHeroKicker}
+              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#123d70]">
+                Ready when you are
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                {publicSite.signupMobileDescription}
+                The form below takes a few minutes and supports household members too.
               </p>
             </div>
           </div>
@@ -284,11 +315,11 @@ export default function SignupPage() {
 
         <div className="grid gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
           <aside className="order-2 space-y-4 lg:order-1">
-            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">What happens next</p>
+            <div className="rounded-[30px] border border-[#dce8ef] bg-white/92 p-6 shadow-[0_18px_50px_-38px_rgba(18,61,112,0.55)]">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#123d70]">What happens next</p>
               <div className="mt-5 space-y-4">
                 <div className="flex gap-3">
-                  <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e8f7fc] text-[#123d70]">
                     <Users className="h-5 w-5" />
                   </div>
                   <div>
@@ -300,7 +331,7 @@ export default function SignupPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#fff1ef] text-cta">
+                  <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#fff1ef] text-[#ce243c]">
                     <Megaphone className="h-5 w-5" />
                   </div>
                   <div>
@@ -312,7 +343,7 @@ export default function SignupPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eef6ff] text-[#1d74d1]">
+                  <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eef9fe] text-[#2468ad]">
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div>
@@ -325,20 +356,20 @@ export default function SignupPage() {
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-[#f0d9a4] bg-[#fff9ec] p-6 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#93650d]">Campaign note</p>
+            <div className="rounded-[30px] border border-[#f0d9a4] bg-[#fffaf0] p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#93650d]">Party note</p>
               <p className="mt-3 text-sm leading-7 text-slate-700">
-                By submitting this form, you are sharing your information with the campaign so the team can stay in touch, invite you to campaign activity, and organize supporter outreach.
+                By submitting this form, you are sharing your information with the Democratic Party of Guam so the team can stay in touch, share voter information, and organize supporter outreach.
               </p>
             </div>
           </aside>
 
-          <form onSubmit={handleSubmit} className="order-1 rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_24px_60px_-32px_rgba(15,42,91,0.35)] md:p-6 lg:order-2">
+          <form onSubmit={handleSubmit} className="order-1 rounded-[34px] border border-[#dce8ef] bg-white p-5 shadow-[0_28px_80px_-44px_rgba(18,61,112,0.65)] md:p-6 lg:order-2">
             <div className="space-y-6">
               <div>
                 <h2 className="text-2xl font-bold text-slate-950">Supporter information</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Fill out the form below to join the campaign effort.
+                  Fill out the form below to join the voter engagement effort.
                 </p>
               </div>
 
@@ -479,7 +510,7 @@ export default function SignupPage() {
               </section>
 
               <section className="rounded-[24px] border border-slate-200 bg-white px-4 py-4">
-                <p className="text-sm font-semibold text-slate-900">How can the campaign help?</p>
+                <p className="text-sm font-semibold text-slate-900">How can the party help?</p>
                 <div className="mt-3 space-y-2">
                   {SUPPORT_NEED_OPTIONS.map((option) => (
                     <label key={option.key} className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 px-3 py-2">
@@ -620,7 +651,7 @@ export default function SignupPage() {
                         )}
 
                         <div className="mt-4">
-                          <p className="text-sm font-medium text-slate-900">How can the campaign help this supporter?</p>
+                          <p className="text-sm font-medium text-slate-900">How can the party help this supporter?</p>
                           <div className="mt-2 space-y-2">
                             {SUPPORT_NEED_OPTIONS.map((option) => (
                               <label key={`${option.key}-${index}`} className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 px-3 py-2">

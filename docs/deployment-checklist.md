@@ -1,16 +1,25 @@
 # DPG Deployment Checklist
 
-**Last updated:** May 9, 2026  
+**Last updated:** May 9, 2026
 **Current verified commit:** `0c532f4 DPG-17: Document current project status`
 
 ## Isolation requirements
 
 - [x] GitHub repository is DPG-specific: `Shimizu-Technology/dpg-voter-platform`.
 - [ ] Backend service uses a DPG-specific `DATABASE_URL`.
+- [ ] Backend service uses a DPG-specific `DIRECT_DATABASE_URL` for migration/pre-deploy commands, matching the campaign-tracker production pattern.
+- [ ] Render web service is DPG-specific and does not reuse the Josh/Tina service.
+- [ ] Render worker service is DPG-specific if background jobs are run separately (`bundle exec bin/jobs`).
+- [ ] `CACHE_DATABASE_URL` and `QUEUE_DATABASE_URL` are either DPG-specific Neon URLs or intentionally blank to share the DPG `DATABASE_URL`.
+- [ ] `SECRET_KEY_BASE` is set on the Render web service and worker.
+- [ ] `REDIS_URL` is blank for the simple Monday deploy, or points to DPG-specific Redis if shared realtime is needed.
 - [ ] Frontend service uses a DPG-specific Clerk publishable key.
 - [ ] Backend service uses a DPG-specific Clerk secret key.
+- [ ] Netlify deploy uses a DPG-specific `NETLIFY_SITE_ID`.
 - [ ] `FRONTEND_URL` points to the DPG frontend domain/subdomain.
+- [ ] `ALLOWED_ORIGINS` includes only the DPG frontend domain(s).
 - [ ] SMS/email sender settings are DPG-specific or explicitly approved shared infrastructure.
+- [ ] `DPG_LIVE_OUTREACH_ENABLED=false` for Monday testing unless live sends are explicitly approved.
 - [ ] Backups are configured for the DPG database before Monday testing.
 
 ## Pre-deploy verification
@@ -23,6 +32,8 @@ Verified locally after latest cleanup:
 - [x] Ruby syntax checks for edited backend files.
 - [x] `RAILS_ENV=test bundle exec rails zeitwerk:check`
 - [x] `RAILS_ENV=test bundle exec rails db:prepare`
+- [x] Render pre-deploy command uses `DATABASE_URL=$DIRECT_DATABASE_URL bundle exec rails db:migrate:primary` only after `DIRECT_DATABASE_URL` is set.
+- [x] Background worker recurring tasks only reference classes that exist in the DPG build.
 - [x] Source scan has no active Josh/Tina/quota/war-room/poll-watcher/yard-sign/event-rsvp residue in Monday-facing source.
 - [x] Built `web/dist` scan has no other-campaign or proprietary workflow terms.
 - [x] Rails route scan has no deferred election-day/proprietary modules. Only duplicate-review `scan_duplicates` remains, which is expected.

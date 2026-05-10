@@ -10,7 +10,10 @@ export type PublicSiteConfig = {
     subtitle: string;
     amp?: string;
     imageSrc?: string;
+    imageSrcSet?: string;
     imageAlt?: string;
+    iconSrc?: string;
+    iconSrcSet?: string;
   };
   officialInfoUrl: string;
   officialInfoLabel: string;
@@ -24,6 +27,7 @@ export type PublicSiteConfig = {
   secondaryCta: string;
   featurePanelLabel: string;
   featurePanelImageSrc: string;
+  featurePanelImageSrcSet?: string;
   featurePanelImageAlt: string;
   featurePanelKicker: string;
   featurePanelText: string;
@@ -32,6 +36,7 @@ export type PublicSiteConfig = {
   signupHeroDescription: string;
   signupNetworkTitle: string;
   signupNetworkImageSrc: string;
+  signupNetworkImageSrcSet?: string;
   signupNetworkImageAlt: string;
   signupMobileDescription: string;
   consentName: string;
@@ -39,6 +44,7 @@ export type PublicSiteConfig = {
   thankYouSubtitle: string;
   thankYouBody: string;
   thankYouImageSrc?: string;
+  thankYouImageSrcSet?: string;
   thankYouImageAlt?: string;
   followLabel: string;
   footerContactEmail: string;
@@ -76,8 +82,11 @@ export const publicSiteConfig: PublicSiteConfig = {
     mode: 'image',
     title: 'Democratic Party of Guam',
     subtitle: 'Voter Engagement Platform',
-    imageSrc: '/dpg-wordmark.png',
-    imageAlt: 'Democratic Party of Guam',
+    imageSrc: '/brand/dpg-wordmark-900.png',
+    imageSrcSet: '/brand/dpg-wordmark-600.png 600w, /brand/dpg-wordmark-900.png 900w',
+    imageAlt: 'Guam Democratic Party wordmark',
+    iconSrc: '/brand/dpg-mark-384.png',
+    iconSrcSet: '/brand/dpg-mark-192.png 192w, /brand/dpg-mark-384.png 384w',
   },
   officialInfoUrl: 'https://democraticpartyofguam.org',
   officialInfoLabel: 'Main party website',
@@ -90,22 +99,25 @@ export const publicSiteConfig: PublicSiteConfig = {
   primaryCta: 'Sign up with the party',
   secondaryCta: 'Visit the main website',
   featurePanelLabel: 'Democratic Party voter engagement',
-  featurePanelImageSrc: '/dpg-disc.svg',
-  featurePanelImageAlt: 'Democratic Party of Guam circular mark',
+  featurePanelImageSrc: '/brand/dpg-wordmark-900.png',
+  featurePanelImageSrcSet: '/brand/dpg-wordmark-600.png 600w, /brand/dpg-wordmark-900.png 900w',
+  featurePanelImageAlt: 'Guam Democratic Party wordmark',
   featurePanelKicker: 'Island-wide voter engagement',
   featurePanelText: 'Every signup helps the party stay connected, support voters, and coordinate outreach ahead of election season.',
   signupHeroKicker: 'Democratic Party of Guam',
   signupHeroTitle: 'Sign up to stay connected.',
   signupHeroDescription: 'Add your information, share any voter-help needs, and help the Democratic Party of Guam coordinate outreach across the island.',
   signupNetworkTitle: 'Join the voter engagement network',
-  signupNetworkImageSrc: '/dpg-disc.svg',
+  signupNetworkImageSrc: '/brand/dpg-mark-384.png',
+  signupNetworkImageSrcSet: '/brand/dpg-mark-192.png 192w, /brand/dpg-mark-384.png 384w',
   signupNetworkImageAlt: 'Democratic Party of Guam circular mark',
   signupMobileDescription: 'Add your information below to stay connected with the Democratic Party of Guam and share any voter-help needs.',
   consentName: 'Democratic Party of Guam',
   thankYouTitle: "Si Yu'os Ma'åse!",
   thankYouSubtitle: 'Thank you for connecting with the Democratic Party of Guam.',
   thankYouBody: 'Your signup helps the party understand support, voter needs, and outreach opportunities across Guam.',
-  thankYouImageSrc: '/dpg-disc.svg',
+  thankYouImageSrc: '/brand/dpg-mark-384.png',
+  thankYouImageSrcSet: '/brand/dpg-mark-192.png 192w, /brand/dpg-mark-384.png 384w',
   thankYouImageAlt: 'Democratic Party of Guam circular mark',
   followLabel: 'Follow the party',
   footerContactEmail: 'info@democraticpartyofguam.org',

@@ -12,7 +12,7 @@ type WorkspaceBrandPanelProps = {
 export default function WorkspaceBrandPanel({
   workspaceName,
   workspaceDescription,
-  badge = "Internal campaign workspace",
+  badge = "Internal DPG workspace",
   compact = false,
   centered = false,
   className = "",

@@ -1,39 +1,42 @@
 {
-  "name": "DPG Voter Platform",
+  "name": "Democratic Party of Guam Voter Platform",
   "short_name": "DPG Voter",
-  "description": "Voter engagement signup, outreach, and election operations platform.",
+  "description": "Voter engagement signup, outreach, and election operations platform for the Democratic Party of Guam.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0F3E86",
-  "theme_color": "#0F3E86",
+  "background_color": "#F7FBFC",
+  "theme_color": "#123D70",
   "orientation": "portrait-primary",
   "scope": "/",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/icon-192-dpg2.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/icon-512-dpg2.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-192.png",
+      "src": "/icon-192-dpg2.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/icon-512-dpg2.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     }
   ],
-  "categories": ["politics", "productivity"],
+  "categories": [
+    "politics",
+    "productivity"
+  ],
   "lang": "en-US"
 }

@@ -12,7 +12,7 @@ function buildCableUrl(token?: string): string {
   return url.toString();
 }
 
-export type CampaignEventType = 'new_supporter' | 'poll_report' | 'event_check_in' | 'supporter_updated' | 'stats_update';
+export type CampaignEventType = 'new_supporter' | 'supporter_updated' | 'stats_update';
 
 export interface CampaignEvent {
   type: CampaignEventType;
@@ -23,7 +23,7 @@ export interface CampaignEvent {
 export type CampaignEventHandler = (event: CampaignEvent) => void;
 
 /**
- * Subscribe to the CampaignChannel for real-time updates.
+ * Subscribe to the workspace channel for real-time DPG updates.
  * Returns an unsubscribe function.
  */
 export function subscribeToCampaign(onEvent: CampaignEventHandler, token?: string): () => void {

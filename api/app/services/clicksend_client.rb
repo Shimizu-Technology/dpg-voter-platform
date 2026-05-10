@@ -33,7 +33,7 @@ class ClicksendClient
       payload = {
         messages: [
           {
-            source: "campaign_tracker",
+            source: "dpg_voter_platform",
             from: from,
             body: encoded_body,
             to: formatted_to
@@ -105,7 +105,7 @@ class ClicksendClient
         formatted_to = "+#{formatted_to}" unless formatted_to.start_with?("+")
 
         {
-          source: "campaign_tracker",
+          source: "dpg_voter_platform",
           from: from,
           body: item[:body].gsub("$", "USD "),
           to: formatted_to

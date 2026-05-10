@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Broadcasts real-time updates to connected WebSocket clients.
-# All events go to the "campaign_updates" stream with a `type` field
+# All events go to the "dpg_updates" stream with a `type` field
 # so the frontend can filter which events it cares about.
 class CampaignBroadcast
   class << self
@@ -16,39 +16,6 @@ class CampaignBroadcast
         village_name: supporter.village&.name,
         source: supporter.source,
         created_at: supporter.created_at&.iso8601
-      })
-    end
-
-    # Field observer submitted a report
-    def poll_report(report)
-      precinct = report.precinct
-      village = precinct.village
-      registered = precinct.registered_voters || 0
-      turnout_pct = registered > 0 ? (report.voter_count * 100.0 / registered).round(1) : 0
-
-      broadcast(:poll_report, {
-        report_id: report.id,
-        precinct_id: precinct.id,
-        precinct_number: precinct.number,
-        village_id: village.id,
-        village_name: village.name,
-        voter_count: report.voter_count,
-        report_type: report.report_type,
-        turnout_pct: turnout_pct,
-        notes: report.notes,
-        reported_at: report.reported_at&.iso8601
-      })
-    end
-
-    # Event check-in happened
-    def event_check_in(event, supporter, rsvp)
-      broadcast(:event_check_in, {
-        event_id: event.id,
-        event_name: event.name,
-        supporter_name: supporter.print_name,
-        attended_count: event.attended_count,
-        invited_count: event.invited_count,
-        checked_in_at: rsvp.checked_in_at&.iso8601
       })
     end
 
@@ -76,7 +43,7 @@ class CampaignBroadcast
     private
 
     def broadcast(type, payload)
-      ActionCable.server.broadcast("campaign_updates", {
+      ActionCable.server.broadcast("dpg_updates", {
         type: type,
         data: payload,
         timestamp: Time.current.iso8601

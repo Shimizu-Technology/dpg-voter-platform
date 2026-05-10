@@ -368,7 +368,7 @@ function supporterStatusLabel(supporter: Pick<SupporterDetail, 'source' | 'revie
   if (isApprovedPublicSignup(supporter)) return 'Approved public supporter';
   if (supporter.source === 'staff_entry') return 'Approved Staff Supporter';
   if (supporter.source === 'bulk_import') return 'Approved Imported Supporter';
-  return 'Approved campaign supporter';
+  return 'Approved party supporter';
 }
 
 function supporterStatusDetail(supporter: Pick<SupporterDetail, 'source' | 'review_status' | 'public_review_status'>) {
@@ -388,7 +388,7 @@ function supporterStatusDetail(supporter: Pick<SupporterDetail, 'source' | 'revi
     return 'This supporter was entered by staff and has been approved into the official supporter list.';
   }
   if (supporter.source === 'bulk_import') {
-    return 'This supporter was added through a campaign import and has been approved into the official supporter list.';
+    return 'This supporter was added through a party import and has been approved into the official supporter list.';
   }
   return 'This supporter is already part of the official supporter list.';
 }
@@ -707,7 +707,7 @@ export default function SupporterDetailPage() {
           </div>
           {!canEdit && !isEditing && (
             <p className="mb-3 text-xs text-[var(--text-secondary)] italic">
-              View only — editing requires campaign admin or district coordinator role.
+              View only — editing requires party admin or district coordinator role.
             </p>
           )}
           <div className="grid md:grid-cols-3 gap-3">

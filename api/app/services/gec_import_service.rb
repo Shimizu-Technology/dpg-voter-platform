@@ -107,8 +107,8 @@ class GecImportService
 
   # Cache TTL for heartbeat and progress keys. Must exceed the longest
   # plausible import runtime (60K rows on a loaded DB can take >1 hour).
-  # Kept in the service to avoid a reverse dependency on GecImportJob.
-  # GecImportJob::PROCESSING_TIMEOUT (30 min) should be less than this value.
+  # Keep this higher than any caller-level processing timeout so stale
+  # artifacts do not disappear while an import is still being parsed.
   IMPORT_CACHE_TTL = 90.minutes
 
 
@@ -402,14 +402,15 @@ class GecImportService
     Rails.logger.warn("GEC progress cache write failed for import #{import_id}: #{e.class}: #{e.message}")
   end
 
-  # Non-transactional heartbeat visible to the stale-processing detector
-  # in GecImportJob. DB updated_at is invisible during an open transaction,
-  # so the job checks this cache key first.
+  # Non-transactional heartbeat visible to any stale-processing detector.
+  # DB updated_at is invisible during an open transaction, so monitors should
+  # check this cache key first.
   #
   # TTL must exceed the longest plausible import. If the TTL expires before
   # the import finishes, the stale detector falls back to DB updated_at which
   # may be stale (set at "parsing" stage before the transaction opened).
-  # See GecImportJob comments for queue retry window requirements.
+  # Async callers should keep their retry windows shorter than the artifact
+  # expiration window above.
   def write_heartbeat_cache(import_id)
     Rails.cache.write(
       "gec_import_heartbeat:#{import_id}",

@@ -66,8 +66,6 @@ Rails.application.routes.draw do
       get "sms/blasts/:id", to: "sms#blast_status"
       get "email/status", to: "email#status"
       post "email/blast", to: "email#blast"
-
-
     end
   end
 

@@ -4,13 +4,11 @@ import { ClerkProvider } from '@clerk/clerk-react'
 import { PostHogProvider } from '@posthog/react'
 import './index.css'
 import App from './App'
+import { AppErrorBoundary, ConfigurationNeededPage } from './components/ConfigurationNeededPage'
 import { isAnalyticsEnabled } from './lib/analytics'
+import { isPlaceholderClerkKey } from './lib/clerkConfig'
 
 const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
-
-if (!CLERK_KEY) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY')
-}
 
 const posthogKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY
 const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
@@ -27,13 +25,17 @@ const posthogOptions = {
   },
 }
 
-const app = (
-  <StrictMode>
-    <ClerkProvider publishableKey={CLERK_KEY}>
-      <App />
-    </ClerkProvider>
-  </StrictMode>
-)
+const app = isPlaceholderClerkKey(CLERK_KEY)
+  ? <ConfigurationNeededPage />
+  : (
+      <StrictMode>
+        <AppErrorBoundary>
+          <ClerkProvider publishableKey={CLERK_KEY}>
+            <App />
+          </ClerkProvider>
+        </AppErrorBoundary>
+      </StrictMode>
+    )
 
 createRoot(document.getElementById('root')!).render(
   posthogKey && isAnalyticsEnabled
