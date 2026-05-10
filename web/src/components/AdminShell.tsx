@@ -113,7 +113,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         key={item.to}
         to={item.to}
         onClick={() => setSidebarOpen(false)}
-        className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-150 ${
+        className={`flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
           active
             ? 'bg-primary text-white shadow-[0_12px_24px_-16px_rgba(15,42,91,0.8)]'
             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -133,7 +133,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const sidebarContent = (
     <nav className="flex flex-col h-full">
       {/* Brand */}
-      <div className="px-4 pt-5 pb-4">
+      <div className="px-3 pt-4 pb-3">
         <Link to="/admin" className="block" onClick={() => setSidebarOpen(false)}>
           <WorkspaceBrandPanel
             compact
@@ -145,7 +145,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* Nav Groups */}
-      <div className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
+      <div className="flex-1 space-y-4 overflow-y-auto px-3 pb-3">
         {navGroups.map((group) => (
           <div key={group.label}>
             <div className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
@@ -163,7 +163,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         <div className="px-3 pb-2">
           <Link
             to="/data"
-            className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-[13px] font-semibold text-blue-700 transition-all duration-150 hover:bg-blue-100"
+            className="flex min-h-11 items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] font-semibold text-blue-700 transition-all duration-150 hover:bg-blue-100"
           >
             <Database className="h-4 w-4 shrink-0 text-blue-500" />
             <span>Open Data Ops</span>
@@ -172,10 +172,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       )}
 
       {/* View Public Site */}
-      <div className="mt-auto border-t border-slate-200 px-3 pt-3 pb-4">
+      <div className="mt-auto border-t border-slate-200 px-3 pt-2 pb-2">
         <Link
           to="/"
-          className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-500 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900"
+          className="flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-500 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900"
         >
           <Home className="h-4 w-4 shrink-0 text-slate-400" />
           <span>View Public Site</span>
@@ -183,7 +183,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* User */}
-      <div className="flex items-center gap-3 border-t border-slate-200 px-4 py-4">
+      <div className="flex items-center gap-3 border-t border-slate-200 px-4 py-3">
         <UserButton afterSignOutUrl="/" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-medium text-slate-900">
