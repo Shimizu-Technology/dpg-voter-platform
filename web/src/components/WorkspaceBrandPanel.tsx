@@ -1,4 +1,5 @@
 import PublicWordmark from './PublicWordmark';
+import { publicSiteConfig } from '../lib/publicSite';
 
 type WorkspaceBrandPanelProps = {
   workspaceName: string;
@@ -17,6 +18,49 @@ export default function WorkspaceBrandPanel({
   centered = false,
   className = "",
 }: WorkspaceBrandPanelProps) {
+  if (compact) {
+    const iconSrc = publicSiteConfig.wordmark.iconSrc;
+
+    return (
+      <div
+        className={[
+          "overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_14px_32px_-26px_rgba(15,42,91,0.35)]",
+          className,
+        ].join(" ")}
+      >
+        <div className="bg-primary px-3 py-1.5 text-center text-[9px] font-semibold uppercase leading-4 tracking-[0.2em] text-white">
+          Building Guam&apos;s Future Together
+        </div>
+        <div className="p-3">
+          <div className="flex items-center gap-3">
+            {iconSrc ? (
+              <img
+                src={iconSrc}
+                srcSet={publicSiteConfig.wordmark.iconSrcSet}
+                sizes="44px"
+                alt="Democratic Party of Guam circular mark"
+                className="h-11 w-11 shrink-0 rounded-2xl object-contain drop-shadow-sm"
+              />
+            ) : (
+              <PublicWordmark size="sm" />
+            )}
+            <div className="min-w-0">
+              <div className="inline-flex max-w-full rounded-full border border-[#d8e4f2] bg-[#eef4ff] px-2.5 py-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-primary">
+                <span className="truncate">{badge}</span>
+              </div>
+              <h2 className="mt-2 truncate text-[15px] font-bold tracking-tight text-slate-950">
+                {workspaceName}
+              </h2>
+            </div>
+          </div>
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+            {workspaceDescription}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={[
@@ -27,8 +71,8 @@ export default function WorkspaceBrandPanel({
       <div className="bg-primary px-4 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-white">
         Building Guam&apos;s Future Together
       </div>
-      <div className={compact ? "space-y-3 p-4" : "space-y-4 p-5 md:p-6"}>
-        <PublicWordmark size={compact ? "sm" : "md"} centered={centered} />
+      <div className="space-y-4 p-5 md:p-6">
+        <PublicWordmark size="md" centered={centered} />
         <div className={centered ? "text-center" : ""}>
           <div className="inline-flex rounded-full border border-[#d8e4f2] bg-[#eef4ff] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
             {badge}
