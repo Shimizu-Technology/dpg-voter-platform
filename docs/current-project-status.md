@@ -1,7 +1,7 @@
 # DPG Voter Platform — Current Project Status
 
 **Last updated:** May 9, 2026  
-**Current commit:** `fb02556 DPG-16: Remove inherited campaign workflow surfaces`
+**Current branch:** `main` plus active cleanup work for DPG review findings
 
 ## One-line status
 

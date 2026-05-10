@@ -133,21 +133,21 @@ class SupporterEmailService
       HTML
 
       email_layout_html(
-        section_label: "Official campaign supporter update",
+        section_label: "Official party supporter update",
         title: "Si Yu'os Ma'&aring;se, #{name}!",
         intro_html: intro,
         content_html: nil,
-        footer_html: "You&apos;re receiving this because you signed up at #{escaped_frontend_url} and opted in to email updates.<br>If you no longer wish to receive campaign emails, please contact the campaign team."
+        footer_html: "You&apos;re receiving this because you signed up at #{escaped_frontend_url} and opted in to email updates.<br>If you no longer wish to receive party emails, please contact the party team."
       )
     end
 
     def blast_wrapper_html(content)
       email_layout_html(
-        section_label: "Campaign email update",
+        section_label: "Party email update",
         title: nil,
         intro_html: nil,
         content_html: content,
-        footer_html: "You&apos;re receiving this because you opted in to email updates from #{ERB::Util.html_escape(CampaignBranding::CAMPAIGN_LABEL)}.<br>To unsubscribe, please contact the campaign team."
+        footer_html: "You&apos;re receiving this because you opted in to email updates from #{ERB::Util.html_escape(CampaignBranding::CAMPAIGN_LABEL)}.<br>To unsubscribe, please contact the party team."
       )
     end
 

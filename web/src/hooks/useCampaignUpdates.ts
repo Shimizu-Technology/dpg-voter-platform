@@ -27,8 +27,6 @@ export function useCampaignUpdates(onEvent?: (event: CampaignEvent) => void, ena
         'public-review',
         'reports-list',
       ],
-      poll_report: ['dashboard', 'village'],
-      event_check_in: ['dashboard'],
       supporter_updated: [
         'supporters',
         'dashboard',

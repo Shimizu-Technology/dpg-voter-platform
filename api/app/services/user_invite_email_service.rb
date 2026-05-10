@@ -74,7 +74,7 @@ class UserInviteEmailService
     end
 
     def invite_html(user:, invited_by:)
-      inviter = escape_html(invited_by&.name.presence || invited_by&.email.presence || "a campaign admin")
+      inviter = escape_html(invited_by&.name.presence || invited_by&.email.presence || "a party admin")
       role = escape_html(role_label(user.role).split.map(&:capitalize).join(" "))
       assignment_context = assignment_context_html(user)
 
@@ -181,7 +181,7 @@ class UserInviteEmailService
                     <tr>
                       <td style="padding: 18px 24px 0 24px; text-align: center;">
                         <p style="margin: 0; font-size: 11px; line-height: 1.6; color: #64748b;">
-                          This invitation is for internal campaign use only. Contact the campaign admin if you need help accessing the staff workspace.
+                          This invitation is for internal party use only. Contact the party admin if you need help accessing the staff workspace.
                         </p>
                       </td>
                     </tr>

@@ -36,20 +36,34 @@ export default function PublicWordmark({
   const config = publicSiteConfig.wordmark;
 
   if (config.mode === 'image' && config.imageSrc) {
-    const imageSize = size === 'sm' ? 'h-12 md:h-14' : size === 'lg' ? 'h-28 md:h-36' : 'h-20 md:h-24';
+    const wordmarkSize = size === 'sm' ? 'h-14 md:h-16 lg:h-18' : size === 'lg' ? 'h-24 md:h-32 lg:h-36' : 'h-18 md:h-24';
+    const iconSize = size === 'sm' ? 'h-14 w-14' : size === 'lg' ? 'h-20 w-20' : 'h-16 w-16';
 
     return (
       <div
         className={[
-          'inline-flex flex-col leading-none',
+          'inline-flex leading-none',
           centered ? 'items-center text-center' : 'items-start text-left',
           className,
         ].join(' ')}
       >
-        <img src={config.imageSrc} alt={config.imageAlt || config.title} className={`${imageSize} w-auto object-contain`} />
-        <p className={`${styles.subtitle} mt-2 font-semibold uppercase tracking-[0.22em] text-slate-500`}>
-          {config.subtitle}
-        </p>
+        {config.iconSrc && (
+          <img
+            src={config.iconSrc}
+            srcSet={config.iconSrcSet}
+            sizes={size === 'sm' ? '56px' : '64px'}
+            alt={config.imageAlt || config.title}
+            className={`${iconSize} object-contain drop-shadow-sm md:hidden`}
+          />
+        )}
+        <img
+          src={config.imageSrc}
+          srcSet={config.imageSrcSet}
+          sizes={size === 'sm' ? '(min-width: 1024px) 250px, (min-width: 768px) 220px, 56px' : '(min-width: 1024px) 520px, 360px'}
+          alt={config.imageAlt || config.title}
+          className={`${config.iconSrc ? 'hidden md:block' : ''} ${wordmarkSize} max-w-[min(78vw,520px)] object-contain drop-shadow-sm`}
+        />
+        <span className="sr-only">{config.title} · {config.subtitle}</span>
       </div>
     );
   }

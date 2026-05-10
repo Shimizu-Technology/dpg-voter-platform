@@ -161,7 +161,7 @@ function supporterStatusLabel(supporter: Pick<SupporterItem, 'source' | 'review_
   }
   if (supporter.source === 'staff_entry') return 'Approved Staff Supporter';
   if (supporter.source === 'bulk_import') return 'Approved Imported Supporter';
-  return 'Campaign Supporter';
+  return 'DPG Supporter';
 }
 
 function supporterStatusChipClass(supporter: Pick<SupporterItem, 'source' | 'review_status' | 'public_review_status'>) {

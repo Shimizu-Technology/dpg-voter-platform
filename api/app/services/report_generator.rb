@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Generates Excel reports for the campaign data team.
+# Generates Excel reports for the party data team.
 # All reports export to .xlsx format with styled headers.
 #
 # Report types:

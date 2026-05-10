@@ -624,7 +624,7 @@ export default function UsersPage() {
         <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
           <Users className="w-5 h-5 text-primary" /> User Management
         </h1>
-        <p className="text-gray-500 text-sm">Authorized managers can invite users and assign allowed campaign roles.</p>
+        <p className="text-gray-500 text-sm">Authorized managers can invite users and assign allowed party roles.</p>
       </div>
 
       <div className="space-y-6">

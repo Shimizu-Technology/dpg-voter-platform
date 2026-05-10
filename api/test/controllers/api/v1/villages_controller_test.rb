@@ -38,29 +38,7 @@ class Api::V1::VillagesControllerTest < ActionDispatch::IntegrationTest
     assert_equal 2, village["precincts"].size
   end
 
-  test "show returns official supporters and current period progress" do
-    Campaign.create!(
-      name: "Village Test Campaign",
-      election_year: 2026,
-      status: "active"
-    )
-    cycle = CampaignCycle.create!(
-      name: "Village Test Cycle",
-      cycle_type: "general",
-      start_date: Date.current.beginning_of_year,
-      end_date: Date.current.end_of_year,
-      status: "active"
-    )
-    period = QuotaPeriod.create!(
-      campaign_cycle: cycle,
-      name: Date.current.strftime("%B %Y"),
-      start_date: Date.current.beginning_of_month,
-      end_date: Date.current.end_of_month,
-      due_date: Date.current.end_of_month,
-      quota_target: 25
-    )
-    VillageQuota.create!(quota_period: period, village: @village, target: 25)
-
+  test "show returns official supporters and review breakdown" do
     precinct_a = @village.precincts.order(:number).first
     precinct_b = @village.precincts.order(:number).last
 
@@ -74,8 +52,7 @@ class Api::V1::VillagesControllerTest < ActionDispatch::IntegrationTest
       status: "active",
       review_status: "approved",
       public_review_status: "not_applicable",
-      verification_status: "verified",
-      quota_period: period
+      verification_status: "verified"
     )
     Supporter.create!(
       first_name: "Jose",
@@ -87,8 +64,7 @@ class Api::V1::VillagesControllerTest < ActionDispatch::IntegrationTest
       status: "active",
       review_status: "approved",
       public_review_status: "not_applicable",
-      verification_status: "unverified",
-      quota_period: period
+      verification_status: "unverified"
     )
     Supporter.create!(
       first_name: "Pending",
@@ -121,8 +97,6 @@ class Api::V1::VillagesControllerTest < ActionDispatch::IntegrationTest
     village = JSON.parse(response.body)["village"]
     assert_equal 2, village["official_supporters_count"]
     assert_equal 1, village["matched_to_gec_count"]
-    assert_equal 2, village["current_period_progress"]
-    assert_equal 25, village["current_period_target"]
     assert_equal 1, village["team_pending_count"]
     assert_equal 1, village["public_pending_count"]
     assert_equal 2, village["supporter_count"]

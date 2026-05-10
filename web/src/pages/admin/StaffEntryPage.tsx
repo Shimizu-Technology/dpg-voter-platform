@@ -394,7 +394,7 @@ export default function StaffEntryPage() {
         <div className="space-y-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-raised)] p-4">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">Support requests</p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">Track any campaign or voter help this supporter asked for.</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Track any party or voter help this supporter asked for.</p>
           </div>
           <div className="space-y-3">
             {SUPPORT_NEED_OPTIONS.map((option) => (

@@ -14,29 +14,11 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
       name: "Coordinator",
       role: "district_coordinator"
     )
-    @campaign = Campaign.create!(name: "Test Campaign", election_year: Date.current.year, status: "active")
-    @event = Event.create!(
-      campaign: @campaign,
-      name: "Test Event",
-      event_type: "meeting",
-      date: Date.current,
-      status: "upcoming"
-    )
   end
 
   test "block leader cannot send test sms" do
     post "/api/v1/sms/send",
       params: { phone: "6715551234", message: "test" },
-      headers: auth_headers(@leader)
-
-    assert_response :forbidden
-    payload = JSON.parse(response.body)
-    assert_equal "coordinator_access_required", payload["code"]
-  end
-
-  test "block leader cannot send event notification" do
-    post "/api/v1/sms/event_notify",
-      params: { event_id: @event.id, type: "rsvp" },
       headers: auth_headers(@leader)
 
     assert_response :forbidden
@@ -53,10 +35,12 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
       status: "active"
     )
 
-    assert_enqueued_with(job: SmsBlastJob) do
-      post "/api/v1/sms/blast",
-        params: { message: "Campaign update" },
-        headers: auth_headers(@coordinator)
+    with_live_outreach_enabled do
+      assert_enqueued_with(job: SmsBlastJob) do
+        post "/api/v1/sms/blast",
+          params: { message: "DPG update" },
+          headers: auth_headers(@coordinator)
+      end
     end
 
     assert_response :accepted
@@ -66,25 +50,13 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
 
   test "coordinator can dry run blast" do
     post "/api/v1/sms/blast",
-      params: { message: "Campaign update", dry_run: "true" },
+      params: { message: "DPG update", dry_run: "true" },
       headers: auth_headers(@coordinator)
 
     assert_response :success
     payload = JSON.parse(response.body)
     assert_equal true, payload["dry_run"]
     assert_enqueued_jobs 0
-  end
-
-  test "coordinator event notify enqueues job" do
-    assert_enqueued_with(job: EventNotifyJob) do
-      post "/api/v1/sms/event_notify",
-        params: { event_id: @event.id, type: "reminder" },
-        headers: auth_headers(@coordinator)
-    end
-
-    assert_response :accepted
-    payload = JSON.parse(response.body)
-    assert_equal true, payload["queued"]
   end
 
   test "coordinator blast validates message with standard error envelope" do
@@ -96,5 +68,35 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body)
     assert_equal "Message is required", payload["error"]
     assert_equal "sms_message_required", payload["code"]
+  end
+
+  test "coordinator live blast is blocked by default" do
+    with_live_outreach_disabled do
+      post "/api/v1/sms/blast",
+        params: { message: "DPG update" },
+        headers: auth_headers(@coordinator)
+    end
+
+    assert_response :forbidden
+    payload = JSON.parse(response.body)
+    assert_equal "live_outreach_disabled", payload["code"]
+  end
+
+  private
+
+  def with_live_outreach_enabled
+    previous = ENV["DPG_LIVE_OUTREACH_ENABLED"]
+    ENV["DPG_LIVE_OUTREACH_ENABLED"] = "true"
+    yield
+  ensure
+    ENV["DPG_LIVE_OUTREACH_ENABLED"] = previous
+  end
+
+  def with_live_outreach_disabled
+    previous = ENV["DPG_LIVE_OUTREACH_ENABLED"]
+    ENV["DPG_LIVE_OUTREACH_ENABLED"] = "false"
+    yield
+  ensure
+    ENV["DPG_LIVE_OUTREACH_ENABLED"] = previous
   end
 end

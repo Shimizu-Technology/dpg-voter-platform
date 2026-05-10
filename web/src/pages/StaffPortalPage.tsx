@@ -30,7 +30,7 @@ export default function StaffPortalPage() {
                 centered
                 workspaceName="Staff Portal"
                 workspaceDescription="Sign in to reach DPG Operations or the Data Ops Workspace."
-                badge="Internal campaign workspace"
+                badge="Internal DPG workspace"
               />
               <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-[0_24px_60px_-32px_rgba(15,42,91,0.35)]">
                 <h1 className="mb-2 text-2xl font-bold text-gray-900">Staff Sign In</h1>

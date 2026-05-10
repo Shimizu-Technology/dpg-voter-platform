@@ -39,69 +39,20 @@ namespace :performance do
         scope.order(created_at: :desc).limit(50).to_a.each { |s| s.village&.name; s.precinct&.number }
       },
       "dashboard_show_payload" => lambda {
-        campaign = Campaign.active.first
         village_ids = Village.pluck(:id)
-        supporter_counts = Supporter.active.where(village_id: village_ids).group(:village_id).count
-        today_counts = Supporter.active.today.where(village_id: village_ids).group(:village_id).count
-        week_counts = Supporter.active.this_week.where(village_id: village_ids).group(:village_id).count
-        quota_targets = campaign ? Quota.where(campaign_id: campaign.id, village_id: village_ids).group(:village_id).sum(:target_count) : {}
+        supporter_counts = Supporter.working_supporters.where(village_id: village_ids).group(:village_id).count
+        verified_counts = Supporter.working_supporters.verified.where(village_id: village_ids).group(:village_id).count
+        today_counts = Supporter.working_supporters.today.where(village_id: village_ids).group(:village_id).count
+        week_counts = Supporter.working_supporters.this_week.where(village_id: village_ids).group(:village_id).count
         Village.order(:name).map do |village|
-          supporter_count = supporter_counts[village.id] || 0
-          target = quota_targets[village.id] || 0
           {
             id: village.id,
-            supporter_count: supporter_count,
+            supporter_count: supporter_counts[village.id] || 0,
+            verified_count: verified_counts[village.id] || 0,
             today_count: today_counts[village.id] || 0,
-            week_count: week_counts[village.id] || 0,
-            quota_target: target,
-            quota_percentage: target.positive? ? (supporter_count * 100.0 / target).round(1) : 0
+            week_count: week_counts[village.id] || 0
           }
         end
-      },
-      "war_room_index_payload" => lambda {
-        latest_reports = PollReport.today.latest_per_precinct.index_by(&:precinct_id)
-        all_reports_today = PollReport.today.chronological.includes(precinct: :village).limit(20).to_a
-        precinct_rows = Precinct.select(:id, :village_id, :registered_voters)
-        precinct_ids_by_village = Hash.new { |hash, key| hash[key] = [] }
-        registered_voters_by_village = Hash.new(0)
-        precinct_rows.each do |precinct|
-          precinct_ids_by_village[precinct.village_id] << precinct.id
-          registered_voters_by_village[precinct.village_id] += precinct.registered_voters.to_i
-        end
-        supporter_counts_by_village = Supporter.active.group(:village_id).count
-        villages = Village.order(:name).map do |village|
-          precinct_ids = precinct_ids_by_village[village.id]
-          village_reports = latest_reports.values_at(*precinct_ids).compact
-          total_registered = registered_voters_by_village[village.id]
-          total_voted = village_reports.sum(&:voter_count)
-          {
-            id: village.id,
-            turnout_pct: total_registered > 0 ? (total_voted * 100.0 / total_registered).round(1) : 0,
-            supporter_count: supporter_counts_by_village[village.id] || 0,
-            issue_flag: village_reports.any? { |r| r.report_type == "issue" }
-          }
-        end
-        [ villages.size, all_reports_today.size ]
-      },
-      "poll_watcher_index_payload" => lambda {
-        accessible_precincts = Precinct.includes(:village).order(:number)
-        latest_reports = PollReport.today.latest_per_precinct.where(precinct_id: accessible_precincts.select(:id)).index_by(&:precinct_id)
-        villages = accessible_precincts.group_by(&:village).map do |village, village_precincts|
-          precincts = village_precincts.map do |p|
-            report = latest_reports[p.id]
-            {
-              id: p.id,
-              reporting: report.present?,
-              turnout_pct: report && p.registered_voters.to_i > 0 ? (report.voter_count * 100.0 / p.registered_voters).round(1) : nil
-            }
-          end
-          {
-            id: village.id,
-            precinct_count: precincts.size,
-            reporting_count: precincts.count { |x| x[:reporting] }
-          }
-        end
-        villages.size
       }
     }
 
@@ -117,8 +68,7 @@ namespace :performance do
         supporters_active_count: Supporter.active.count,
         supporters_total_count: Supporter.count,
         villages_count: Village.count,
-        precincts_count: Precinct.count,
-        poll_reports_today_count: PollReport.today.count
+        precincts_count: Precinct.count
       },
       scenarios: benchmark_results
     }

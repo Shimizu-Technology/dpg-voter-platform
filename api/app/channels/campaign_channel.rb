@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-# Single channel for all real-time campaign updates.
+# Single channel for all real-time DPG workspace updates.
 # Clients subscribe and receive typed events they can filter on.
 class CampaignChannel < ApplicationCable::Channel
   def subscribed
     reject unless realtime_access_allowed?
-    stream_from "campaign_updates"
+    stream_from "dpg_updates"
   end
 
   def unsubscribed

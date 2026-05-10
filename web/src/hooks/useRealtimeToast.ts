@@ -16,20 +16,6 @@ function eventToToast(event: CampaignEvent): { message: string; type: Toast['typ
         message: `New supporter: ${data.print_name ?? 'Unknown'} (${data.village_name ?? 'Unknown'})`,
         type: 'success',
       };
-    case 'poll_report':
-      {
-        const count = Number(data.voter_count ?? 0);
-        const votersLabel = `${count.toLocaleString()} voter${count === 1 ? '' : 's'}`;
-      return {
-        message: `Precinct ${data.precinct_number ?? 'Unknown'}: ${votersLabel} (${data.turnout_pct ?? 0}%)`,
-        type: 'info',
-      };
-      }
-    case 'event_check_in':
-      return {
-        message: `${data.supporter_name ?? 'Supporter'} checked in at ${data.event_name ?? 'event'}`,
-        type: 'success',
-      };
     case 'supporter_updated': {
       const name = data.print_name ?? `Supporter #${data.supporter_id ?? '?'}`;
       const village = data.village_name ? ` (${data.village_name})` : '';

@@ -106,7 +106,7 @@ class Supporter < ApplicationRecord
   }
   scope :with_household, -> { where.not(household_group_id: nil) }
   scope :registered_voter_status_is, ->(status) { where(registered_voter_status: status) }
-  # Legacy broad campaign-help scope retained for existing list/report usage.
+  # Legacy broad voter-help scope retained for existing list/report usage.
   # This still includes voter registration help; new support-track follow-up
   # code should prefer `needs_support_services` to exclude registration work.
   scope :needs_campaign_help, -> {

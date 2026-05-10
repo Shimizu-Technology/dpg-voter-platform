@@ -34,10 +34,9 @@ The app is much cleaner, but the source still contains inherited internals that 
 ### Remove or neutralize before staging if practical
 
 1. **Campaign/quota residue**
-   - `Quota`, `QuotaPeriod`, `VillageQuota`, `CampaignCycle` models/migrations/tests still exist.
-   - Dashboard/report code still computes quota progress.
-   - Seeds still create quota/cycle records.
-   - Recommendation: remove from active DPG dashboards/reports now; decide later whether DPG needs a party-specific goals system.
+   - Active quota routes, dashboards, rake tasks, and tests have been removed from the DPG Monday build.
+   - Historical migrations/schema tables may remain because deleting old migrations would make existing database history harder to reproduce.
+   - Recommendation: decide later whether DPG needs a party-specific goals system, then build it with DPG-defined language and rules.
 
 2. **Motorcade/yard-sign residue**
    - `supporters.motorcade_available` remains in schema and indexes.

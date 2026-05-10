@@ -17,7 +17,6 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
 
     @village = Village.create!(name: "Dashboard Village", region: "Central")
     Precinct.create!(number: "D1", village: @village)
-    Quota.create!(village: @village, campaign: @campaign, period: "quarterly", target_count: 100, target_date: Date.current)
 
     Supporter.create!(
       first_name: "Supporter", last_name: "One", print_name: "Supporter One",
@@ -106,9 +105,6 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, village["unverified_count"]
     # supporter_count = verified (backward compat)
     assert_equal 3, village["supporter_count"]
-    assert_equal 100, village["quota_target"]
-    # Quota percentage based on verified only: 3/100 = 3.0%
-    assert_equal 3.0, village["quota_percentage"]
     assert_equal 3, village["team_input_count"]
     assert_equal 1, village["public_approved_count"]
     assert_equal 1, village["team_pending_count"]
@@ -129,7 +125,6 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
   test "scoped user sees island-wide summary with scoped village list" do
     other_village = Village.create!(name: "Other Village", region: "North")
     Precinct.create!(number: "O1", village: other_village)
-    Quota.create!(village: other_village, campaign: @campaign, period: "quarterly", target_count: 50, target_date: Date.current)
     Supporter.create!(
       first_name: "Supporter", last_name: "Four", print_name: "Supporter Four",
       contact_number: "6715551003",
