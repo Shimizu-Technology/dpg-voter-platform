@@ -32,29 +32,29 @@ class AuthenticatableBootstrapAdminTest < ActionController::TestCase
   end
 
   test "allowlisted bootstrap admin email creates and authorizes production user" do
-    ENV["BOOTSTRAP_ADMIN_EMAILS"] = "shimizutechnology@gmail.com"
+    ENV["BOOTSTRAP_ADMIN_EMAILS"] = "bootstrap@example.com"
     ENV["BOOTSTRAP_ADMIN_ROLE"] = "campaign_admin"
     stub_clerk_token(
       "sub" => "user_prod_bootstrap",
-      "email" => "shimizutechnology@gmail.com",
-      "name" => "Leon Shimizu"
+      "email" => "bootstrap@example.com",
+      "name" => "Bootstrap Admin"
     )
 
     get :show
 
     assert_response :success
     payload = JSON.parse(response.body)
-    assert_equal "shimizutechnology@gmail.com", payload["email"]
+    assert_equal "bootstrap@example.com", payload["email"]
     assert_equal "campaign_admin", payload["role"]
     assert_equal "user_prod_bootstrap", payload["clerk_id"]
 
-    user = User.find_by!(email: "shimizutechnology@gmail.com")
+    user = User.find_by!(email: "bootstrap@example.com")
     assert_equal "campaign_admin", user.role
     assert_equal "user_prod_bootstrap", user.clerk_id
   end
 
   test "non allowlisted email remains blocked" do
-    ENV["BOOTSTRAP_ADMIN_EMAILS"] = "shimizutechnology@gmail.com"
+    ENV["BOOTSTRAP_ADMIN_EMAILS"] = "bootstrap@example.com"
     stub_clerk_token(
       "sub" => "user_blocked",
       "email" => "blocked@example.com",

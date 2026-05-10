@@ -381,12 +381,26 @@ module Authenticatable
     role = ENV.fetch("BOOTSTRAP_ADMIN_ROLE", "campaign_admin")
     role = "campaign_admin" unless User::ROLES.include?(role)
 
-    user = User.find_or_initialize_by(email: email)
-    user.clerk_id = clerk_id
-    user.name = token_name.presence || user.name.presence || default_name_for_email(email)
-    user.role = role
-    user.save!
+    created = false
+    user = User.create_or_find_by!(email: email) do |u|
+      created = true
+      u.clerk_id = clerk_id
+      u.name = token_name.presence || default_name_for_email(email)
+      u.role = role
+    end
+
+    user.with_lock do
+      user.update!(
+        clerk_id: clerk_id,
+        name: token_name.presence || user.name.presence || default_name_for_email(email),
+        role: role
+      )
+    end
+
+    Rails.logger.info("[Auth] Bootstrap admin #{created ? 'created' : 'linked'} — clerk_id=#{clerk_id} email=#{email} role=#{role} env=#{Rails.env}")
     user
+  rescue ActiveRecord::RecordNotUnique
+    retry
   end
 
   def bootstrap_admin_emails
