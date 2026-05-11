@@ -253,7 +253,7 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 - Add structured contact history. **Implemented in Phase 3 on contact detail through logged call, SMS, and in-person attempts with outcomes and notes.**
 - Add GEC voter search by name, address, village, precinct. **Implemented at `/admin/gec-voters` and `/api/v1/gec_voters`.**
 - Add address/household grouping from GEC data. **Implemented as address lookup that shows GEC voters and existing DPG contacts at matching addresses.**
-- Add DPG contact to GEC voter matching. **Implemented for creating a DPG contact from a GEC voter and linking the resulting contact to the voter record. Existing-contact linking exists in the API; a richer UI picker is deferred to the contact-detail pass.**
+- Add DPG contact to GEC voter matching. **Implemented for creating a DPG contact from a GEC voter and linking existing DPG contacts from the GEC workspace UI.**
 - Add skipped-row/import-error review if needed.
 
 ### Phase 3: Contact/Household/Outreach Operations
@@ -267,6 +267,7 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 - Build Contact Attempt logging.
 - Build Household/Address workspace.
 - Build Outreach queues for registration, absentee, homebound, ride, volunteer, membership follow-up.
+- Surface latest contact attempts in the Follow-Up Queue and let staff log call/SMS/in-person touches from each queue card. **Implemented in the outreach queue so queue work updates the shared contact-history timeline.**
 
 ### Phase 4: Imports and List Types
 
