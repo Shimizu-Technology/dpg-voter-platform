@@ -217,9 +217,6 @@ class Supporter < ApplicationRecord
     if public_review_status == "rejected" || review_status == "rejected"
       self.public_review_status = "rejected"
       self.review_status = "rejected"
-    elsif PUBLIC_SOURCES.include?(source)
-      self.public_review_status = "not_applicable"
-      self.review_status = review_status.presence || "approved"
     else
       self.public_review_status = "not_applicable"
       self.review_status = review_status.presence || "approved"

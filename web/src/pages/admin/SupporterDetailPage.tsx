@@ -7,6 +7,11 @@ import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
 import { assignPrecinctIdByLastName } from '../../lib/precinctAssignment';
 import WorkspacePage from '../../components/WorkspacePage';
+import {
+  CONTACT_CLASSIFICATION_OPTIONS,
+  contactClassificationChipClass,
+  contactClassificationLabel,
+} from '../../lib/contactClassification';
 
 interface VillageOption {
   id: number;
@@ -407,41 +412,6 @@ function supporterStatusDetail(supporter: Pick<SupporterDetail, 'source' | 'revi
   return 'This contact is part of the DPG contact workspace.';
 }
 
-const CONTACT_CLASSIFICATION_OPTIONS = [
-  { value: 'new_intake', label: 'New intake' },
-  { value: 'active_contact', label: 'Active contact' },
-  { value: 'supporter', label: 'Supporter' },
-  { value: 'member', label: 'Member' },
-  { value: 'volunteer', label: 'Volunteer' },
-  { value: 'undecided', label: 'Undecided' },
-  { value: 'not_supporting', label: 'Not supporting' },
-] as const;
-
-function contactClassificationLabel(status?: string | null) {
-  return CONTACT_CLASSIFICATION_OPTIONS.find((entry) => entry.value === status)?.label || 'Contact';
-}
-
-function contactClassificationClass(status?: string | null) {
-  switch (status) {
-    case 'new_intake':
-      return 'bg-amber-100 text-amber-700';
-    case 'active_contact':
-      return 'bg-blue-100 text-blue-700';
-    case 'supporter':
-      return 'bg-green-100 text-green-700';
-    case 'member':
-      return 'bg-emerald-100 text-emerald-700';
-    case 'volunteer':
-      return 'bg-indigo-100 text-indigo-700';
-    case 'undecided':
-      return 'bg-slate-100 text-slate-700';
-    case 'not_supporting':
-      return 'bg-red-100 text-red-700';
-    default:
-      return 'bg-gray-100 text-gray-700';
-  }
-}
-
 function activitySourceLabel(supporter: Pick<SupporterDetail, 'source' | 'attribution_method'>) {
   if (supporter.source === 'public_signup' || supporter.source === 'qr_signup') return 'Public signup';
   if (supporter.attribution_method === 'staff_scan') return 'Staff scan';
@@ -683,7 +653,7 @@ export default function SupporterDetailPage() {
           {activityActionLabel(supporter)} {formatDateTime(supporter.created_at)} · {activitySourceLabel(supporter)}
         </p>
         <div className="flex items-center gap-2 mt-1">
-          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${contactClassificationClass(supporter.contact_classification)}`}>
+          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${contactClassificationChipClass(supporter.contact_classification)}`}>
             {contactClassificationLabel(supporter.contact_classification)}
           </span>
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1036,7 +1006,7 @@ export default function SupporterDetailPage() {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-[var(--text-secondary)]">Current classification:</span>
-              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${contactClassificationClass(supporter.contact_classification)}`}>
+              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${contactClassificationChipClass(supporter.contact_classification)}`}>
                 {contactClassificationLabel(supporter.contact_classification)}
               </span>
             </div>
