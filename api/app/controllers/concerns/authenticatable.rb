@@ -387,13 +387,17 @@ module Authenticatable
     created = false
     user = User.find_by(email: email)
     unless user
-      user = User.create!(
-        email: email,
-        clerk_id: clerk_id,
-        name: token_name.presence || default_name_for_email(email),
-        role: role
-      )
-      created = true
+      begin
+        user = User.create!(
+          email: email,
+          clerk_id: clerk_id,
+          name: token_name.presence || default_name_for_email(email),
+          role: role
+        )
+        created = true
+      rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+        user = User.find_by!(email: email)
+      end
     end
 
     user.with_lock do
@@ -406,10 +410,6 @@ module Authenticatable
 
     Rails.logger.info("[Auth] Bootstrap admin #{created ? 'created' : 'linked'} — clerk_id=#{clerk_id} email=#{email} role=#{role} env=#{Rails.env}")
     user
-  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
-    raise unless e.is_a?(ActiveRecord::RecordNotUnique) || User.exists?(email: email)
-
-    retry
   end
 
   def bootstrap_admin_emails
