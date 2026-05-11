@@ -79,12 +79,12 @@ export const createSupporterContactAttempt = (supporterId: number, data: JsonRec
 export const getSmsStatus = () => api.get('/sms/status').then(r => r.data);
 export const sendTestSms = (phone: string, message: string) =>
   api.post('/sms/send', { phone, message }).then(r => r.data);
-export const sendSmsBlast = (data: { message: string; village_id?: number; registered_voter?: string; dry_run?: string }) =>
+export const sendSmsBlast = (data: { message: string; village_id?: number; registered_voter?: string; dry_run?: string; recipient_reviewed?: boolean; expected_recipient_count?: number }) =>
   api.post('/sms/blast', data).then(r => r.data);
 export const getSmsBlasts = () => api.get('/sms/blasts').then(r => r.data);
 export const getSmsBlastStatus = (id: number) => api.get(`/sms/blasts/${id}`).then(r => r.data);
 export const getEmailStatus = () => api.get('/email/status').then(r => r.data);
-export const sendEmailBlast = (data: { subject: string; body: string; village_id?: number; registered_voter?: string; dry_run?: string }) =>
+export const sendEmailBlast = (data: { subject: string; body: string; village_id?: number; registered_voter?: string; dry_run?: string; recipient_reviewed?: boolean; expected_recipient_count?: number }) =>
   api.post('/email/blast', data).then(r => r.data);
 // Import
 export const uploadImportPreview = (file: File) => {

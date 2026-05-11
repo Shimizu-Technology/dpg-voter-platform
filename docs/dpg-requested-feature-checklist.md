@@ -140,9 +140,9 @@ Core requirement:
 - SMS/email settings screens if stable
 - opt-in fields respected
 - live sending available only in approved DPG environments with configured sender credentials; dry-run/preview first for normal testing
-- email/SMS templates
-- live blast governance and recipient approval workflow
-- outreach actions should create contact history records
+- email/SMS templates: starter compose templates implemented for registration help, event/community updates, and volunteer follow-up
+- live blast governance and recipient approval workflow: implemented through dry-run recipient preview plus required matching recipient-count confirmation for live sends
+- outreach actions should create contact history records: implemented for SMS/email blast attempts
 - reminder flows
 - possible autodialer integration
 

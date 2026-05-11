@@ -26,12 +26,14 @@ class SupporterEmailService
 
     # Send a blast email to multiple supporters.
     # Returns { sent: count, failed: count, errors: [] }
-    def send_blast(subject:, body_html:, supporters:)
+    def send_blast(subject:, body_html:, supporters:, recorded_by_user_id: nil)
       return { sent: 0, failed: 0, errors: [ "Email not configured" ] } unless configured?
 
       sent = 0
       failed = 0
       errors = []
+      contact_attempts = []
+      now = Time.current
 
       supporters.find_each do |supporter|
         next if supporter.email.blank?
@@ -47,13 +49,28 @@ class SupporterEmailService
             }
           )
           sent += 1
+          contact_attempts << contact_attempt_attributes(
+            supporter_id: supporter.id,
+            recorded_by_user_id: recorded_by_user_id,
+            outcome: "attempted",
+            note: "Email blast sent: #{personalize(subject, supporter).to_s.truncate(120)}",
+            recorded_at: now
+          )
         rescue StandardError => e
           failed += 1
+          contact_attempts << contact_attempt_attributes(
+            supporter_id: supporter.id,
+            recorded_by_user_id: recorded_by_user_id,
+            outcome: "unavailable",
+            note: "Email blast failed: #{personalize(subject, supporter).to_s.truncate(120)}. Error: #{e.message}",
+            recorded_at: now
+          )
           errors << "#{supporter.email}: #{e.message}" if errors.length < 10
           Rails.logger.error("[SupporterEmail] blast failed for #{supporter.email}: #{e.class} #{e.message}")
         end
       end
 
+      SupporterContactAttempt.insert_all!(contact_attempts.compact) if contact_attempts.any?
       { sent: sent, failed: failed, errors: errors }
     end
 
@@ -100,6 +117,21 @@ class SupporterEmailService
       text.gsub("{first_name}", ERB::Util.html_escape(supporter.first_name.to_s))
           .gsub("{last_name}", ERB::Util.html_escape(supporter.last_name.to_s))
           .gsub("{village}", ERB::Util.html_escape(supporter.village&.name.to_s))
+    end
+
+    def contact_attempt_attributes(supporter_id:, recorded_by_user_id:, outcome:, note:, recorded_at:)
+      return nil if recorded_by_user_id.blank?
+
+      {
+        supporter_id: supporter_id,
+        recorded_by_user_id: recorded_by_user_id,
+        channel: "email",
+        outcome: outcome,
+        note: note,
+        recorded_at: recorded_at,
+        created_at: recorded_at,
+        updated_at: recorded_at
+      }
     end
 
     def welcome_html(supporter)

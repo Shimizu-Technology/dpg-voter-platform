@@ -91,7 +91,7 @@ class ClicksendClient
       if username.blank? || api_key.blank?
         Rails.logger.error("[ClicksendClient] Missing credentials — batch not sent")
         return {
-          results: phones_and_bodies.map { |m| { to: m[:to], success: false, message_id: nil, error: "missing_credentials" } },
+          results: phones_and_bodies.map { |m| batch_result(m, success: false, message_id: nil, error: "missing_credentials") },
           sent: 0,
           failed: phones_and_bodies.size
         }
@@ -108,7 +108,8 @@ class ClicksendClient
           source: "dpg_voter_platform",
           from: from,
           body: item[:body].gsub("$", "USD "),
-          to: formatted_to
+          to: formatted_to,
+          supporter_id: item[:supporter_id]
         }
       end
 
@@ -126,13 +127,13 @@ class ClicksendClient
         "Authorization" => "Basic #{auth}",
         "Content-Type"  => "application/json"
       })
-      request.body = { messages: messages }.to_json
+      request.body = { messages: messages.map { |message| message.except(:supporter_id) } }.to_json
 
       begin
         response = http.request(request)
       rescue StandardError => e
         Rails.logger.error("[ClicksendClient] Batch HTTP error: #{e.message}")
-        return { results: messages.map { |m| { to: m[:to], success: false, message_id: nil, error: e.message } }, sent: 0, failed: messages.size }
+        return { results: messages.map { |m| batch_result(m, success: false, message_id: nil, error: e.message) }, sent: 0, failed: messages.size }
       end
 
       sent = 0
@@ -149,9 +150,10 @@ class ClicksendClient
 
         if json.nil?
           failed = messages.size
-          results = messages.map { |m| { to: m[:to], success: false, message_id: nil, error: "json_parse_error" } }
+          results = messages.map { |m| batch_result(m, success: false, message_id: nil, error: "json_parse_error") }
         else
           api_messages = json.dig("data", "messages") || []
+          messages_by_phone = messages_by_normalized_phone(messages)
 
           api_messages.each do |msg|
             success = msg["status"] == "SUCCESS"
@@ -160,30 +162,30 @@ class ClicksendClient
             else
               failed += 1
             end
-            results << {
+            message = messages_by_phone[normalized_phone_key(msg["to"])]&.shift || { to: msg["to"] }
+            results << batch_result(message,
               to: msg["to"],
               success: success,
               message_id: msg["message_id"],
               error: success ? nil : msg["status"]
-            }
+            )
           end
 
           # If API returned fewer results than messages sent, count the gap as failures
-          unaccounted = messages.size - (sent + failed)
+          accounted = sent + failed
+          unaccounted = messages.size - accounted
           if unaccounted > 0
             Rails.logger.warn("[ClicksendClient] #{unaccounted} messages unaccounted for in API response")
             failed += unaccounted
-            accounted_tos = results.map { |r| r[:to] }.to_set
-            messages.each do |m|
-              next if accounted_tos.include?(m[:to])
-              results << { to: m[:to], success: false, message_id: nil, error: "unaccounted_in_response" }
+            messages_by_phone.values.flatten.first(unaccounted).each do |m|
+              results << batch_result(m, success: false, message_id: nil, error: "unaccounted_in_response")
             end
           end
         end
       else
         Rails.logger.error("[ClicksendClient] Batch HTTP #{response.code}: #{response.body}")
         failed = messages.size
-        results = messages.map { |m| { to: m[:to], success: false, message_id: nil, error: "http_#{response.code}" } }
+        results = messages.map { |m| batch_result(m, success: false, message_id: nil, error: "http_#{response.code}") }
       end
 
       Rails.logger.info("[ClicksendClient] Batch complete: #{sent} sent, #{failed} failed")
@@ -212,6 +214,28 @@ class ClicksendClient
     rescue StandardError => e
       Rails.logger.error("[ClicksendClient] Balance check failed: #{e.message}")
       nil
+    end
+
+    def batch_result(message, to: nil, success:, message_id:, error:)
+      {
+        to: to || message[:to],
+        supporter_id: message[:supporter_id],
+        success: success,
+        message_id: message_id,
+        error: error
+      }
+    end
+
+    def messages_by_normalized_phone(messages)
+      messages.each_with_object({}) do |message, memo|
+        key = normalized_phone_key(message[:to])
+        memo[key] ||= []
+        memo[key] << message
+      end
+    end
+
+    def normalized_phone_key(phone)
+      phone.to_s.gsub(/\D/, "").sub(/\A1(?=\d{10}\z)/, "")
     end
 
     def mask_phone(phone)
