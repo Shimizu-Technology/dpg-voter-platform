@@ -400,12 +400,14 @@ module Authenticatable
       end
     end
 
-    user.with_lock do
-      user.update!(
-        clerk_id: clerk_id,
-        name: token_name.presence || user.name.presence || default_name_for_email(email),
-        role: role
-      )
+    unless created
+      user.with_lock do
+        user.update!(
+          clerk_id: clerk_id,
+          name: token_name.presence || user.name.presence || default_name_for_email(email),
+          role: role
+        )
+      end
     end
 
     Rails.logger.info("[Auth] Bootstrap admin #{created ? 'created' : 'linked'} — clerk_id=#{clerk_id} email=#{email} role=#{role} env=#{Rails.env}")
