@@ -17,6 +17,7 @@ Rails.application.routes.draw do
         end
       end
       resources :supporters, only: [ :create, :index, :show, :update ] do
+        resources :contact_attempts, only: [ :index, :create ], controller: "supporter_contact_attempts"
         member do
           patch :verify
           patch :resolve_duplicate

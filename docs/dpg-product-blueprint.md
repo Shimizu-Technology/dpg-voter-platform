@@ -248,6 +248,9 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 
 - Restore/build GEC voter-list import flow from reusable campaign-tracker foundation. **Implemented in the Phase 2 GEC workspace as a DPG-scoped spreadsheet import/preview using the reusable `GecImportService`.**
 - Add GEC list version/date management. **Implemented for imported list dates and recent import history; full import artifact/change review remains a later hardening pass.**
+- Add GEC search, address lookup, create-contact, and link-existing-contact workflows. **Implemented in `/admin/gec-voters`; the link-existing-contact UI is available inline from voter search results.**
+- Add first-pass household/address operations. **Implemented in Phase 3 through `/admin/households`, which combines GEC voters and DPG contacts by searched address.**
+- Add structured contact history. **Implemented in Phase 3 on contact detail through logged call, SMS, and in-person attempts with outcomes and notes.**
 - Add GEC voter search by name, address, village, precinct. **Implemented at `/admin/gec-voters` and `/api/v1/gec_voters`.**
 - Add address/household grouping from GEC data. **Implemented as address lookup that shows GEC voters and existing DPG contacts at matching addresses.**
 - Add DPG contact to GEC voter matching. **Implemented for creating a DPG contact from a GEC voter and linking the resulting contact to the voter record. Existing-contact linking exists in the API; a richer UI picker is deferred to the contact-detail pass.**

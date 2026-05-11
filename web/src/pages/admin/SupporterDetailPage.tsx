@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ChevronLeft, Pencil, Save, UserRound, X } from 'lucide-react';
-import { getSupporter, getVillages, updateSupporter, verifySupporter, updateOutreachStatus } from '../../lib/api';
+import { AlertTriangle, ChevronLeft, Loader2, MapPin, MessageSquare, Pencil, Phone, Plus, Save, StickyNote, UserRound, X } from 'lucide-react';
+import { createSupporterContactAttempt, getSupporter, getSupporterContactAttempts, getVillages, updateSupporter, verifySupporter, updateOutreachStatus } from '../../lib/api';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
 import { assignPrecinctIdByLastName } from '../../lib/precinctAssignment';
@@ -107,6 +107,16 @@ interface AuditLogItem {
   actor_role?: string;
   changed_data: Record<string, unknown>;
   created_at: string;
+}
+
+interface ContactAttemptItem {
+  id: number;
+  channel: string;
+  outcome: string;
+  note?: string | null;
+  recorded_at: string;
+  recorded_by_name?: string | null;
+  recorded_by_email?: string | null;
 }
 
 interface SupporterPermissions {
@@ -252,6 +262,25 @@ const PRIMARY_AUDIT_FIELD_ORDER = [
   'opt_in_email',
   'dob',
 ];
+
+const CONTACT_ATTEMPT_CHANNELS = [
+  { value: 'in_person', label: 'In person', icon: MapPin },
+  { value: 'call', label: 'Call', icon: Phone },
+  { value: 'sms', label: 'SMS', icon: MessageSquare },
+];
+
+const CONTACT_ATTEMPT_OUTCOMES = [
+  { value: 'reached', label: 'Reached' },
+  { value: 'attempted', label: 'Attempted' },
+  { value: 'unavailable', label: 'Unavailable' },
+  { value: 'wrong_number', label: 'Wrong number' },
+  { value: 'refused', label: 'Refused' },
+];
+
+function localDateTimeInputValue(date = new Date()) {
+  const localTime = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localTime.toISOString().slice(0, 16);
+}
 
 function humanizeRole(role?: string) {
   return role ? role.replaceAll('_', ' ') : 'public/system';
@@ -488,6 +517,21 @@ function supportDetailBackLabel(returnTo: string) {
   return 'Back';
 }
 
+function contactAttemptChannelLabel(channel: string) {
+  return CONTACT_ATTEMPT_CHANNELS.find((option) => option.value === channel)?.label || channel.replaceAll('_', ' ');
+}
+
+function contactAttemptOutcomeLabel(outcome: string) {
+  return CONTACT_ATTEMPT_OUTCOMES.find((option) => option.value === outcome)?.label || outcome.replaceAll('_', ' ');
+}
+
+function contactAttemptTone(outcome: string) {
+  if (outcome === 'reached') return 'bg-green-100 text-green-700';
+  if (outcome === 'refused' || outcome === 'wrong_number') return 'bg-red-100 text-red-700';
+  if (outcome === 'unavailable') return 'bg-amber-100 text-amber-800';
+  return 'bg-blue-100 text-blue-700';
+}
+
 function detailFlagChips(flags: Array<{ label: string; active: boolean; tone?: 'blue' | 'amber' | 'indigo' | 'green' }>) {
   const toneClass = {
     blue: 'bg-blue-100 text-blue-700',
@@ -520,10 +564,16 @@ export default function SupporterDetailPage() {
     queryKey: ['villages'],
     queryFn: getVillages,
   });
+  const { data: contactAttemptsData } = useQuery({
+    queryKey: ['supporter-contact-attempts', supporterId],
+    queryFn: () => getSupporterContactAttempts(supporterId),
+    enabled: Number.isFinite(supporterId),
+  });
 
   const supporter: SupporterDetail | undefined = data?.supporter;
   const permissions: SupporterPermissions | undefined = data?.permissions;
   const auditLogs: AuditLogItem[] = data?.audit_logs || [];
+  const contactAttempts: ContactAttemptItem[] = contactAttemptsData?.contact_attempts || [];
   const returnTo = searchParams.get('return_to') || '';
   const villages: VillageOption[] = useMemo(() => villagesData?.villages || [], [villagesData]);
   const villageNameById = useMemo(
@@ -537,7 +587,15 @@ export default function SupporterDetailPage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<Partial<SupporterDetail> | null>(null);
+  const [attemptDraft, setAttemptDraft] = useState({
+    channel: 'in_person',
+    outcome: 'reached',
+    note: '',
+    recorded_at: localDateTimeInputValue(),
+  });
+  const [attemptError, setAttemptError] = useState<string | null>(null);
   const canEdit = permissions?.can_edit ?? false;
+  const canLogContactAttempt = canEdit;
   const canMarkVerifiedVoter = supporter ? !isNoGecMatch(supporter) : false;
   const supporterDetailPath = (targetId: number) => {
     const basePath = '/admin/supporters';
@@ -593,6 +651,35 @@ export default function SupporterDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['supporters'] });
       queryClient.invalidateQueries({ queryKey: ['village'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
+  const contactAttemptMutation = useMutation({
+    mutationFn: () => createSupporterContactAttempt(supporterId, {
+      channel: attemptDraft.channel,
+      outcome: attemptDraft.outcome,
+      note: attemptDraft.note.trim(),
+      recorded_at: attemptDraft.recorded_at,
+    }),
+    onSuccess: () => {
+      setAttemptError(null);
+      setAttemptDraft({
+        channel: 'in_person',
+        outcome: 'reached',
+        note: '',
+        recorded_at: localDateTimeInputValue(),
+      });
+      queryClient.invalidateQueries({ queryKey: ['supporter-contact-attempts', supporterId] });
+      queryClient.invalidateQueries({ queryKey: ['supporter', supporterId] });
+      queryClient.invalidateQueries({ queryKey: ['outreach'] });
+    },
+    onError: (error: unknown) => {
+      if (typeof error === 'object' && error && 'response' in error) {
+        const response = (error as { response?: { data?: { error?: string } } }).response;
+        setAttemptError(response?.data?.error || 'Could not log this contact attempt.');
+      } else {
+        setAttemptError('Could not log this contact attempt.');
+      }
     },
   });
 
@@ -1338,6 +1425,120 @@ export default function SupporterDetailPage() {
                 )}
               </>
             )}
+          </div>
+        </section>
+
+        <section className="app-card p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="font-semibold text-[var(--text-primary)]">Contact History</h2>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                Log calls, texts, and in-person conversations so DPG can see the full relationship history for this contact.
+              </p>
+            </div>
+            <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {contactAttempts.length} attempt{contactAttempts.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          {canLogContactAttempt && (
+            <form
+              className="mt-4 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-bg)] p-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                contactAttemptMutation.mutate();
+              }}
+            >
+              <div className="grid gap-3 md:grid-cols-[160px_160px_190px_minmax(0,1fr)_auto] md:items-end">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Channel</span>
+                  <select
+                    value={attemptDraft.channel}
+                    onChange={(event) => setAttemptDraft((prev) => ({ ...prev, channel: event.target.value }))}
+                    className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                  >
+                    {CONTACT_ATTEMPT_CHANNELS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Outcome</span>
+                  <select
+                    value={attemptDraft.outcome}
+                    onChange={(event) => setAttemptDraft((prev) => ({ ...prev, outcome: event.target.value }))}
+                    className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                  >
+                    {CONTACT_ATTEMPT_OUTCOMES.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">When</span>
+                  <input
+                    type="datetime-local"
+                    value={attemptDraft.recorded_at}
+                    onChange={(event) => setAttemptDraft((prev) => ({ ...prev, recorded_at: event.target.value }))}
+                    className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Note</span>
+                  <input
+                    value={attemptDraft.note}
+                    onChange={(event) => setAttemptDraft((prev) => ({ ...prev, note: event.target.value }))}
+                    placeholder="What happened?"
+                    className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={contactAttemptMutation.isPending}
+                  className="app-btn-primary min-h-10 justify-center"
+                >
+                  {contactAttemptMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Log
+                </button>
+              </div>
+              {attemptError && (
+                <div className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {attemptError}
+                </div>
+              )}
+            </form>
+          )}
+
+          <div className="mt-4 space-y-3">
+            {contactAttempts.length === 0 ? (
+              <div className="rounded-xl bg-[var(--surface-bg)] px-4 py-6 text-center text-sm text-[var(--text-secondary)]">
+                No contact attempts have been logged yet.
+              </div>
+            ) : contactAttempts.map((attempt) => {
+              const ChannelIcon = CONTACT_ATTEMPT_CHANNELS.find((option) => option.value === attempt.channel)?.icon || StickyNote;
+              return (
+                <div key={attempt.id} className="rounded-xl border border-[var(--border-soft)] px-4 py-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ChannelIcon className="h-4 w-4 text-[var(--text-secondary)]" />
+                        <span className="font-semibold text-[var(--text-primary)]">{contactAttemptChannelLabel(attempt.channel)}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${contactAttemptTone(attempt.outcome)}`}>
+                          {contactAttemptOutcomeLabel(attempt.outcome)}
+                        </span>
+                      </div>
+                      {attempt.note && (
+                        <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-primary)]">{attempt.note}</p>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-left text-xs text-[var(--text-muted)] sm:text-right">
+                      <div>{formatDateTime(attempt.recorded_at)}</div>
+                      <div>{attempt.recorded_by_name || attempt.recorded_by_email || 'DPG staff'}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
 

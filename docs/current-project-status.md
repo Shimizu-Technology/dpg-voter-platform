@@ -124,8 +124,15 @@ DPG's requested platform includes:
 - GEC/public voter-list matching/search foundation is preserved because it is generic and DPG-requested.
 - GEC voter-list import/search is now restored as a first-class DPG workspace; it is public voter-file infrastructure, not Josh/Tina proprietary.
 - Staff can search by address/name/village/precinct/voter-registration number, inspect households from the GEC list, and create linked DPG contacts from GEC voter records.
-- Existing-contact-to-GEC linking is available in the API. The next UI refinement is a contact picker from GEC search/contact detail so staff can link existing DPG contacts without leaving the workflow.
+- Existing-contact-to-GEC linking is available from the GEC workspace UI through a contact picker, so staff can link existing DPG contacts without leaving the workflow.
 - Josh/Tina quota/vetting semantics have been removed from active DPG surfaces.
+
+### Contact/household operations
+
+- Contact detail now has a structured Contact History timeline.
+- Staff can log in-person, call, and SMS attempts with outcome, timestamp, note, and staff attribution.
+- Contact-attempt logging is village-scoped through the same DPG contact permissions as the rest of the workspace.
+- A dedicated `/admin/households` workspace now searches addresses across the current GEC voter file and DPG contacts, showing who is registered at an address and which DPG contacts are already linked there.
 
 ### Reports/export
 
@@ -163,8 +170,7 @@ These are not optional in the long-term DPG product, but should be implemented d
 - richer GEC import QA/review screens for skipped rows, source artifacts, and import diffs
 - DPG membership roster vs GEC automation
 - multiple list types: GEC, registered Democrat list, DPG roster/supporter list
-- fuller household/address workspace beyond current GEC address search and linked-household display
-- structured contact attempt history
+- richer canvassing route/assignment tooling beyond address search
 - support/lean/donation tracking
 - DPG-specific district grouping
 - precinct/village/district-scoped permissions
