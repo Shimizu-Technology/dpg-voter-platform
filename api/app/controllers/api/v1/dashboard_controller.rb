@@ -12,16 +12,18 @@ module Api
       # GET /api/v1/stats (public — no auth)
       def stats
         contacts = Supporter.contacts
+        total_contacts = contacts.count
+        matched_contacts = contacts.verified.count
 
         render json: {
-          verified_supporters: contacts.verified.count,
-          total_supporters: contacts.count,
+          verified_supporters: matched_contacts,
+          total_supporters: total_contacts,
           unverified_supporters: contacts.unverified.count,
           flagged_supporters: contacts.flagged.count,
           potential_duplicates: contacts.potential_duplicates_only.count,
-          total_contacts: contacts.count,
+          total_contacts: total_contacts,
           new_intake: Supporter.intake.count,
-          matched_to_gec: contacts.verified.count,
+          matched_to_gec: matched_contacts,
           total_villages: official_village_scope.count,
           campaign_name: Campaign.active.first&.name || CampaignBranding::CAMPAIGN_LABEL
         }
@@ -92,6 +94,18 @@ module Api
         global_contacts = Supporter.contacts
         global_verified = global_contacts.verified.count
         global_total = global_contacts.count
+        global_intake = Supporter.intake.count
+        global_supporters = Supporter.classified_supporters.count
+        global_members = Supporter.members.count
+        global_volunteers = Supporter.volunteers.count
+        global_follow_up = global_contacts.needs_follow_up.count
+        global_unverified = global_contacts.unverified.count
+        global_today_verified = global_contacts.verified_today.count
+        global_today_total = global_contacts.today.count
+        global_week_verified = global_contacts.verified_this_week.count
+        global_week_total = global_contacts.this_week.count
+        global_team_input = global_contacts.where(source: Supporter::TEAM_SOURCES).count
+        global_public_signups = global_contacts.public_origin.count
         all_villages = Village.all
         global_total_precincts = all_villages.sum { |v| v.precinct_count.to_i }
 
@@ -101,24 +115,24 @@ module Api
           campaign: campaign&.slice(:id, :name, :candidate_names, :election_year, :primary_color, :secondary_color),
           summary: {
             total_contacts: global_total,
-            new_intake: Supporter.intake.count,
-            supporters: Supporter.classified_supporters.count,
-            members: Supporter.members.count,
-            volunteers: Supporter.volunteers.count,
-            needs_follow_up: global_contacts.needs_follow_up.count,
+            new_intake: global_intake,
+            supporters: global_supporters,
+            members: global_members,
+            volunteers: global_volunteers,
+            needs_follow_up: global_follow_up,
             matched_to_gec: global_verified,
             verified_supporters: global_verified,
             total_supporters: global_total,
-            unverified_supporters: global_contacts.unverified.count,
+            unverified_supporters: global_unverified,
             total_registered_voters: all_villages.sum { |v| v.registered_voters.to_i },
             total_villages: official_village_scope.count,
             total_precincts: global_total_precincts,
-            today_signups: global_contacts.verified_today.count,
-            today_total_signups: global_contacts.today.count,
-            week_signups: global_contacts.verified_this_week.count,
-            week_total_signups: global_contacts.this_week.count,
-            team_input_count: global_contacts.where(source: Supporter::TEAM_SOURCES).count,
-            public_signup_count: global_contacts.public_origin.count
+            today_signups: global_today_verified,
+            today_total_signups: global_today_total,
+            week_signups: global_week_verified,
+            week_total_signups: global_week_total,
+            team_input_count: global_team_input,
+            public_signup_count: global_public_signups
           },
           villages: villages
         }

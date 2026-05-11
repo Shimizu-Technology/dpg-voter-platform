@@ -1,6 +1,6 @@
 class Supporter < ApplicationRecord
   ATTRIBUTION_METHODS = %w[qr_self_signup staff_manual staff_scan bulk_import public_signup].freeze
-  INTAKE_STATUSES = %w[accepted pending_public_review].freeze
+  INTAKE_STATUSES = %w[accepted].freeze
   CONTACT_CLASSIFICATIONS = %w[
     new_intake
     active_contact
@@ -214,17 +214,12 @@ class Supporter < ApplicationRecord
   end
 
   def sync_review_workflow_fields
-    if PUBLIC_SOURCES.include?(source)
-      if public_review_status == "rejected" || review_status == "rejected"
-        self.public_review_status = "rejected"
-        self.review_status = "rejected"
-      elsif intake_status == "pending_public_review"
-        self.public_review_status = "pending"
-        self.review_status = "pending"
-      else
-        self.public_review_status = "not_applicable"
-        self.review_status = review_status.presence || "approved"
-      end
+    if public_review_status == "rejected" || review_status == "rejected"
+      self.public_review_status = "rejected"
+      self.review_status = "rejected"
+    elsif PUBLIC_SOURCES.include?(source)
+      self.public_review_status = "not_applicable"
+      self.review_status = review_status.presence || "approved"
     else
       self.public_review_status = "not_applicable"
       self.review_status = review_status.presence || "approved"

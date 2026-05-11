@@ -86,9 +86,9 @@ class Api::V1::VillagesControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       source: "public_signup",
       status: "active",
-      intake_status: "pending_public_review",
-      review_status: "pending",
-      public_review_status: "pending",
+      intake_status: "accepted",
+      review_status: "approved",
+      public_review_status: "not_applicable",
       verification_status: "unverified"
     )
 

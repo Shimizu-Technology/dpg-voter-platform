@@ -101,6 +101,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_11_100000) do
     t.index ["campaign_id"], name: "index_districts_on_campaign_id"
   end
 
+  create_table "dpg_supporter_review_flow_backups", primary_key: "supporter_id", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "intake_status"
+    t.string "public_review_status"
+    t.string "review_status"
+    t.index ["supporter_id"], name: "index_dpg_supporter_review_flow_backups_on_supporter_id", unique: true
+  end
+
   create_table "event_rsvps", force: :cascade do |t|
     t.boolean "attended"
     t.datetime "checked_in_at"

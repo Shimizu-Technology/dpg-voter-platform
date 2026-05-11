@@ -54,10 +54,9 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 function LegacyWorkspaceRedirect() {
   const location = useLocation();
   const pathname = location.pathname
-    .replace(/^\/data/, '/admin')
-    .replace(/^\/team/, '/admin')
-    .replace('/admin/entry', '/admin/supporters/new')
-    .replace('/admin/campaign-settings', '/admin/sms/settings');
+    .replace(/^\/(data|team)(?=\/|$)/, '/admin')
+    .replace(/^\/admin\/entry(?=\/|$)/, '/admin/supporters/new')
+    .replace(/^\/admin\/campaign-settings(?=\/|$)/, '/admin/sms/settings');
 
   return <Navigate to={`${pathname}${location.search}`} replace />;
 }
