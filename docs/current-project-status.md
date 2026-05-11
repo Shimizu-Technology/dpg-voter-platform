@@ -122,8 +122,9 @@ DPG's requested platform includes:
 
 - Guam village/precinct foundation exists.
 - GEC/public voter-list matching/search foundation is preserved because it is generic and DPG-requested.
-- GEC voter-list import/search should be restored as a first-class DPG workspace; it is public voter-file infrastructure, not Josh/Tina proprietary.
-- The target workflow is address/name/village/precinct search against GEC, then link/create DPG contacts and record outreach/contact attempts.
+- GEC voter-list import/search is now restored as a first-class DPG workspace; it is public voter-file infrastructure, not Josh/Tina proprietary.
+- Staff can search by address/name/village/precinct/voter-registration number, inspect households from the GEC list, and create linked DPG contacts from GEC voter records.
+- Existing-contact-to-GEC linking is available in the API. The next UI refinement is a contact picker from GEC search/contact detail so staff can link existing DPG contacts without leaving the workflow.
 - Josh/Tina quota/vetting semantics have been removed from active DPG surfaces.
 
 ### Reports/export
@@ -159,10 +160,10 @@ Inactive implementation residue still exists in a few backend/support files, suc
 
 These are not optional in the long-term DPG product, but should be implemented deliberately in the updated priority order:
 
-- GEC voter-list import/search/address workspace
+- richer GEC import QA/review screens for skipped rows, source artifacts, and import diffs
 - DPG membership roster vs GEC automation
 - multiple list types: GEC, registered Democrat list, DPG roster/supporter list
-- fuller household/address workspace beyond the current street-address search and linked-household display
+- fuller household/address workspace beyond current GEC address search and linked-household display
 - structured contact attempt history
 - support/lean/donation tracking
 - DPG-specific district grouping

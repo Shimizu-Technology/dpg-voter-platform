@@ -22,6 +22,7 @@ import {
   Home,
   Settings,
   Copy,
+  Database,
 } from 'lucide-react';
 import WorkspaceBrandPanel from './WorkspaceBrandPanel';
 import { publicSiteConfig } from '../lib/publicSite';
@@ -61,6 +62,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
         ...(permissions?.can_view_supporters ? [ { to: '/admin/supporters', label: 'Contacts', icon: Users } ] : []),
         ...(permissions?.can_view_supporters ? [ { to: '/admin/intake', label: 'Intake', icon: ClipboardCheck, badge: sessionData?.counts?.new_intake } ] : []),
+        ...(permissions?.can_view_supporters ? [ { to: '/admin/gec-voters', label: 'GEC Voters', icon: Database } ] : []),
       ],
     },
     {

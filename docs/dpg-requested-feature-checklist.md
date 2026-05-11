@@ -219,10 +219,10 @@ Core build:
 
 ## Phase 2: GEC voter list
 
-- GEC voter-list import
-- GEC voter search
-- address/household view from GEC
-- DPG contact to GEC match
+- GEC voter-list import: implemented for DPG admins/data ops through the first-class GEC workspace.
+- GEC voter search: implemented by name, address, village, precinct, and voter registration number.
+- address/household view from GEC: implemented as address lookup showing GEC voters and DPG contacts at matching addresses.
+- DPG contact to GEC match: implemented for creating contacts from GEC voters and API-level existing contact linking.
 - DPG list cross-reference
 
 ## Phase 3: Contacts, households, outreach
