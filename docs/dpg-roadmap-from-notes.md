@@ -72,7 +72,7 @@ The starter build should be presented as a usable DPG voter-engagement foundatio
 3. Build DPG Contact/Household/Outreach operations:
    - household/address workspace: implemented as `/admin/households`
    - structured contact history: implemented on contact detail for call/SMS/in-person attempts
-   - registration/absentee/homebound/ride/volunteer follow-up queues
+   - registration/absentee/homebound/ride/volunteer follow-up queues: implemented with queue-card contact-attempt logging and latest-attempt summaries
 4. Expand imports into explicit list types:
    - GEC voter list
    - DPG contacts/supporters

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Clock3, MapPinned, Search, StickyNote, Users } from 'lucide-react';
-import { getOutreachSupporters, getVillages, updateOutreachStatus } from '../../lib/api';
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Clock3, MapPin, MapPinned, MessageSquare, Phone, Search, StickyNote, Users } from 'lucide-react';
+import { createSupporterContactAttempt, getOutreachSupporters, getVillages, updateOutreachStatus } from '../../lib/api';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
 import WorkspacePage from '../../components/WorkspacePage';
@@ -48,7 +48,18 @@ interface OutreachSupporter {
   support_follow_up_status: string | null;
   support_follow_up_date: string | null;
   support_follow_up_notes: string | null;
+  latest_contact_attempt?: ContactAttemptSummary | null;
   created_at?: string | null;
+}
+
+interface ContactAttemptSummary {
+  id: number;
+  channel: string;
+  outcome: string;
+  note?: string | null;
+  recorded_at?: string | null;
+  recorded_by_name?: string | null;
+  recorded_by_email?: string | null;
 }
 
 interface OutreachCounts {
@@ -96,6 +107,20 @@ const SUPPORT_STATUS_BADGES: Record<string, { bg: string; text: string; label: s
   declined: { bg: 'bg-red-100', text: 'text-red-800', label: 'Declined' },
 };
 
+const CONTACT_ATTEMPT_CHANNELS = [
+  { value: 'in_person', label: 'In person', icon: MapPin },
+  { value: 'call', label: 'Call', icon: Phone },
+  { value: 'sms', label: 'SMS', icon: MessageSquare },
+];
+
+const CONTACT_ATTEMPT_OUTCOMES = [
+  { value: 'reached', label: 'Reached' },
+  { value: 'attempted', label: 'Attempted' },
+  { value: 'unavailable', label: 'Unavailable' },
+  { value: 'wrong_number', label: 'Wrong number' },
+  { value: 'refused', label: 'Refused' },
+];
+
 function StatusBadge({
   status,
   emptyLabel,
@@ -127,6 +152,21 @@ function reasonChipClass(reason: string) {
   return 'bg-blue-100 text-blue-700';
 }
 
+function contactAttemptChannelLabel(channel: string) {
+  return CONTACT_ATTEMPT_CHANNELS.find((option) => option.value === channel)?.label || channel.replaceAll('_', ' ');
+}
+
+function contactAttemptOutcomeLabel(outcome: string) {
+  return CONTACT_ATTEMPT_OUTCOMES.find((option) => option.value === outcome)?.label || outcome.replaceAll('_', ' ');
+}
+
+function contactAttemptTone(outcome: string) {
+  if (outcome === 'reached') return 'bg-green-100 text-green-700';
+  if (outcome === 'refused' || outcome === 'wrong_number') return 'bg-red-100 text-red-700';
+  if (outcome === 'unavailable') return 'bg-amber-100 text-amber-800';
+  return 'bg-blue-100 text-blue-700';
+}
+
 export default function OutreachPage() {
   const queryClient = useQueryClient();
   const { data: sessionData } = useSession();
@@ -144,6 +184,13 @@ export default function OutreachPage() {
     supportStatus: string;
     supportNotes: string;
   }>>({});
+  const [attemptDrafts, setAttemptDrafts] = useState<Record<number, {
+    channel: string;
+    outcome: string;
+    note: string;
+  }>>({});
+  const [loggingAttemptIds, setLoggingAttemptIds] = useState<Set<number>>(() => new Set());
+  const [attemptErrorBySupporter, setAttemptErrorBySupporter] = useState<Record<number, string>>({});
   const debouncedSearch = useDebouncedValue(search, 250);
 
   const { data: villageData } = useQuery({ queryKey: ['villages'], queryFn: getVillages });
@@ -210,6 +257,50 @@ export default function OutreachPage() {
     },
   });
 
+  const contactAttemptMutation = useMutation({
+    mutationFn: ({ id, channel, outcome, note }: { id: number; channel: string; outcome: string; note: string }) =>
+      createSupporterContactAttempt(id, { channel, outcome, note }),
+    onMutate: (variables) => {
+      setLoggingAttemptIds((prev) => {
+        const next = new Set(prev);
+        next.add(variables.id);
+        return next;
+      });
+    },
+    onSuccess: (_data, variables) => {
+      setAttemptDrafts((prev) => ({
+        ...prev,
+        [variables.id]: { channel: 'call', outcome: 'attempted', note: '' },
+      }));
+      setLoggingAttemptIds((prev) => {
+        const next = new Set(prev);
+        next.delete(variables.id);
+        return next;
+      });
+      setAttemptErrorBySupporter((prev) => {
+        const next = { ...prev };
+        delete next[variables.id];
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: ['outreach'] });
+      queryClient.invalidateQueries({ queryKey: ['supporter', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['supporter-contact-attempts', variables.id] });
+    },
+    onError: (error: unknown, variables) => {
+      let message = 'Could not log this contact attempt.';
+      if (typeof error === 'object' && error && 'response' in error) {
+        const response = (error as { response?: { data?: { error?: string } } }).response;
+        message = response?.data?.error || message;
+      }
+      setLoggingAttemptIds((prev) => {
+        const next = new Set(prev);
+        next.delete(variables.id);
+        return next;
+      });
+      setAttemptErrorBySupporter((prev) => ({ ...prev, [variables.id]: message }));
+    },
+  });
+
   const supporters: OutreachSupporter[] = data?.supporters || [];
   const counts: OutreachCounts = data?.counts || {
     total: 0,
@@ -237,6 +328,13 @@ export default function OutreachPage() {
       supportNotes: supporter.support_follow_up_notes || '',
     };
 
+  const getAttemptDraft = (supporterId: number) =>
+    attemptDrafts[supporterId] || {
+      channel: 'call',
+      outcome: 'attempted',
+      note: '',
+    };
+
   const updateDraft = (
     supporterId: number,
     patch: Partial<{
@@ -257,6 +355,32 @@ export default function OutreachPage() {
         ...prev,
         [supporterId]: { ...existing, ...patch },
       };
+    });
+  };
+
+  const updateAttemptDraft = (
+    supporterId: number,
+    patch: Partial<{
+      channel: string;
+      outcome: string;
+      note: string;
+    }>
+  ) => {
+    setAttemptDrafts((prev) => ({
+      ...prev,
+      [supporterId]: { ...getAttemptDraft(supporterId), ...patch },
+    }));
+  };
+
+  const logContactAttempt = (supporter: OutreachSupporter) => {
+    if (loggingAttemptIds.has(supporter.id)) return;
+
+    const draft = getAttemptDraft(supporter.id);
+    contactAttemptMutation.mutate({
+      id: supporter.id,
+      channel: draft.channel,
+      outcome: draft.outcome,
+      note: draft.note.trim(),
     });
   };
 
@@ -431,12 +555,16 @@ export default function OutreachPage() {
         ) : (
           supporters.map((supporter) => {
             const draft = getDraft(supporter);
+            const attemptDraft = getAttemptDraft(supporter.id);
             const registrationStatusChanged = draft.registrationStatus !== (supporter.registration_outreach_status || '');
             const registrationNotesChanged = draft.registrationNotes !== (supporter.registration_outreach_notes || '');
             const supportStatusChanged = draft.supportStatus !== (supporter.support_follow_up_status || '');
             const supportNotesChanged = draft.supportNotes !== (supporter.support_follow_up_notes || '');
             const hasPendingChanges = registrationStatusChanged || registrationNotesChanged || supportStatusChanged || supportNotesChanged;
             const isSaving = updateMutation.isPending && updateMutation.variables?.id === supporter.id;
+            const isLoggingAttempt = loggingAttemptIds.has(supporter.id);
+            const latestAttempt = supporter.latest_contact_attempt;
+            const LatestAttemptIcon = latestAttempt ? CONTACT_ATTEMPT_CHANNELS.find((option) => option.value === latestAttempt.channel)?.icon || StickyNote : StickyNote;
             const latestFollowUpDate = [supporter.registration_outreach_date, supporter.support_follow_up_date]
               .filter((value): value is string => Boolean(value))
               .sort()
@@ -511,17 +639,33 @@ export default function OutreachPage() {
                         </div>
                       </div>
                       <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Household / referral</div>
-                        <div className="mt-1 text-sm text-gray-700">
-                          {(supporter.household_member_count || 0) > 0 ? `${supporter.household_member_count} linked supporter${supporter.household_member_count === 1 ? '' : 's'}` : 'Single supporter'}
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Latest contact</div>
+                        <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-700">
+                          <LatestAttemptIcon className="h-3.5 w-3.5 text-gray-400" />
+                          {latestAttempt ? contactAttemptChannelLabel(latestAttempt.channel) : 'No attempt logged yet'}
+                          {latestAttempt && (
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${contactAttemptTone(latestAttempt.outcome)}`}>
+                              {contactAttemptOutcomeLabel(latestAttempt.outcome)}
+                            </span>
+                          )}
                         </div>
                         <div className="mt-1 text-xs text-gray-500">
-                          {supporter.referred_by_name ? `Referred by ${supporter.referred_by_name}` : 'No referral note'}
+                          {latestAttempt?.recorded_at ? formatDateTime(latestAttempt.recorded_at) : 'Log the next call, text, or visit below'}
                         </div>
                       </div>
                     </div>
 
-                    {(supporter.registered_voter_location_note || supporter.registration_outreach_notes || supporter.support_follow_up_notes) && (
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Household / referral</div>
+                      <div className="mt-1 text-sm text-gray-700">
+                        {(supporter.household_member_count || 0) > 0 ? `${supporter.household_member_count} linked supporter${supporter.household_member_count === 1 ? '' : 's'}` : 'Single supporter'}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {supporter.referred_by_name ? `Referred by ${supporter.referred_by_name}` : 'No referral note'}
+                      </div>
+                    </div>
+
+                    {(supporter.registered_voter_location_note || supporter.registration_outreach_notes || supporter.support_follow_up_notes || latestAttempt?.note) && (
                       <div className="space-y-2">
                         {supporter.registered_voter_location_note && (
                           <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">
@@ -544,6 +688,15 @@ export default function OutreachPage() {
                               Support follow-up note
                             </div>
                             <div className="mt-1 whitespace-pre-wrap">{supporter.support_follow_up_notes}</div>
+                          </div>
+                        )}
+                        {latestAttempt?.note && (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                              <StickyNote className="h-3.5 w-3.5" />
+                              Latest contact note
+                            </div>
+                            <div className="mt-1 whitespace-pre-wrap">{latestAttempt.note}</div>
                           </div>
                         )}
                       </div>
@@ -623,6 +776,58 @@ export default function OutreachPage() {
                       >
                         {isSaving ? 'Saving...' : 'Save Follow-Up Updates'}
                       </button>
+                      <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Log contact attempt</div>
+                          <div className="mt-1 text-xs text-slate-500">Record the actual outreach touch while working this queue.</div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">Channel</span>
+                            <select
+                              value={attemptDraft.channel}
+                              onChange={(e) => updateAttemptDraft(supporter.id, { channel: e.target.value })}
+                              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm"
+                            >
+                              {CONTACT_ATTEMPT_CHANNELS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">Outcome</span>
+                            <select
+                              value={attemptDraft.outcome}
+                              onChange={(e) => updateAttemptDraft(supporter.id, { outcome: e.target.value })}
+                              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm"
+                            >
+                              {CONTACT_ATTEMPT_OUTCOMES.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                        <textarea
+                          value={attemptDraft.note}
+                          onChange={(e) => updateAttemptDraft(supporter.id, { note: e.target.value })}
+                          rows={2}
+                          placeholder="Quick note about this call, text, or visit..."
+                          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                        />
+                        {attemptErrorBySupporter[supporter.id] && (
+                          <div className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
+                            {attemptErrorBySupporter[supporter.id]}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => logContactAttempt(supporter)}
+                          disabled={isLoggingAttempt}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isLoggingAttempt ? 'Logging...' : 'Log Contact Attempt'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

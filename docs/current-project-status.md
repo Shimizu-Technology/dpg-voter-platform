@@ -133,6 +133,7 @@ DPG's requested platform includes:
 - Staff can log in-person, call, and SMS attempts with outcome, timestamp, note, and staff attribution.
 - Contact-attempt logging is village-scoped through the same DPG contact permissions as the rest of the workspace.
 - A dedicated `/admin/households` workspace now searches addresses across the current GEC voter file and DPG contacts, showing who is registered at an address and which DPG contacts are already linked there.
+- The `/admin/outreach` Follow-Up Queue now shows the latest contact attempt for each card and lets staff log call/SMS/in-person attempts without leaving the queue.
 
 ### Reports/export
 

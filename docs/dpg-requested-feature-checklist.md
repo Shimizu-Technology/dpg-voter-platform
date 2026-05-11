@@ -229,7 +229,7 @@ Core build:
 
 - structured contact history: implemented for contact detail with channel, outcome, timestamp, note, and staff attribution.
 - household/address workspace: implemented at `/admin/households`, backed by the current GEC household lookup and DPG contact address search.
-- follow-up queues
+- follow-up queues: implemented for registration and voter-help work, now with latest-contact summaries and queue-card logging into the shared contact history.
 - roles/scoped permissions
 
 ## Phase 4: Communications and list operations

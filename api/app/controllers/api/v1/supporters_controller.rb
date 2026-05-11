@@ -565,10 +565,11 @@ module Api
           completed: completed_scope.count
         }
 
-        supporters = supporters.offset((page - 1) * per_page).limit(per_page)
+        supporters = supporters.offset((page - 1) * per_page).limit(per_page).to_a
+        latest_contact_attempts = latest_contact_attempts_for(supporters)
 
         render json: {
-          supporters: supporters.map { |s| outreach_json(s) },
+          supporters: supporters.map { |s| outreach_json(s, latest_contact_attempt: latest_contact_attempts[s.id]) },
           counts: counts,
           pagination: { page: page, per_page: per_page, total: total, pages: (total.to_f / per_page).ceil }
         }
@@ -1243,7 +1244,7 @@ module Api
         }
       end
 
-      def outreach_json(supporter)
+      def outreach_json(supporter, latest_contact_attempt: nil)
         current_gec_match = supporter.gec_voter_id.present?
 
         {
@@ -1282,9 +1283,42 @@ module Api
           support_follow_up_status: supporter.support_follow_up_status,
           support_follow_up_notes: supporter.support_follow_up_notes,
           support_follow_up_date: supporter.support_follow_up_date&.iso8601,
+          latest_contact_attempt: latest_contact_attempt && contact_attempt_summary_json(latest_contact_attempt),
           status: supporter.status,
           contact_classification: supporter.contact_classification,
           created_at: supporter.created_at&.iso8601
+        }
+      end
+
+      def latest_contact_attempts_for(supporters)
+        supporter_ids = supporters.map(&:id)
+        return {} if supporter_ids.empty?
+
+        ranked_attempts = SupporterContactAttempt
+          .select(
+            "supporter_contact_attempts.*, " \
+            "ROW_NUMBER() OVER (PARTITION BY supporter_id ORDER BY recorded_at DESC, id DESC) AS attempt_rank"
+          )
+          .where(supporter_id: supporter_ids)
+
+        SupporterContactAttempt
+          .from(ranked_attempts, :supporter_contact_attempts)
+          .includes(:recorded_by_user)
+          .where("attempt_rank = 1")
+          .each_with_object({}) do |attempt, latest_by_supporter|
+            latest_by_supporter[attempt.supporter_id] = attempt
+          end
+      end
+
+      def contact_attempt_summary_json(attempt)
+        {
+          id: attempt.id,
+          channel: attempt.channel,
+          outcome: attempt.outcome,
+          note: attempt.note,
+          recorded_at: attempt.recorded_at&.iso8601,
+          recorded_by_name: attempt.recorded_by_user&.name,
+          recorded_by_email: attempt.recorded_by_user&.email
         }
       end
 
