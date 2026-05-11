@@ -51,6 +51,7 @@ interface SupporterItem {
   verification_reason_detail?: string | null;
   potential_duplicate: boolean;
   source: string;
+  contact_classification: string;
   attribution_method?: string | null;
   intake_status?: string;
   review_status?: string;
@@ -87,7 +88,7 @@ function parsePerPage(value: string | null): PerPage {
 }
 
 function supporterLabel(count: number) {
-  return `${count} supporter${count === 1 ? '' : 's'}`;
+  return `${count} contact${count === 1 ? '' : 's'}`;
 }
 
 function backLinkLabel(returnTo: string) {
@@ -146,40 +147,39 @@ function sourceChipClass(supporter: Pick<SupporterItem, 'source' | 'attribution_
   return 'bg-purple-100 text-purple-700';
 }
 
-function supporterStatusLabel(supporter: Pick<SupporterItem, 'source' | 'review_status' | 'public_review_status'>) {
-  if ((supporter.source === 'public_signup' || supporter.source === 'qr_signup') && supporter.public_review_status === 'pending') {
-    return 'Pending Public Review';
-  }
-  if (supporter.review_status === 'pending') {
-    return 'Pending Supporter Review';
-  }
-  if (supporter.review_status === 'rejected') {
-    return 'Rejected Submission';
-  }
-  if ((supporter.source === 'public_signup' || supporter.source === 'qr_signup') && supporter.review_status === 'approved') {
-    return 'Approved Public Supporter';
-  }
-  if (supporter.source === 'staff_entry') return 'Approved Staff Supporter';
-  if (supporter.source === 'bulk_import') return 'Approved Imported Supporter';
-  return 'DPG Supporter';
+const CONTACT_CLASSIFICATION_OPTIONS = [
+  { value: 'new_intake', label: 'New intake' },
+  { value: 'active_contact', label: 'Active contact' },
+  { value: 'supporter', label: 'Supporter' },
+  { value: 'member', label: 'Member' },
+  { value: 'volunteer', label: 'Volunteer' },
+  { value: 'undecided', label: 'Undecided' },
+  { value: 'not_supporting', label: 'Not supporting' },
+] as const;
+
+function contactClassificationLabel(status?: string | null) {
+  return CONTACT_CLASSIFICATION_OPTIONS.find((entry) => entry.value === status)?.label || 'Contact';
 }
 
-function supporterStatusChipClass(supporter: Pick<SupporterItem, 'source' | 'review_status' | 'public_review_status'>) {
-  if ((supporter.source === 'public_signup' || supporter.source === 'qr_signup') && supporter.public_review_status === 'pending') {
-    return 'bg-amber-100 text-amber-700';
+function contactClassificationChipClass(status?: string | null) {
+  switch (status) {
+    case 'new_intake':
+      return 'bg-amber-100 text-amber-700';
+    case 'active_contact':
+      return 'bg-blue-100 text-blue-700';
+    case 'supporter':
+      return 'bg-green-100 text-green-700';
+    case 'member':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'volunteer':
+      return 'bg-indigo-100 text-indigo-700';
+    case 'undecided':
+      return 'bg-slate-100 text-slate-700';
+    case 'not_supporting':
+      return 'bg-red-100 text-red-700';
+    default:
+      return 'bg-gray-100 text-gray-700';
   }
-  if (supporter.review_status === 'pending') {
-    return 'bg-blue-100 text-blue-700';
-  }
-  if (supporter.review_status === 'rejected') {
-    return 'bg-red-100 text-red-700';
-  }
-  if ((supporter.source === 'public_signup' || supporter.source === 'qr_signup') && supporter.review_status === 'approved') {
-    return 'bg-blue-100 text-blue-700';
-  }
-  if (supporter.source === 'staff_entry') return 'bg-purple-100 text-purple-700';
-  if (supporter.source === 'bulk_import') return 'bg-slate-100 text-slate-700';
-  return 'bg-gray-100 text-gray-700';
 }
 
 function supporterSortName(supporter: Pick<SupporterItem, 'first_name' | 'middle_name' | 'last_name'>) {
@@ -239,6 +239,7 @@ export default function SupportersPage() {
   const queryClient = useQueryClient();
   const { data: sessionData } = useSession();
   const location = useLocation();
+  const isIntakeView = location.pathname === '/admin/intake';
   const [returnTo] = useState(searchParams.get('return_to') || '');
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [villageFilter, setVillageFilter] = useState(searchParams.get('village_id') || '');
@@ -246,6 +247,7 @@ export default function SupportersPage() {
   const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '');
   const [optInFilter, setOptInFilter] = useState(searchParams.get('opt_in') || '');
   const [verificationFilter, setVerificationFilter] = useState(searchParams.get('verification_status') || '');
+  const [classificationFilter, setClassificationFilter] = useState(searchParams.get('contact_classification') || (isIntakeView ? 'new_intake' : ''));
   const [registeredStatusFilter, setRegisteredStatusFilter] = useState(searchParams.get('registered_voter_status') || '');
   const [supportNeedFilter, setSupportNeedFilter] = useState(searchParams.get('support_need') || '');
   const [lifecycleFilter, setLifecycleFilter] = useState(searchParams.get('status') || 'active');
@@ -297,6 +299,7 @@ export default function SupportersPage() {
     if (sourceFilter) params.set('source', sourceFilter);
     if (optInFilter) params.set('opt_in', optInFilter);
     if (verificationFilter) params.set('verification_status', verificationFilter);
+    if (classificationFilter) params.set('contact_classification', classificationFilter);
     if (registeredStatusFilter) params.set('registered_voter_status', registeredStatusFilter);
     if (supportNeedFilter) params.set('support_need', supportNeedFilter);
     if (lifecycleFilter) params.set('status', lifecycleFilter);
@@ -306,10 +309,10 @@ export default function SupportersPage() {
     params.set('per_page', String(perPage));
     if (returnTo) params.set('return_to', returnTo);
     setSearchParams(params, { replace: true });
-  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, setSearchParams]);
+  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, setSearchParams]);
 
   const { data, isFetching } = useQuery<SupportersResponse>({
-    queryKey: ['supporters', debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
+    queryKey: ['supporters', debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
     queryFn: () => getSupporters({
       search: debouncedSearch,
       village_id: effectiveVillageFilter || undefined,
@@ -318,6 +321,7 @@ export default function SupportersPage() {
       opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
       opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
       verification_status: verificationFilter || undefined,
+      contact_classification: classificationFilter || undefined,
       registered_voter_status: registeredStatusFilter || undefined,
       support_need: supportNeedFilter || undefined,
       status: lifecycleFilter || undefined,
@@ -341,7 +345,7 @@ export default function SupportersPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => setVisibleRows(80), 0);
     return () => window.clearTimeout(timer);
-  }, [progressiveRenderingEnabled, page, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage]);
+  }, [progressiveRenderingEnabled, page, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage]);
 
   useEffect(() => {
     if (!progressiveRenderingEnabled) return;
@@ -358,7 +362,7 @@ export default function SupportersPage() {
     const totalPages = data.pagination.pages;
     if (page < totalPages) {
       void queryClient.prefetchQuery({
-        queryKey: ['supporters', debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
+        queryKey: ['supporters', debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
         queryFn: () => getSupporters({
           search: debouncedSearch,
           village_id: effectiveVillageFilter || undefined,
@@ -367,6 +371,7 @@ export default function SupportersPage() {
           opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
           opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
           verification_status: verificationFilter || undefined,
+          contact_classification: classificationFilter || undefined,
           registered_voter_status: registeredStatusFilter || undefined,
           support_need: supportNeedFilter || undefined,
           status: lifecycleFilter || undefined,
@@ -378,7 +383,7 @@ export default function SupportersPage() {
         }),
       });
     }
-  }, [data, page, perPage, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
+  }, [data, page, perPage, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
 
   const assignPrecinctMutation = useMutation({
     mutationFn: ({ supporterId, precinctId }: { supporterId: number; precinctId: number }) =>
@@ -438,7 +443,7 @@ export default function SupportersPage() {
   };
 
   const supporterDetailLink = (supporterId: number) =>
-    `${location.pathname.startsWith('/data') ? '/data/supporters' : '/admin/supporters'}/${supporterId}?return_to=${encodeURIComponent(`${location.pathname.split('?')[0]}?${searchParams.toString()}`)}`;
+    `/admin/supporters/${supporterId}?return_to=${encodeURIComponent(`${location.pathname.split('?')[0]}?${searchParams.toString()}`)}`;
 
   const handleSort = (field: SortField) => {
     setPage(1);
@@ -469,7 +474,7 @@ export default function SupportersPage() {
           </Link>
         )}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">All Supporters</h1>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{isIntakeView ? 'New Intake' : 'All Contacts'}</h1>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => exportSupporters({
@@ -478,6 +483,7 @@ export default function SupportersPage() {
                 source: sourceFilter || undefined,
                 opt_in: optInFilter || undefined,
                 verification_status: verificationFilter || undefined,
+                contact_classification: classificationFilter || undefined,
                 registered_voter_status: registeredStatusFilter || undefined,
                 support_need: supportNeedFilter || undefined,
                 status: lifecycleFilter || undefined,
@@ -495,9 +501,9 @@ export default function SupportersPage() {
                   <ClipboardPlus className="w-4 h-4" /> New Entry
                 </Link>
               )}
-              <Link to="/admin/supporters?status=removed" className="app-btn-secondary">
+              {!isIntakeView && <Link to="/admin/supporters?status=removed" className="app-btn-secondary">
                 Removed
-              </Link>
+              </Link>}
           </div>
         </div>
       </div>
@@ -511,7 +517,7 @@ export default function SupportersPage() {
               type="text"
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Search by name or phone..."
+              placeholder="Search name, phone, email, or address..."
               className="w-full pl-10 pr-4 py-3 border border-[var(--border-soft)] rounded-xl text-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
@@ -564,6 +570,19 @@ export default function SupportersPage() {
             <option value="text">Opted in: Text</option>
             <option value="email">Opted in: Email</option>
             <option value="both">Opted in: Both</option>
+          </select>
+          <select
+            value={classificationFilter}
+            onChange={(e) => {
+              setClassificationFilter(e.target.value);
+              setPage(1);
+            }}
+            className="md:col-span-2 px-3 py-3 border border-[var(--border-soft)] rounded-xl bg-[var(--surface-raised)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary focus:border-transparent min-w-0"
+          >
+            <option value="">{isIntakeView ? 'All intake records' : 'All classifications'}</option>
+            {CONTACT_CLASSIFICATION_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
           </select>
           <select
             value={verificationFilter}
@@ -718,8 +737,8 @@ export default function SupportersPage() {
                 }`}>
                   {sourceLabel(s)}
                 </span>
-                <span className={`app-chip ${supporterStatusChipClass(s)}`}>
-                  {supporterStatusLabel(s)}
+                <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
+                  {contactClassificationLabel(s.contact_classification)}
                 </span>
                 <span className={`app-chip ${
                   s.verification_status === 'verified' ? 'bg-green-100 text-green-700' :
@@ -768,7 +787,7 @@ export default function SupportersPage() {
             </div>
           ))}
           {supportersRows.length === 0 && (
-            <div className="text-center text-[var(--text-muted)] py-8">No supporters found</div>
+            <div className="text-center text-[var(--text-muted)] py-8">{isIntakeView ? 'No intake records found' : 'No contacts found'}</div>
           )}
           {progressiveRenderingEnabled && effectiveVisibleRows < supportersRows.length && (
             <div className="text-center text-xs text-[var(--text-muted)] py-2">
@@ -805,7 +824,7 @@ export default function SupportersPage() {
                     Origin <ArrowUpDown className="w-3.5 h-3.5" /> {sortLabel('source')}
                   </button>
                 </th>
-                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Supporter Status</th>
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Classification</th>
                 <th className="w-[320px] min-w-[320px] text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Voter Check</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Lifecycle</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">
@@ -872,8 +891,8 @@ export default function SupportersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap align-middle">
-                    <span className={`app-chip ${supporterStatusChipClass(s)}`}>
-                      {supporterStatusLabel(s)}
+                    <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
+                      {contactClassificationLabel(s.contact_classification)}
                     </span>
                   </td>
                   <td className="w-[320px] min-w-[320px] px-4 py-3 align-top">
@@ -907,7 +926,7 @@ export default function SupportersPage() {
               {supportersRows.length === 0 && (
                 <tr>
                   <td colSpan={11} className="px-4 py-8 text-center text-[var(--text-muted)]">
-                    No supporters found
+                    {isIntakeView ? 'No intake records found' : 'No contacts found'}
                   </td>
                 </tr>
               )}

@@ -29,7 +29,7 @@ export default function StaffPortalPage() {
               <WorkspaceBrandPanel
                 centered
                 workspaceName="Staff Portal"
-                workspaceDescription="Sign in to reach DPG Operations or the Data Ops Workspace."
+                workspaceDescription="Sign in to reach the DPG internal workspace."
                 badge="Internal DPG workspace"
               />
               <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-[0_24px_60px_-32px_rgba(15,42,91,0.35)]">

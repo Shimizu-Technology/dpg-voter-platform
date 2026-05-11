@@ -96,8 +96,8 @@ module Api
       # Batch load supporter counts to avoid N+1 queries
       def load_supporter_counts
         @official_counts = Supporter.official_supporters.group(:village_id).count
-        @matched_counts = Supporter.official_supporters.verified.group(:village_id).count
-        @total_counts = Supporter.active.group(:village_id).count
+        @matched_counts = Supporter.contacts.verified.group(:village_id).count
+        @total_counts = Supporter.contacts.group(:village_id).count
         @registered_voter_counts = Precinct.group(:village_id).sum(:registered_voters)
       end
 

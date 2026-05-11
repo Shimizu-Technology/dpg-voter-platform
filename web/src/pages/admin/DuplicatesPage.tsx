@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getDuplicates, resolveDuplicate, scanDuplicates, getVillages } from '../../lib/api';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, Search, ArrowRight, X } from 'lucide-react';
 import { useSession } from '../../hooks/useSession';
 import { formatDateTime } from '../../lib/datetime';
@@ -54,17 +54,17 @@ function supporterApprovalStatusLabel(supporter: Pick<Supporter, 'source' | 'rev
     return 'Pending Public Review';
   }
   if (supporter.review_status === 'pending') {
-    return 'Pending Supporter Review';
+    return 'Pending Review';
   }
   if (supporter.review_status === 'rejected') {
     return 'Rejected Submission';
   }
   if ((supporter.source === 'public_signup' || supporter.source === 'qr_signup') && supporter.review_status === 'approved') {
-    return 'Approved Public Supporter';
+    return 'Public Contact';
   }
-  if (supporter.source === 'staff_entry') return 'Approved Staff Supporter';
-  if (supporter.source === 'bulk_import') return 'Approved Imported Supporter';
-  return 'DPG Supporter';
+  if (supporter.source === 'staff_entry') return 'Staff Contact';
+  if (supporter.source === 'bulk_import') return 'Imported Contact';
+  return 'DPG Contact';
 }
 
 function supporterApprovalStatusClass(supporter: Pick<Supporter, 'source' | 'review_status' | 'public_review_status'>) {
@@ -156,9 +156,8 @@ export default function DuplicatesPage() {
   const [villageFilter, setVillageFilter] = useState<string>('');
   const queryClient = useQueryClient();
   const { data: sessionData } = useSession();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const supporterBasePath = location.pathname.startsWith('/data') ? '/data/supporters' : '/admin/supporters';
+  const supporterBasePath = '/admin/supporters';
   const focusSupporterId = Number(searchParams.get('focus_supporter_id') || '');
 
   const { data: dupData, isLoading } = useQuery({

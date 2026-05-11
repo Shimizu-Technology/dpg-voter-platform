@@ -45,6 +45,7 @@ interface SupporterDetail {
   opt_in_email: boolean;
   opt_in_text: boolean;
   verification_status: string;
+  contact_classification: string;
   referred_from_village_id?: number | null;
   referred_from_village_name?: string | null;
   verification_reason?: string | null;
@@ -120,6 +121,7 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   village_id: 'Village ID',
   precinct_id: 'Precinct ID',
   source: 'Source',
+  contact_classification: 'Classification',
   intake_status: 'Supporter status',
   review_status: 'Review status',
   public_review_status: 'Public review status',
@@ -187,9 +189,21 @@ const AUDIT_VALUE_LABELS: Record<string, Record<string, string>> = {
     not_sure: 'Not sure',
   },
   review_status: {
-    pending: 'Pending supporter review',
+    pending: 'Pending review',
     approved: 'Approved',
     rejected: 'Rejected',
+  },
+  contact_classification: {
+    new_intake: 'New intake',
+    active_contact: 'Active contact',
+    supporter: 'Supporter',
+    member: 'Member',
+    volunteer: 'Volunteer',
+    undecided: 'Undecided',
+    not_supporting: 'Not supporting',
+    duplicate: 'Duplicate',
+    invalid: 'Invalid',
+    archived: 'Archived',
   },
   public_review_status: {
     not_applicable: 'Not applicable',
@@ -363,34 +377,69 @@ function isApprovedPublicSignup(supporter: Pick<SupporterDetail, 'source' | 'rev
 
 function supporterStatusLabel(supporter: Pick<SupporterDetail, 'source' | 'review_status' | 'public_review_status'>) {
   if (isPendingPublicSignup(supporter)) return 'Pending public review';
-  if (supporter.review_status === 'pending') return 'Pending supporter review';
+  if (supporter.review_status === 'pending') return 'Pending review';
   if (supporter.review_status === 'rejected') return 'Rejected submission';
-  if (isApprovedPublicSignup(supporter)) return 'Approved public supporter';
-  if (supporter.source === 'staff_entry') return 'Approved Staff Supporter';
-  if (supporter.source === 'bulk_import') return 'Approved Imported Supporter';
-  return 'Approved party supporter';
+  if (isApprovedPublicSignup(supporter)) return 'Accepted public contact';
+  if (supporter.source === 'staff_entry') return 'Staff-entered contact';
+  if (supporter.source === 'bulk_import') return 'Imported contact';
+  return 'Accepted contact';
 }
 
 function supporterStatusDetail(supporter: Pick<SupporterDetail, 'source' | 'review_status' | 'public_review_status'>) {
   if (isPendingPublicSignup(supporter)) {
-    return 'This supporter came from the public signup form and is waiting for public-review approval before entering the main supporter review queue.';
+    return 'This contact came from the public signup form and is waiting for intake review.';
   }
   if (supporter.review_status === 'pending') {
-    return 'This submission is waiting for data-team approval before it joins the official supporter list.';
+    return 'This submission is waiting for review before it joins the active contact workspace.';
   }
   if (supporter.review_status === 'rejected') {
     return 'This submission was rejected and is kept only for audit and possible follow-up.';
   }
   if (isApprovedPublicSignup(supporter)) {
-    return 'This supporter came from the public signup form and has been fully approved into the official supporter list.';
+    return 'This contact came from the public signup form and is available for DPG follow-up.';
   }
   if (supporter.source === 'staff_entry') {
-    return 'This supporter was entered by staff and has been approved into the official supporter list.';
+    return 'This contact was entered by staff and is available for DPG follow-up.';
   }
   if (supporter.source === 'bulk_import') {
-    return 'This supporter was added through a party import and has been approved into the official supporter list.';
+    return 'This contact was added through an import and is available for DPG follow-up.';
   }
-  return 'This supporter is already part of the official supporter list.';
+  return 'This contact is part of the DPG contact workspace.';
+}
+
+const CONTACT_CLASSIFICATION_OPTIONS = [
+  { value: 'new_intake', label: 'New intake' },
+  { value: 'active_contact', label: 'Active contact' },
+  { value: 'supporter', label: 'Supporter' },
+  { value: 'member', label: 'Member' },
+  { value: 'volunteer', label: 'Volunteer' },
+  { value: 'undecided', label: 'Undecided' },
+  { value: 'not_supporting', label: 'Not supporting' },
+] as const;
+
+function contactClassificationLabel(status?: string | null) {
+  return CONTACT_CLASSIFICATION_OPTIONS.find((entry) => entry.value === status)?.label || 'Contact';
+}
+
+function contactClassificationClass(status?: string | null) {
+  switch (status) {
+    case 'new_intake':
+      return 'bg-amber-100 text-amber-700';
+    case 'active_contact':
+      return 'bg-blue-100 text-blue-700';
+    case 'supporter':
+      return 'bg-green-100 text-green-700';
+    case 'member':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'volunteer':
+      return 'bg-indigo-100 text-indigo-700';
+    case 'undecided':
+      return 'bg-slate-100 text-slate-700';
+    case 'not_supporting':
+      return 'bg-red-100 text-red-700';
+    default:
+      return 'bg-gray-100 text-gray-700';
+  }
 }
 
 function activitySourceLabel(supporter: Pick<SupporterDetail, 'source' | 'attribution_method'>) {
@@ -521,7 +570,7 @@ export default function SupporterDetailPage() {
   const canEdit = permissions?.can_edit ?? false;
   const canMarkVerifiedVoter = supporter ? !isNoGecMatch(supporter) : false;
   const supporterDetailPath = (targetId: number) => {
-    const basePath = location.pathname.startsWith('/data') ? '/data/supporters' : '/admin/supporters';
+    const basePath = '/admin/supporters';
     const nextReturnTo = `${location.pathname}${location.search}`;
     return `${basePath}/${targetId}?return_to=${encodeURIComponent(nextReturnTo)}`;
   };
@@ -542,6 +591,7 @@ export default function SupporterDetailPage() {
       registered_voter_status: supporter.registered_voter_status,
       registered_voter_location_note: supporter.registered_voter_location_note || '',
       registered_voter: supporter.registered_voter,
+      contact_classification: supporter.contact_classification,
       wants_to_volunteer: supporter.wants_to_volunteer,
       needs_absentee_ballot_help: supporter.needs_absentee_ballot_help,
       needs_homebound_voting_help: supporter.needs_homebound_voting_help,
@@ -633,8 +683,8 @@ export default function SupporterDetailPage() {
           {activityActionLabel(supporter)} {formatDateTime(supporter.created_at)} · {activitySourceLabel(supporter)}
         </p>
         <div className="flex items-center gap-2 mt-1">
-          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-            {supporterStatusLabel(supporter)}
+          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${contactClassificationClass(supporter.contact_classification)}`}>
+            {contactClassificationLabel(supporter.contact_classification)}
           </span>
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
             supporter.verification_status === 'verified' ? 'bg-green-100 text-green-800' :
@@ -674,7 +724,7 @@ export default function SupporterDetailPage() {
 
         <section className="app-card p-4">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <h2 className="font-semibold text-[var(--text-primary)]">Supporter Details</h2>
+            <h2 className="font-semibold text-[var(--text-primary)]">Contact Details</h2>
             {!isEditing ? (
               canEdit && (
                 <button
@@ -788,6 +838,16 @@ export default function SupporterDetailPage() {
               <option value="">Not assigned</option>
               {(selectedVillage?.precincts || []).map((p) => (
                 <option key={p.id} value={p.id}>Precinct {p.number} ({p.alpha_range})</option>
+              ))}
+            </select>
+            <select
+              value={String(currentForm.contact_classification || 'new_intake')}
+              onChange={(e) => updateDraft({ contact_classification: e.target.value })}
+              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+              disabled={!isEditing}
+            >
+              {CONTACT_CLASSIFICATION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
             <select
@@ -964,24 +1024,24 @@ export default function SupporterDetailPage() {
               </div>
               <p className="mt-3 text-sm text-purple-700">
                 {supporter.review_status === 'approved'
-                  ? 'This supporter appears on the Referral List report as an approved referral.'
-                  : 'This supporter should appear on the Referral List report once they are approved into the official supporter list.'}
+                  ? 'This contact appears on the Referral List report as an approved referral.'
+                  : 'This contact should appear on the Referral List report once reviewed.'}
               </p>
             </div>
           )}
         </section>
 
         <section className="app-card p-4">
-          <h2 className="font-semibold text-[var(--text-primary)] mb-2">Supporter Status</h2>
+          <h2 className="font-semibold text-[var(--text-primary)] mb-2">Contact Classification</h2>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-[var(--text-secondary)]">Current supporter status:</span>
-              <span className="inline-block px-3 py-1.5 rounded-full text-sm font-semibold bg-slate-100 text-slate-700">
-                {supporterStatusLabel(supporter)}
+              <span className="text-sm text-[var(--text-secondary)]">Current classification:</span>
+              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${contactClassificationClass(supporter.contact_classification)}`}>
+                {contactClassificationLabel(supporter.contact_classification)}
               </span>
             </div>
             <p className="text-sm text-[var(--text-secondary)]">
-              {supporterStatusDetail(supporter)}
+              {supporterStatusLabel(supporter)}. {supporterStatusDetail(supporter)}
             </p>
           </div>
         </section>
@@ -1063,7 +1123,7 @@ export default function SupporterDetailPage() {
 
                 {!canMarkVerifiedVoter && (
                   <p className="text-xs text-[var(--text-secondary)]">
-                    Marking someone as matched to GEC is only available when the supporter has a current GEC match. This supporter can stay on the official supporter list even without a current GEC match.
+                    Marking someone as matched to GEC is only available when the contact has a current GEC match. This contact can still stay in DPG's workspace for follow-up.
                   </p>
                 )}
 
@@ -1106,7 +1166,7 @@ export default function SupporterDetailPage() {
 
             {canEdit && (
               <p className="text-xs text-[var(--text-secondary)]">
-                Supporter approval and voter check are tracked separately. Supporter status controls whether this record belongs in the official supporter list, while voter check shows whether the person matched the current voter list.
+                Contact classification and voter check are tracked separately. Classification describes the relationship to DPG, while voter check shows whether the person matched the current voter list.
               </p>
             )}
           </div>

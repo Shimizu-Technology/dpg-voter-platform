@@ -81,7 +81,7 @@ module Api
 
       def live_outreach_disabled_response
         render_api_error(
-          message: "Live SMS/email sending is disabled for this DPG environment. Use dry run until sender setup and approval are complete.",
+          message: "Live SMS/email sending is off for this DPG environment. Use dry run, or enable this only in an approved DPG environment with sender credentials configured.",
           status: :forbidden,
           code: "live_outreach_disabled"
         )

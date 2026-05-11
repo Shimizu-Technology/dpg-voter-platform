@@ -66,13 +66,13 @@ const ROLE_GUIDE: RoleGuideRow[] = [
     role: 'campaign_admin',
     level: 'Level 1',
     who: 'DPG leadership / trusted admins',
-    can: 'Full system access across Data Ops and DPG tools, including setup, users, outreach, and reports',
+    can: 'Full system access across the DPG workspace, including setup, users, outreach, imports, and reports',
   },
   {
     role: 'data_team',
     level: 'Level 2',
     who: 'Monthly voter-list and reporting staff',
-    can: 'Import GEC lists, vet supporters, review public signups, resolve duplicates, audit changes, and generate reports island-wide',
+    can: 'Import GEC lists, manage contacts, resolve duplicates, audit changes, and generate reports island-wide',
   },
   {
     role: 'district_coordinator',
@@ -143,7 +143,7 @@ const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_import_supporters: 'Excel import supporters',
   can_access_duplicates: 'Duplicates review',
   can_access_audit_logs: 'Activity log',
-  can_access_data_team: 'Data Ops workspace',
+  can_access_data_team: 'Data management tools',
   can_access_reports: 'Reports',
   can_upload_gec: 'GEC imports',
   can_bulk_vet: 'Bulk vetting',
@@ -315,7 +315,7 @@ function RolePermissionsDisclosure({ role }: { role: string }) {
 
 function roleScopeRule(role: string): string {
   if (role === 'campaign_admin') return 'Scope rule: full access to all villages';
-  if (role === 'data_team') return 'Scope rule: island-wide Data Ops access';
+  if (role === 'data_team') return 'Scope rule: island-wide contact and data access';
   if (role === 'district_coordinator') return 'Scope rule: assigned district (or all villages if no district assigned)';
   return 'Scope rule: assigned village only';
 }
@@ -328,7 +328,7 @@ function scopeLabelForRole(
   districts: DistrictOption[]
 ): string {
   if (role === 'campaign_admin') return 'Scope: all villages';
-  if (role === 'data_team') return 'Scope: island-wide Data Ops';
+  if (role === 'data_team') return 'Scope: island-wide data tools';
   if (role === 'district_coordinator') {
     if (!assignedDistrictId) return 'Scope: all villages (no district assigned)';
     const district = districts.find((d) => d.id === assignedDistrictId);

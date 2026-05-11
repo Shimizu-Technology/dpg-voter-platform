@@ -1,13 +1,28 @@
 # DPG Voter Platform — Current Project Status
 
-**Last updated:** May 9, 2026  
-**Current branch:** `main` plus active cleanup work for DPG review findings
+**Last updated:** May 11, 2026
+**Current branch:** `phase-1-dpg-workflow-reset`
 
 ## One-line status
 
-The Democratic Party of Guam app is now a clean, Monday-testable voter engagement MVP built from Shimizu Technology's reusable platform foundation, with other-campaign data, branding, and active campaign-specific workflows removed from the starter build.
+The Democratic Party of Guam app now has the Phase 1 DPG workflow reset in place: one internal workspace, visible Contacts, visible Intake, contact classification, and dashboard/session counts that no longer treat every public signup as an official supporter/member.
 
-It is ready to move toward isolated DPG staging after final deployment setup, but it is not yet the full election-operations platform DPG described in the meetings.
+It can be used for internal testing/familiarization once a DPG admin account is created and the deployed/staging URL is confirmed, but the GEC voter-list workspace, household/address canvassing workflow, and contact-attempt history are still next-phase work.
+
+## May 11 review note
+
+This review reconciled the app with:
+
+- Brain-Dump DPG transcripts from April 2 and April 27, 2026.
+- Brain-Dump Josh/Tina notes, especially GEC import/runbook and UAT drafts.
+- Current DPG route/UI/API surface.
+- Current DPG docs and deployment checklist.
+
+The updated product frame is:
+
+> DPG needs a party-wide voter engagement platform centered on public GEC voter-file import/search, DPG contacts and intake, address/household canvassing, contact history, and outreach follow-up. Public signups and staff entries should be visible immediately, but they should not inflate official supporter/member counts until classified by DPG.
+
+See `docs/dpg-product-blueprint.md` for the source-of-truth plan.
 
 ## Why we are building it this way
 
@@ -50,30 +65,40 @@ DPG's requested platform includes:
 - App is DPG-branded.
 - DPG-specific docs and guardrails exist.
 - Active Josh/Tina branding/data/workflow surfaces have been removed or disabled.
-- Current branch is pushed and clean.
+- Current tracked source is aligned with the DPG cleanup. Local git currently also shows an untracked root `package-lock.json`; decide whether to keep or delete it before the next commit.
 
-### Public signup
+### Public signup and Intake
 
 - Public signup works.
 - Thank-you flow works.
-- Public signup creates a supporter/contact record.
-- This covers the basic QR/mobile-signup foundation.
+- Public signup creates a DPG contact record.
+- Public signup records default to `new_intake`, appear immediately in Contacts and Intake, and do not count as official supporters/members until classified.
+- Browser smoke test passed locally on May 11 against `http://127.0.0.1:5175`: landing page, signup form, village selection, submit, and thank-you redirect.
+### One DPG internal workspace
+
+- The active internal experience is `/admin`.
+- Legacy `/data` and `/team` routes now redirect into `/admin`.
+- Sidebar navigation now centers on Dashboard, Contacts, Intake, New Entry, Import Contacts, Follow-Up, Reports, and setup tools.
 
 ### Admin/staff access
 
 - Clerk login works locally.
+- Public staff portal and admin sign-in screens render locally after Clerk loads.
 - Admin dashboard loads.
 - User role authorization works.
 - Users/roles page loads.
 - Audit logs work.
+- For Auntie Stephanie: collect her email and create her as `campaign_admin`, which is the highest-level role in the current app.
 
-### Supporter/contact CRM
+### Contact CRM
 
-- Supporter list works.
-- Supporter detail works.
+- Contact list works.
+- Contact detail works.
+- Contacts can be classified as new intake, active contact, supporter, member, volunteer, undecided, or not supporting.
 - Manual staff entry works.
-- Staff-entered supporters now default to approved/searchable.
-- Supporter search/filter basics exist.
+- The stale `/api/v1/staff/supporters` route was fixed to point at the existing staff-supporter controller; the frontend's current manual-entry path remains `/api/v1/supporters?entry_mode=staff&entry_channel=manual`.
+- Staff-entered contacts are visible/searchable immediately and default to `new_intake`.
+- Supporter search/filter basics exist, including name, phone, email, and street-address/household-style lookup.
 - Village/precinct fields exist.
 - Voter-help/support fields exist:
   - volunteer interest
@@ -87,6 +112,8 @@ DPG's requested platform includes:
 ### Import/data workflow
 
 - CSV import backend flow works.
+- Imported contacts default to `new_intake` and are visible immediately.
+- A new DPG readiness integration smoke test covers public signup, staff entry, session, supporter list, address/email search, duplicate scan, reports, audit logs, users, CSV import preview/parse/confirm, SMS status/dry-run, and email status/dry-run.
 - Test import created supporter records successfully.
 - Duplicate review/warnings work.
 - Import UI exists, though final browser upload smoke test should still be repeated on staging.
@@ -95,6 +122,8 @@ DPG's requested platform includes:
 
 - Guam village/precinct foundation exists.
 - GEC/public voter-list matching/search foundation is preserved because it is generic and DPG-requested.
+- GEC voter-list import/search should be restored as a first-class DPG workspace; it is public voter-file infrastructure, not Josh/Tina proprietary.
+- The target workflow is address/name/village/precinct search against GEC, then link/create DPG contacts and record outreach/contact attempts.
 - Josh/Tina quota/vetting semantics have been removed from active DPG surfaces.
 
 ### Reports/export
@@ -110,7 +139,8 @@ DPG's requested platform includes:
 - Email page works.
 - SMS/settings page works.
 - Dry-run/preview works.
-- Live SMS/email sending is blocked unless `DPG_LIVE_OUTREACH_ENABLED=true` is explicitly approved.
+- Live SMS/email provider credentials have been configured for DPG, and `DPG_LIVE_OUTREACH_ENABLED=true` is expected in the active DPG environment.
+- Use dry-run/preview for normal smoke testing; run real sends only intentionally with DPG-approved recipients/content.
 - Default sender identity is DPG-specific.
 
 ### Clean-room cleanup completed
@@ -123,13 +153,16 @@ The latest cleanup removed active inherited surfaces including:
 - static `campaign-tracker` metadata/cache keys
 - active quota/war-room/poll-watcher/OCR routes and UI surfaces
 
+Inactive implementation residue still exists in a few backend/support files, such as generic GEC PDF parsing, duplicate scanning, `EventRsvp`, and generic `campaign_*` service naming. These are not visible Monday-facing Josh/Tina workflows, but they should be reviewed before building any future DPG poll-watcher, OCR, event, or turnout module.
+
 ## What is intentionally deferred
 
-These were requested or discussed by DPG, but should not be rushed into Monday unless separately scoped/tested:
+These are not optional in the long-term DPG product, but should be implemented deliberately in the updated priority order:
 
+- GEC voter-list import/search/address workspace
 - DPG membership roster vs GEC automation
 - multiple list types: GEC, registered Democrat list, DPG roster/supporter list
-- household/address lookup
+- fuller household/address workspace beyond the current street-address search and linked-household display
 - structured contact attempt history
 - support/lean/donation tracking
 - DPG-specific district grouping
@@ -140,7 +173,7 @@ These were requested or discussed by DPG, but should not be rushed into Monday u
 - GIS/maps/heatmaps
 - ID/photo/OCR scanning
 - autodialer integration
-- live SMS/email blasts
+- live SMS/email blast governance, templates, and recipient approval flow
 
 ## What still needs to happen before Monday/staging
 
@@ -153,6 +186,7 @@ These were requested or discussed by DPG, but should not be rushed into Monday u
 - Configure DPG-specific env vars/secrets.
 - Confirm `FRONTEND_URL`, CORS, and API URLs.
 - Configure backups before real testing data is entered.
+- Share the deployed/staging URL with DPG only after confirming it points at DPG-specific services, database, Clerk keys, and environment variables.
 
 ### Final staging smoke test
 
@@ -171,7 +205,7 @@ Run on staging:
 - users/roles
 - audit logs
 - SMS/email dry-run
-- live SMS/email blocked unless approved
+- live SMS/email configured; controlled live-send QA only when intentional
 
 ### Handoff prep
 
@@ -181,31 +215,31 @@ Prepare for DPG testers:
 - what to test first
 - known limitations
 - intentionally deferred modules
-- warning that live blasts are disabled unless explicitly approved
+- operating note that live outreach is configured and real sends should only be done intentionally
 - note that election-day/poll-watcher/war-room tools are next-phase workflow design items
 
 ## Current recommendation
 
-Use this as the Monday testing build for the core voter engagement/admin foundation.
+Use the current build as a testing foundation. The Phase 1 workflow reset is now in place, so DPG can start testing Contacts, Intake, imports, search, reports, users, audit logs, and outreach basics while the GEC voter-list workspace is implemented next.
 
 Frame it as:
 
-> “This is the DPG voter engagement foundation: signup, CRM, import, search/filter, roles, reports, audit logs, and safe SMS/email preview. The election-day operations layer — poll watchers, voted/not-voted tracking, war room, household canvassing, and maps — should be designed with DPG after they validate the core workflow.”
+> “This is the DPG voter engagement foundation. Contacts and Intake are ready for testing now. The next pass adds the GEC voter-file search, address/household canvassing, contact history, and deeper outreach workflow.”
 
 Do not frame it as a finished election-day command center yet.
 
 ## Verification already passed after latest cleanup
 
-- frontend lint
-- frontend production build
-- frontend TypeScript build
-- Ruby syntax checks
-- Rails zeitwerk check
-- source scan for active Josh/Tina/quota/war-room/poll-watcher/yard-sign/event-rsvp residue
+- frontend lint: passed on May 11
+- frontend production build: passed on May 11; Vite warned that local Node 22.0.0 is below the recommended 22.12+ line
+- Rails tests: passed on May 11 with rbenv Ruby 3.3.7 and Bundler 4.0.5: 173 runs, 656 assertions, 0 failures.
+- Rails tests: passed on May 11 with rbenv Ruby 3.3.7 / Bundler 4.0.5; 173 runs, 645 assertions, 0 failures
+- route/source review: no active DPG routes for inherited war-room, poll-watcher, quota, OCR form scan, yard-sign, or motorcade modules
 
 ## Related docs
 
 - `docs/dpg-requested-feature-checklist.md` — what DPG asked for and Monday vs next phase.
+- `docs/dpg-product-blueprint.md` — source-of-truth DPG workflow and phased implementation plan.
 - `docs/clean-room-implementation-plan.md` — boundary rules and cleanup rationale.
 - `docs/proprietary-vs-reusable-review.md` — Josh/Tina vs reusable platform analysis.
 - `docs/dpg-remove-add-plan.md` — what to remove, keep, and add.

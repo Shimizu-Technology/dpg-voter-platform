@@ -10,8 +10,8 @@ function compactProps(props: AnalyticsProps = {}) {
 }
 
 function routeArea(pathname: string) {
-  if (pathname.startsWith('/data')) return 'data_ops';
   if (pathname.startsWith('/admin')) return 'admin';
+  if (pathname.startsWith('/data') || pathname.startsWith('/team')) return 'legacy_workspace';
   if (pathname.startsWith('/signup') || pathname === '/thank-you' || pathname === '/') return 'public';
   return 'other';
 }

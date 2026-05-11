@@ -23,6 +23,7 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551000",
       village: @village,
       source: "staff_entry",
+      contact_classification: "supporter",
       status: "active",
       verification_status: "verified",
       # Created before this week, but vetted now.
@@ -34,6 +35,7 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551001",
       village: @village,
       source: "staff_entry",
+      contact_classification: "member",
       status: "active",
       verification_status: "verified"
     )
@@ -42,6 +44,7 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551002",
       village: @village,
       source: "staff_entry",
+      contact_classification: "active_contact",
       status: "active",
       verification_status: "unverified"
     )
@@ -50,6 +53,7 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551004",
       village: @village,
       source: "qr_signup",
+      contact_classification: "supporter",
       intake_status: "accepted",
       public_review_status: "approved",
       review_status: "approved",
@@ -61,9 +65,9 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551005",
       village: @village,
       source: "public_signup",
-      intake_status: "pending_public_review",
-      public_review_status: "pending",
-      review_status: "pending",
+      intake_status: "accepted",
+      public_review_status: "not_applicable",
+      review_status: "approved",
       status: "active",
       verification_status: "unverified"
     )
@@ -74,13 +78,13 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       source: "bulk_import",
       intake_status: "accepted",
       public_review_status: "not_applicable",
-      review_status: "pending",
+      review_status: "approved",
       status: "active",
       verification_status: "unverified"
     )
   end
 
-  test "show returns aggregated dashboard payload with vetting separation" do
+  test "show returns aggregated dashboard payload with contact classification separation" do
     get "/api/v1/dashboard", headers: auth_headers(@user)
 
     assert_response :success
@@ -88,27 +92,33 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal "Dashboard Campaign", payload.dig("campaign", "name")
 
-    # Verified supporters are the primary count
+    assert_equal 6, payload.dig("summary", "total_contacts")
+    assert_equal 2, payload.dig("summary", "new_intake")
+    assert_equal 2, payload.dig("summary", "supporters")
+    assert_equal 1, payload.dig("summary", "members")
+    assert_equal 0, payload.dig("summary", "volunteers")
+    assert_equal 3, payload.dig("summary", "matched_to_gec")
+
+    # Legacy fields are kept for existing clients.
     assert_equal 3, payload.dig("summary", "verified_supporters")
-    # Total includes unverified
-    assert_equal 4, payload.dig("summary", "total_supporters")
-    assert_equal 1, payload.dig("summary", "unverified_supporters")
-    # Today/week counts are verified only
+    assert_equal 6, payload.dig("summary", "total_supporters")
+    assert_equal 3, payload.dig("summary", "unverified_supporters")
     assert_equal 3, payload.dig("summary", "today_signups")
     assert_equal 3, payload.dig("summary", "week_signups")
 
     assert_equal 1, payload["villages"].size
     village = payload["villages"][0]
-    # Village counts reflect vetting separation
     assert_equal 3, village["verified_count"]
-    assert_equal 4, village["total_count"]
-    assert_equal 1, village["unverified_count"]
-    # supporter_count = verified (backward compat)
-    assert_equal 3, village["supporter_count"]
-    assert_equal 3, village["team_input_count"]
-    assert_equal 1, village["public_approved_count"]
-    assert_equal 1, village["team_pending_count"]
-    assert_equal 1, village["public_signup_count"]
+    assert_equal 6, village["total_count"]
+    assert_equal 6, village["total_contacts"]
+    assert_equal 2, village["new_intake_count"]
+    assert_equal 2, village["supporter_count"]
+    assert_equal 1, village["member_count"]
+    assert_equal 3, village["unverified_count"]
+    assert_equal 4, village["team_input_count"]
+    assert_equal 2, village["public_approved_count"]
+    assert_equal 2, village["team_pending_count"]
+    assert_equal 2, village["public_signup_count"]
   end
 
   test "show excludes unassigned village from total village summary" do
@@ -130,6 +140,7 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551003",
       village: other_village,
       source: "staff_entry",
+      contact_classification: "supporter",
       status: "active",
       verification_status: "verified",
       verified_at: Time.current
@@ -149,7 +160,7 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body)
 
     # Summary remains island-wide.
-    assert_equal 5, payload.dig("summary", "total_supporters")
+    assert_equal 7, payload.dig("summary", "total_supporters")
     assert_equal 4, payload.dig("summary", "verified_supporters")
 
     # Village cards are scoped to the assigned village.

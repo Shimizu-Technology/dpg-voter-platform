@@ -138,6 +138,7 @@ module Api
           updates[:precinct_id] = nil
         end
         updates[:precinct_id] = nil if updates.key?(:precinct_id) && updates[:precinct_id].blank?
+        apply_contact_classification_metadata!(supporter, updates)
 
         if supporter.update(updates)
           changes = supporter.saved_changes.except("updated_at")
@@ -272,7 +273,7 @@ module Api
             :block,
             :referred_from_village,
             household_group: :supporters
-          ).official_supporters
+          ).contacts
         )
 
         # Filters
@@ -295,26 +296,9 @@ module Api
         supporters = supporters.where(opt_in_email: true) if params[:opt_in_email] == "true"
         supporters = supporters.where(opt_in_text: true) if params[:opt_in_text] == "true"
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
+        supporters = supporters.where(contact_classification: params[:contact_classification]) if params[:contact_classification].present?
 
-        if params[:search].present?
-          raw = params[:search].to_s.strip
-          sanitized = ActiveRecord::Base.sanitize_sql_like(raw)
-          name_query = "%#{sanitized.downcase}%"
-          phone_digits = raw.gsub(/\D/, "")
-          if phone_digits.present?
-            phone_query = "%#{ActiveRecord::Base.sanitize_sql_like(phone_digits)}%"
-            supporters = supporters.where(
-              "LOWER(supporters.print_name) LIKE :name_query OR LOWER(supporters.first_name) LIKE :name_query OR LOWER(supporters.last_name) LIKE :name_query OR regexp_replace(supporters.contact_number, '\\D', '', 'g') LIKE :phone_query",
-              name_query: name_query,
-              phone_query: phone_query
-            )
-          else
-            supporters = supporters.where(
-              "LOWER(supporters.print_name) LIKE :q OR LOWER(supporters.first_name) LIKE :q OR LOWER(supporters.last_name) LIKE :q",
-              q: name_query
-            )
-          end
-        end
+        supporters = apply_supporter_search(supporters, params[:search]) if params[:search].present?
         supporters = apply_index_sort(supporters)
 
         # Pagination
@@ -381,7 +365,7 @@ module Api
 
       # GET /api/v1/supporters/export
       def export
-        supporters = apply_export_filters(scope_supporters(Supporter.includes(:village, :precinct).official_supporters.order(created_at: :desc)))
+        supporters = apply_export_filters(scope_supporters(Supporter.includes(:village, :precinct).contacts.order(created_at: :desc)))
         total = supporters.count
 
         if total > MAX_EXPORT_ROWS
@@ -531,7 +515,7 @@ module Api
       # GET /api/v1/supporters/outreach
       def outreach
         supporters = scope_supporters(Supporter.includes(:village, :submitted_village, :precinct, household_group: :supporters))
-                       .working_supporters
+                       .contacts
                        .needs_follow_up
 
         supporters = supporters.where(village_id: params[:village_id]) if params[:village_id].present?
@@ -557,15 +541,7 @@ module Api
         supporters = supporters.where(registered_voter_status: params[:registered_voter_status]) if params[:registered_voter_status].present?
         supporters = apply_support_need_filter(supporters, params[:support_need])
 
-        if params[:search].present?
-          raw = params[:search].to_s.strip
-          sanitized = ActiveRecord::Base.sanitize_sql_like(raw)
-          name_query = "%#{sanitized.downcase}%"
-          supporters = supporters.where(
-            "LOWER(supporters.print_name) LIKE :q OR LOWER(supporters.first_name) LIKE :q OR LOWER(supporters.last_name) LIKE :q",
-            q: name_query
-          )
-        end
+        supporters = apply_supporter_search(supporters, params[:search]) if params[:search].present?
 
         supporters = supporters.order(Arel.sql(outreach_priority_order_sql))
 
@@ -574,7 +550,7 @@ module Api
         total = supporters.count
 
         base_scope = scope_supporters(Supporter)
-                       .working_supporters
+                       .contacts
                        .needs_follow_up
         base_scope = base_scope.where(village_id: params[:village_id]) if params[:village_id].present?
         open_scope = open_follow_up_scope(base_scope)
@@ -767,7 +743,7 @@ module Api
         }, normalize: true)
         CampaignBroadcast.supporter_updated(supporter, action: "supporter_review_approved")
 
-        render json: { supporter: supporter_json(supporter), message: "Supporter approved into the official supporter list" }
+        render json: { supporter: supporter_json(supporter), message: "Contact approved into the DPG workspace" }
       end
 
       # PATCH /api/v1/supporters/:id/reject_supporter
@@ -951,26 +927,9 @@ module Api
         supporters = supporters.where(opt_in_email: true) if params[:opt_in_email] == "true"
         supporters = supporters.where(opt_in_text: true) if params[:opt_in_text] == "true"
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
+        supporters = supporters.where(contact_classification: params[:contact_classification]) if params[:contact_classification].present?
 
-        if params[:search].present?
-          raw = params[:search].to_s.strip
-          sanitized = ActiveRecord::Base.sanitize_sql_like(raw)
-          name_query = "%#{sanitized.downcase}%"
-          phone_digits = raw.gsub(/\D/, "")
-          if phone_digits.present?
-            phone_query = "%#{ActiveRecord::Base.sanitize_sql_like(phone_digits)}%"
-            supporters = supporters.where(
-              "LOWER(supporters.print_name) LIKE :name_query OR LOWER(supporters.first_name) LIKE :name_query OR LOWER(supporters.last_name) LIKE :name_query OR regexp_replace(supporters.contact_number, '\\D', '', 'g') LIKE :phone_query",
-              name_query: name_query,
-              phone_query: phone_query
-            )
-          else
-            supporters = supporters.where(
-              "LOWER(supporters.print_name) LIKE :q OR LOWER(supporters.first_name) LIKE :q OR LOWER(supporters.last_name) LIKE :q",
-              q: name_query
-            )
-          end
-        end
+        supporters = apply_supporter_search(supporters, params[:search]) if params[:search].present?
 
         apply_index_sort(supporters)
       end
@@ -1000,7 +959,7 @@ module Api
           :registered_voter_location_note, :wants_to_volunteer, :needs_absentee_ballot_help,
           :needs_homebound_voting_help, :needs_voter_registration_help, :needs_election_day_ride, :referred_by_name,
           :household_primary,
-          :opt_in_email, :opt_in_text, :status
+          :opt_in_email, :opt_in_text, :status, :contact_classification
         )
       end
 
@@ -1015,6 +974,16 @@ module Api
 
       def normalized_supporter_update_params
         normalize_registered_voter_fields(supporter_update_params.to_h)
+      end
+
+      def apply_contact_classification_metadata!(supporter, updates)
+        return unless updates.key?("contact_classification") || updates.key?(:contact_classification)
+
+        new_classification = updates["contact_classification"] || updates[:contact_classification]
+        return if new_classification.blank? || new_classification == supporter.contact_classification
+
+        updates[:classified_at] = Time.current
+        updates[:classified_by_user_id] = current_user.id
       end
 
       def normalize_registered_voter_fields(attributes)
@@ -1062,11 +1031,11 @@ module Api
       end
 
       def create_intake_status(source)
-        Supporter::PUBLIC_SOURCES.include?(source) ? "pending_public_review" : "accepted"
+        "accepted"
       end
 
       def create_public_review_status(source)
-        Supporter::PUBLIC_SOURCES.include?(source) ? "pending" : "not_applicable"
+        "not_applicable"
       end
 
       def public_review_bucket
@@ -1160,6 +1129,31 @@ module Api
         end
       end
 
+      def apply_supporter_search(scope, query)
+        raw = query.to_s.strip
+        return scope if raw.blank?
+
+        sanitized = ActiveRecord::Base.sanitize_sql_like(raw.downcase)
+        text_query = "%#{sanitized}%"
+        phone_digits = raw.gsub(/\D/, "")
+        conditions = [
+          "LOWER(supporters.print_name) LIKE :text_query",
+          "LOWER(supporters.first_name) LIKE :text_query",
+          "LOWER(supporters.middle_name) LIKE :text_query",
+          "LOWER(supporters.last_name) LIKE :text_query",
+          "LOWER(supporters.email) LIKE :text_query",
+          "LOWER(supporters.street_address) LIKE :text_query"
+        ]
+        binds = { text_query: text_query }
+
+        if phone_digits.present?
+          conditions << "regexp_replace(supporters.contact_number, '\\D', '', 'g') LIKE :phone_query"
+          binds[:phone_query] = "%#{ActiveRecord::Base.sanitize_sql_like(phone_digits)}%"
+        end
+
+        scope.where(conditions.join(" OR "), binds)
+      end
+
       def apply_loose_supporter_search(scope, query)
         tokens = query.to_s.downcase.split(/\s+/).reject(&:blank?).first(6)
         return scope if tokens.empty?
@@ -1168,7 +1162,7 @@ module Api
           sanitized = ActiveRecord::Base.sanitize_sql_like(token)
           pattern = "%#{sanitized}%"
           relation.where(
-            "LOWER(supporters.first_name) LIKE :pattern OR LOWER(supporters.middle_name) LIKE :pattern OR LOWER(supporters.last_name) LIKE :pattern OR LOWER(supporters.print_name) LIKE :pattern OR LOWER(supporters.contact_number) LIKE :pattern",
+            "LOWER(supporters.first_name) LIKE :pattern OR LOWER(supporters.middle_name) LIKE :pattern OR LOWER(supporters.last_name) LIKE :pattern OR LOWER(supporters.print_name) LIKE :pattern OR LOWER(supporters.contact_number) LIKE :pattern OR LOWER(supporters.email) LIKE :pattern OR LOWER(supporters.street_address) LIKE :pattern",
             pattern: pattern
           )
         end
@@ -1213,6 +1207,7 @@ module Api
           verified_at: supporter.verified_at&.iso8601,
           verified_by_user_id: supporter.verified_by_user_id,
           source: supporter.source,
+          contact_classification: supporter.contact_classification,
           intake_status: supporter.intake_status,
           review_status: supporter.review_status,
           public_review_status: supporter.public_review_status,
@@ -1288,6 +1283,7 @@ module Api
           support_follow_up_notes: supporter.support_follow_up_notes,
           support_follow_up_date: supporter.support_follow_up_date&.iso8601,
           status: supporter.status,
+          contact_classification: supporter.contact_classification,
           created_at: supporter.created_at&.iso8601
         }
       end
@@ -1305,6 +1301,7 @@ module Api
               last_name: member.last_name,
               print_name: member.print_name,
               village_name: member.village&.name,
+              contact_classification: member.contact_classification,
               registered_voter_status: member.registered_voter_status,
               review_status: member.review_status,
               public_review_status: member.public_review_status
@@ -1357,7 +1354,7 @@ module Api
         supporter.source = source
         supporter.attribution_method = attribution_method
         supporter.intake_status = intake_status
-        supporter.review_status = Supporter::PUBLIC_SOURCES.include?(source) ? "pending" : "approved"
+        supporter.review_status = "approved"
         supporter.public_review_status = public_review_status
         supporter.status = "active"
         supporter.leader_code = leader_code

@@ -236,7 +236,7 @@ export default function EmailPage() {
             <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
             <div>
               <p className="text-amber-800 font-medium">Live email sending disabled</p>
-              <p className="text-amber-700 text-sm">Preview/dry-run is available. Enable DPG_LIVE_OUTREACH_ENABLED only after DPG sender setup and approval.</p>
+              <p className="text-amber-700 text-sm">Preview/dry-run is available. Enable DPG_LIVE_OUTREACH_ENABLED only in approved DPG environments with sender credentials configured.</p>
             </div>
           </div>
         )}

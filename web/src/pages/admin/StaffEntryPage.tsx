@@ -168,20 +168,20 @@ export default function StaffEntryPage() {
       return {
         container: 'bg-green-50 border-green-200 text-green-700',
         badge: 'bg-green-100 text-green-700',
-        detail: 'Saved and sent to the Supporter Review Queue. The voter check found a current GEC match.',
+        detail: 'Saved to New Intake. The voter check found a current GEC match.',
       };
     }
     if (status === 'flagged') {
       return {
         container: 'bg-amber-50 border-amber-200 text-amber-700',
         badge: 'bg-amber-100 text-amber-700',
-        detail: 'Saved and sent to the Supporter Review Queue. The voter check needs manual follow-up.',
+        detail: 'Saved to New Intake. The voter check needs manual follow-up.',
       };
     }
     return {
       container: 'bg-blue-50 border-blue-200 text-blue-700',
       badge: 'bg-blue-100 text-blue-700',
-      detail: 'Saved and sent to the Supporter Review Queue. This person is not in the official supporter list until the data team approves them.',
+      detail: 'Saved to New Intake. Staff can classify this contact after review.',
     };
   };
 
@@ -220,7 +220,7 @@ export default function StaffEntryPage() {
             <Check className="w-5 h-5 shrink-0 mt-0.5" />
             <div className="min-w-0">
               <div className="font-semibold">
-                {saveFeedback.name} saved and sent to Supporter Review.
+                {saveFeedback.name} saved to New Intake.
               </div>
               <div className="text-sm mt-1">
                 {successTone(saveFeedback.verificationStatus).detail}

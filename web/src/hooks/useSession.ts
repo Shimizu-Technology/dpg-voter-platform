@@ -14,6 +14,12 @@ export interface SessionResponse {
     scoped_village_ids: number[] | null;
   };
   counts: {
+    total_contacts: number;
+    new_intake: number;
+    supporters: number;
+    members: number;
+    volunteers: number;
+    needs_follow_up: number;
     pending_vetting: number;
     flagged_supporters: number;
     public_signups_pending: number;
