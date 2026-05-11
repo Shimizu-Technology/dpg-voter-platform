@@ -53,6 +53,34 @@ class AuthenticatableBootstrapAdminTest < ActionController::TestCase
     assert_equal "user_prod_bootstrap", user.clerk_id
   end
 
+  test "allowlisted bootstrap admin email promotes preexisting lower role user" do
+    User.create!(
+      email: "bootstrap@example.com",
+      clerk_id: "seeded_lower_role",
+      name: "Seeded Lower Role",
+      role: "block_leader"
+    )
+    ENV["BOOTSTRAP_ADMIN_EMAILS"] = "bootstrap@example.com"
+    ENV["BOOTSTRAP_ADMIN_ROLE"] = "campaign_admin"
+    stub_clerk_token(
+      "sub" => "user_prod_bootstrap",
+      "email" => "bootstrap@example.com",
+      "name" => "Bootstrap Admin"
+    )
+
+    get :show
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal "bootstrap@example.com", payload["email"]
+    assert_equal "campaign_admin", payload["role"]
+    assert_equal "user_prod_bootstrap", payload["clerk_id"]
+
+    user = User.find_by!(email: "bootstrap@example.com")
+    assert_equal "campaign_admin", user.role
+    assert_equal "user_prod_bootstrap", user.clerk_id
+  end
+
   test "non allowlisted email remains blocked" do
     ENV["BOOTSTRAP_ADMIN_EMAILS"] = "bootstrap@example.com"
     stub_clerk_token(
