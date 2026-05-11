@@ -222,13 +222,13 @@ Core build:
 - GEC voter-list import: implemented for DPG admins/data ops through the first-class GEC workspace.
 - GEC voter search: implemented by name, address, village, precinct, and voter registration number.
 - address/household view from GEC: implemented as address lookup showing GEC voters and DPG contacts at matching addresses.
-- DPG contact to GEC match: implemented for creating contacts from GEC voters and API-level existing contact linking.
+- DPG contact to GEC match: implemented for creating contacts from GEC voters and linking existing contacts from the GEC workspace UI.
 - DPG list cross-reference
 
 ## Phase 3: Contacts, households, outreach
 
-- structured contact history
-- household/address workspace
+- structured contact history: implemented for contact detail with channel, outcome, timestamp, note, and staff attribution.
+- household/address workspace: implemented at `/admin/households`, backed by the current GEC household lookup and DPG contact address search.
 - follow-up queues
 - roles/scoped permissions
 

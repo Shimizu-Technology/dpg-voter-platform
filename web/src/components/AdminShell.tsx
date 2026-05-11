@@ -63,6 +63,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         ...(permissions?.can_view_supporters ? [ { to: '/admin/supporters', label: 'Contacts', icon: Users } ] : []),
         ...(permissions?.can_view_supporters ? [ { to: '/admin/intake', label: 'Intake', icon: ClipboardCheck, badge: sessionData?.counts?.new_intake } ] : []),
         ...(permissions?.can_view_supporters ? [ { to: '/admin/gec-voters', label: 'GEC Voters', icon: Database } ] : []),
+        ...(permissions?.can_view_supporters ? [ { to: '/admin/households', label: 'Households', icon: Home } ] : []),
       ],
     },
     {

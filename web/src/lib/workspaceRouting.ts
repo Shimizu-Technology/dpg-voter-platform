@@ -28,6 +28,8 @@ const PERMISSION_RULES: PermissionRule[] = [
   { prefix: '/admin/import', permission: 'can_import_supporters' },
   { prefix: '/admin/supporters', permission: 'can_view_supporters' },
   { prefix: '/admin/intake', permission: 'can_view_supporters' },
+  { prefix: '/admin/gec-voters', permission: 'can_view_supporters' },
+  { prefix: '/admin/households', permission: 'can_view_supporters' },
   { prefix: '/admin/reports', permission: 'can_access_reports' },
   { prefix: '/admin/duplicates', permission: 'can_access_duplicates' },
   { prefix: '/admin/sms/settings', permission: 'can_manage_configuration' },
