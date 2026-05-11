@@ -6,6 +6,7 @@ type WorkspaceBrandPanelProps = {
   workspaceDescription: string;
   badge?: string;
   compact?: boolean;
+  rail?: boolean;
   centered?: boolean;
   className?: string;
 };
@@ -15,11 +16,36 @@ export default function WorkspaceBrandPanel({
   workspaceDescription,
   badge = "Internal DPG workspace",
   compact = false,
+  rail = false,
   centered = false,
   className = "",
 }: WorkspaceBrandPanelProps) {
   if (compact) {
     const iconSrc = publicSiteConfig.wordmark.iconSrc;
+
+    if (rail) {
+      return (
+        <div
+          className={[
+            "flex min-h-16 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-[0_14px_32px_-26px_rgba(15,42,91,0.35)]",
+            className,
+          ].join(" ")}
+        >
+          {iconSrc ? (
+            <img
+              src={iconSrc}
+              srcSet={publicSiteConfig.wordmark.iconSrcSet}
+              sizes="40px"
+              alt="Democratic Party of Guam circular mark"
+              className="h-10 w-10 rounded-2xl object-contain drop-shadow-sm"
+            />
+          ) : (
+            <PublicWordmark size="sm" />
+          )}
+          <span className="sr-only">{workspaceName}</span>
+        </div>
+      );
+    }
 
     return (
       <div
@@ -72,7 +98,9 @@ export default function WorkspaceBrandPanel({
         Building Guam&apos;s Future Together
       </div>
       <div className="space-y-4 p-5 md:p-6">
-        <PublicWordmark size="md" centered={centered} />
+        <div className={centered ? "flex justify-center" : ""}>
+          <PublicWordmark size="md" centered={centered} />
+        </div>
         <div className={centered ? "text-center" : ""}>
           <div className="inline-flex rounded-full border border-[#d8e4f2] bg-[#eef4ff] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
             {badge}

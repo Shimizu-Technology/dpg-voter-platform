@@ -36,7 +36,7 @@ export default function PublicWordmark({
   const config = publicSiteConfig.wordmark;
 
   if (config.mode === 'image' && config.imageSrc) {
-    const wordmarkSize = size === 'sm' ? 'h-14 md:h-16 lg:h-18' : size === 'lg' ? 'h-24 md:h-32 lg:h-36' : 'h-18 md:h-24';
+    const wordmarkSize = size === 'sm' ? 'h-auto max-h-14 md:max-h-16 lg:max-h-18' : size === 'lg' ? 'h-auto max-h-24 md:max-h-32 lg:max-h-36' : 'h-auto max-h-16 md:max-h-20';
     const iconSize = size === 'sm' ? 'h-14 w-14' : size === 'lg' ? 'h-20 w-20' : 'h-16 w-16';
 
     return (
@@ -61,7 +61,7 @@ export default function PublicWordmark({
           srcSet={config.imageSrcSet}
           sizes={size === 'sm' ? '(min-width: 1024px) 250px, (min-width: 768px) 220px, 56px' : '(min-width: 1024px) 520px, 360px'}
           alt={config.imageAlt || config.title}
-          className={`${config.iconSrc ? 'hidden md:block' : ''} ${wordmarkSize} max-w-[min(78vw,520px)] object-contain drop-shadow-sm`}
+          className={`${config.iconSrc ? 'hidden md:block' : ''} ${wordmarkSize} max-w-full object-contain drop-shadow-sm`}
         />
         <span className="sr-only">{config.title} · {config.subtitle}</span>
       </div>

@@ -46,7 +46,11 @@ module Authenticatable
         token_name ||= profile[:name]
       end
 
-      @current_user ||= find_or_link_user_by_email(clerk_id: clerk_id, token_email: token_email, token_name: token_name)
+      if @current_user.nil? && bootstrap_admin_email?(token_email)
+        @current_user = bootstrap_admin_user(clerk_id: clerk_id, token_email: token_email, token_name: token_name)
+      else
+        @current_user ||= find_or_link_user_by_email(clerk_id: clerk_id, token_email: token_email, token_name: token_name)
+      end
 
       if @current_user && token_name.present? && @current_user.name != token_name
         @current_user.update(name: token_name)
@@ -370,6 +374,60 @@ module Authenticatable
       name: token_name || user.name
     )
     user
+  end
+
+  def bootstrap_admin_user(clerk_id:, token_email:, token_name:)
+    email = token_email.to_s.strip.downcase
+    return nil if email.blank?
+    return nil unless bootstrap_admin_email?(email)
+
+    role = ENV.fetch("BOOTSTRAP_ADMIN_ROLE", "campaign_admin")
+    role = "campaign_admin" unless User::ROLES.include?(role)
+
+    created = false
+    user = User.find_by(email: email)
+    unless user
+      begin
+        user = User.create!(
+          email: email,
+          clerk_id: clerk_id,
+          name: token_name.presence || default_name_for_email(email),
+          role: role
+        )
+        created = true
+      rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+        user = User.find_by!(email: email)
+      end
+    end
+
+    unless created
+      user.with_lock do
+        user.update!(
+          clerk_id: clerk_id,
+          name: token_name.presence || user.name.presence || default_name_for_email(email),
+          role: role
+        )
+      end
+    end
+
+    Rails.logger.info("[Auth] Bootstrap admin #{created ? 'created' : 'linked'} — clerk_id=#{clerk_id} email=#{email} role=#{role} env=#{Rails.env}")
+    user
+  end
+
+  def bootstrap_admin_emails
+    ENV.fetch("BOOTSTRAP_ADMIN_EMAILS", "")
+      .split(",")
+      .map { |email| email.strip.downcase }
+      .reject(&:blank?)
+      .uniq
+  end
+
+  def bootstrap_admin_email?(email)
+    bootstrap_admin_emails.include?(email.to_s.strip.downcase)
+  end
+
+  def default_name_for_email(email)
+    email.split("@").first.tr("._", " ").split.map(&:capitalize).join(" ")
   end
 
   def extract_token_email(decoded)
