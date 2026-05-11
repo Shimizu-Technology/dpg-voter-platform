@@ -86,12 +86,38 @@ export const sendEmailBlast = (data: { subject: string; body: string; village_id
 export const uploadImportPreview = (file: File) => {
   const form = new FormData();
   form.append('file', file);
-  return api.post('/imports/preview', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+  return api.post('/imports/preview', form).then(r => r.data);
 };
 export const parseImportRows = (data: { import_key: string; sheet_index: number; column_mapping: Record<string, unknown> }) =>
   api.post('/imports/parse', data).then(r => r.data);
 export const confirmImport = (data: { import_key: string; village_id?: number; rows: Record<string, unknown>[] }) =>
   api.post('/imports/confirm', data).then(r => r.data);
+
+// GEC Voter List
+export const getGecStats = () => api.get('/gec_voters/stats').then(r => r.data);
+export const getGecVoters = (params?: QueryParams) => api.get('/gec_voters', { params }).then(r => r.data);
+export const getGecHouseholds = (params?: QueryParams) => api.get('/gec_voters/households', { params }).then(r => r.data);
+export const getGecImports = () => api.get('/gec_voters/imports').then(r => r.data);
+export const previewGecList = (file: File, gecListDate?: string, limit = 20) => {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('limit', String(limit));
+  if (gecListDate) form.append('gec_list_date', gecListDate);
+  return api.post('/gec_voters/preview', form).then(r => r.data);
+};
+export const uploadGecList = (file: File, gecListDate: string, importType = 'full_list') => {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('gec_list_date', gecListDate);
+  form.append('import_type', importType);
+  return api.post('/gec_voters/upload', form).then(r => r.data);
+};
+export const activateGecImport = (importId: number) =>
+  api.post(`/gec_voters/imports/${importId}/activate`).then(r => r.data);
+export const createContactFromGecVoter = (gecVoterId: number, contactClassification = 'active_contact') =>
+  api.post(`/gec_voters/${gecVoterId}/create_contact`, { contact_classification: contactClassification }).then(r => r.data);
+export const linkContactToGecVoter = (gecVoterId: number, supporterId: number) =>
+  api.post(`/gec_voters/${gecVoterId}/link_contact`, { supporter_id: supporterId }).then(r => r.data);
 
 export const checkDuplicate = (name: string, villageId: number, firstName?: string, lastName?: string) =>
   api.get('/supporters/check_duplicate', { params: { name, village_id: villageId, first_name: firstName, last_name: lastName } }).then(r => r.data);

@@ -29,6 +29,7 @@ const DistrictsPage = lazy(() => import('./pages/admin/DistrictsPage'));
 const PrecinctSettingsPage = lazy(() => import('./pages/admin/PrecinctSettingsPage'));
 const DuplicatesPage = lazy(() => import('./pages/admin/DuplicatesPage'));
 const ImportPage = lazy(() => import('./pages/admin/ImportPage'));
+const GecVotersPage = lazy(() => import('./pages/admin/GecVotersPage'));
 const AuditLogsPage = lazy(() => import('./pages/admin/AuditLogsPage'));
 const OutreachPage = lazy(() => import('./pages/admin/OutreachPage'));
 const TeamReportsPage = lazy(() => import('./pages/team/TeamReportsPage'));
@@ -71,6 +72,7 @@ type PermissionKey =
   | 'can_view_supporters'
   | 'can_create_staff_supporters'
   | 'can_import_supporters'
+  | 'can_upload_gec'
   | 'can_access_reports'
   | 'can_access_duplicates'
   | 'can_access_audit_logs'
@@ -134,6 +136,7 @@ export default function App() {
             <Route path="/admin/supporters/:id" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupporterDetailPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/supporters/new" element={<AdminRoute><PermissionRoute permission="can_create_staff_supporters"><StaffEntryPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/import" element={<AdminRoute><PermissionRoute permission="can_import_supporters"><ImportPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/gec-voters" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><GecVotersPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/reports" element={<AdminRoute><PermissionRoute permission="can_access_reports"><TeamReportsPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/duplicates" element={<AdminRoute><PermissionRoute permission="can_access_duplicates"><DuplicatesPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/villages/:id" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><VillageDetailPage /></PermissionRoute></AdminRoute>} />

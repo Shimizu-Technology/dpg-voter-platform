@@ -38,6 +38,21 @@ Rails.application.routes.draw do
       end
       resources :precincts, only: [ :index, :update ]
       resources :audit_logs, only: [ :index ]
+      resources :gec_voters, only: [ :index ] do
+        collection do
+          get :stats
+          get :households
+          get :imports
+          post :preview
+          post :upload
+          post "imports/:id/activate", action: :activate_import
+        end
+
+        member do
+          post :create_contact
+          post :link_contact
+        end
+      end
 
       # Authenticated staff
       post "staff/supporters", to: "staff_supporters#create"
