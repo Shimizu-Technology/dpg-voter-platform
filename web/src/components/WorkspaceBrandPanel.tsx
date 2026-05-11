@@ -98,7 +98,9 @@ export default function WorkspaceBrandPanel({
         Building Guam&apos;s Future Together
       </div>
       <div className="space-y-4 p-5 md:p-6">
-        <PublicWordmark size="md" centered={centered} />
+        <div className={centered ? "flex justify-center" : ""}>
+          <PublicWordmark size="md" centered={centered} />
+        </div>
         <div className={centered ? "text-center" : ""}>
           <div className="inline-flex rounded-full border border-[#d8e4f2] bg-[#eef4ff] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
             {badge}

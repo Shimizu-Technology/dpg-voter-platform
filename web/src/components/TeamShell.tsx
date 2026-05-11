@@ -46,6 +46,7 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem(teamSidebarStorageKey) === 'true';
   });
+  const [railTooltip, setRailTooltip] = useState<{ label: string; top: number; left: number } | null>(null);
   const counts = sessionData?.counts;
   useCampaignUpdates(handleEvent, true);
 
@@ -109,11 +110,16 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(teamSidebarStorageKey, String(desktopCollapsed));
   }, [desktopCollapsed]);
 
-  const tooltip = (label: string) => (
-    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-xl transition duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 lg:block">
-      {label}
-    </span>
-  );
+  const showRailTooltip = (label: string, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    setRailTooltip({
+      label,
+      top: rect.top + rect.height / 2,
+      left: rect.right + 12,
+    });
+  };
+
+  const hideRailTooltip = () => setRailTooltip(null);
 
   const navLink = (item: NavItem, collapsed = false) => {
     const Icon = item.icon;
@@ -123,6 +129,10 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
         key={item.to}
         to={item.to}
         onClick={() => setSidebarOpen(false)}
+        onMouseEnter={(event) => collapsed && showRailTooltip(item.label, event.currentTarget)}
+        onMouseLeave={hideRailTooltip}
+        onFocus={(event) => collapsed && showRailTooltip(item.label, event.currentTarget)}
+        onBlur={hideRailTooltip}
         aria-label={collapsed ? item.label : undefined}
         title={collapsed ? item.label : undefined}
         className={`group relative flex min-h-11 items-center rounded-xl px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
@@ -140,7 +150,6 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
             {item.badge > 99 ? '99+' : item.badge}
           </span>
         ) : null}
-        {collapsed ? tooltip(item.label) : null}
       </Link>
     );
   };
@@ -149,6 +158,10 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
     <Link
       to={to}
       onClick={() => setSidebarOpen(false)}
+      onMouseEnter={(event) => collapsed && showRailTooltip(label, event.currentTarget)}
+      onMouseLeave={hideRailTooltip}
+      onFocus={(event) => collapsed && showRailTooltip(label, event.currentTarget)}
+      onBlur={hideRailTooltip}
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
       className={`group relative flex min-h-11 items-center rounded-xl px-3 py-2 text-[13px] font-medium text-slate-500 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900 ${
@@ -157,7 +170,6 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
     >
       <Icon className="h-4 w-4 shrink-0 text-slate-400" />
       <span className={collapsed ? 'sr-only' : ''}>{label}</span>
-      {collapsed ? tooltip(label) : null}
     </Link>
   );
 
@@ -177,6 +189,10 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
         <button
           type="button"
           onClick={() => setDesktopCollapsed((value) => !value)}
+          onMouseEnter={(event) => collapsed && showRailTooltip('Expand sidebar', event.currentTarget)}
+          onMouseLeave={hideRailTooltip}
+          onFocus={(event) => collapsed && showRailTooltip('Expand sidebar', event.currentTarget)}
+          onBlur={hideRailTooltip}
           className={`mt-2 hidden min-h-11 w-full items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 lg:flex ${
             collapsed ? 'justify-center' : 'justify-between'
           }`}
@@ -251,6 +267,14 @@ export default function TeamShell({ children }: { children: React.ReactNode }) {
       }`}>
         {sidebarContent(desktopCollapsed)}
       </aside>
+      {desktopCollapsed && railTooltip && (
+        <div
+          className="pointer-events-none fixed z-[80] hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-xl lg:block"
+          style={{ top: railTooltip.top, left: railTooltip.left }}
+        >
+          {railTooltip.label}
+        </div>
+      )}
 
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-[300px] transform border-r border-slate-200 bg-[#f8fbff] shadow-xl transition-transform duration-200 ease-out lg:hidden ${

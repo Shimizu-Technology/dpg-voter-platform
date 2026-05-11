@@ -46,7 +46,7 @@ module Authenticatable
         token_name ||= profile[:name]
       end
 
-      if bootstrap_admin_email?(token_email)
+      if @current_user.nil? && bootstrap_admin_email?(token_email)
         @current_user = bootstrap_admin_user(clerk_id: clerk_id, token_email: token_email, token_name: token_name)
       else
         @current_user ||= find_or_link_user_by_email(clerk_id: clerk_id, token_email: token_email, token_name: token_name)
