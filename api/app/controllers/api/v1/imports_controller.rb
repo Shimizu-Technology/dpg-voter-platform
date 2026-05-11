@@ -208,7 +208,7 @@ module Api
             source: "bulk_import",
             attribution_method: "bulk_import",
             intake_status: "accepted",
-            review_status: "pending",
+            review_status: "approved",
             public_review_status: "not_applicable",
             status: "active",
             turnout_status: "unknown",

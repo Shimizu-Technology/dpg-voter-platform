@@ -23,6 +23,13 @@ interface VillageData {
   region: string;
   registered_voters: number;
   total_count: number;
+  total_contacts?: number;
+  new_intake_count?: number;
+  supporter_count?: number;
+  member_count?: number;
+  volunteer_count?: number;
+  needs_follow_up_count?: number;
+  matched_to_gec_count?: number;
   team_input_count?: number;
   public_approved_count?: number;
   team_pending_count?: number;
@@ -30,6 +37,13 @@ interface VillageData {
 }
 
 interface DashboardSummary {
+  total_contacts: number;
+  new_intake: number;
+  supporters: number;
+  members: number;
+  volunteers: number;
+  needs_follow_up: number;
+  matched_to_gec: number;
   total_supporters: number;
   total_registered_voters: number;
   total_villages: number;
@@ -92,19 +106,21 @@ export default function DashboardPage() {
   const villageProgressRows = villages.map((row) => ({
     villageId: row.id,
     villageName: row.name,
-    supporters: Number(row.total_count || 0),
-    teamApprovedCount: Number(row.team_input_count || 0),
-    publicApprovedCount: Number(row.public_approved_count || 0),
-    teamPendingCount: Number(row.team_pending_count || 0),
-    publicPendingCount: Number(row.public_signup_count || 0),
+    contacts: Number(row.total_contacts ?? row.total_count ?? 0),
+    intake: Number(row.new_intake_count ?? row.team_pending_count ?? 0),
+    matched: Number(row.matched_to_gec_count ?? 0),
+    followUp: Number(row.needs_follow_up_count ?? 0),
+    supporters: Number(row.supporter_count ?? 0),
+    members: Number(row.member_count ?? 0),
     route: `/admin/villages/${row.id}`,
   }));
 
   const quickActions = [
     permissions?.can_create_staff_supporters ? { to: '/admin/supporters/new', icon: ClipboardPlus, label: 'New Entry' } : null,
-    permissions?.can_import_supporters ? { to: '/admin/import', icon: Upload, label: 'Excel Import' } : null,
+    permissions?.can_import_supporters ? { to: '/admin/import', icon: Upload, label: 'Import Contacts' } : null,
     permissions?.can_access_reports ? { to: '/admin/reports', icon: FileSpreadsheet, label: 'Reports' } : null,
-    permissions?.can_view_supporters ? { to: '/admin/supporters', icon: ClipboardCheck, label: 'Supporters' } : null,
+    permissions?.can_view_supporters ? { to: '/admin/supporters', icon: ClipboardCheck, label: 'Contacts' } : null,
+    permissions?.can_view_supporters ? { to: '/admin/intake', icon: UserCheck, label: 'Intake' } : null,
   ].filter(Boolean) as Array<{ to: string; icon: ComponentType<{ className?: string }>; label: string }>;
 
   return (
@@ -119,32 +135,34 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Official Supporters"
-          value={Number(summary.total_supporters ?? counts?.official_supporters ?? 0)}
+          value={Number(summary.supporters ?? counts?.supporters ?? counts?.official_supporters ?? 0)}
           icon={CheckCircle}
           color="green"
-          detail="Approved active supporters"
+          detail="Contacts marked as supporters"
           to={permissions?.can_view_supporters ? '/admin/supporters' : undefined}
         />
         <StatCard
-          label="Supporter Review Queue"
-          value={counts?.pending_vetting ?? 0}
+          label="New Intake"
+          value={Number(summary.new_intake ?? counts?.new_intake ?? counts?.pending_vetting ?? 0)}
           icon={ShieldCheck}
           color="amber"
-          detail="Submitted entries still waiting for data-team approval"
+          detail="New contacts to classify"
+          to={permissions?.can_view_supporters ? '/admin/intake' : undefined}
         />
         <StatCard
-          label="Pending Public Signups"
-          value={counts?.public_signups_pending ?? 0}
+          label="Total Contacts"
+          value={Number(summary.total_contacts ?? counts?.total_contacts ?? summary.total_supporters ?? 0)}
           icon={UserCheck}
           color="blue"
-          detail="Separate public submissions waiting on intake review"
+          detail="Visible DPG contact list"
+          to={permissions?.can_view_supporters ? '/admin/supporters' : undefined}
         />
         <StatCard
           label="Matched To Voter List"
-          value={counts?.matched_to_gec ?? 0}
+          value={Number(summary.matched_to_gec ?? counts?.matched_to_gec ?? 0)}
           icon={Users}
           color="gray"
-          detail="Official supporters matched to the voter list"
+          detail="Contacts matched to GEC"
         />
       </div>
 
@@ -157,16 +175,13 @@ export default function DashboardPage() {
               <QuickAction key={action.to} to={action.to} icon={action.icon} label={action.label} />
             ))}
           </div>
-          <p className="mt-3 text-xs text-gray-500">
-            Staff submissions created here go to the data team&apos;s review workflow before they count as official supporters.
-          </p>
         </div>
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Village Engagement Summary</h2>
         <p className="text-xs text-gray-500 mb-3">
-          Supporter counts show approved records and pending submissions by village.
+          Contact counts show all active DPG contacts, new intake, GEC matches, and follow-up needs by village.
         </p>
         {hasScopedVillageView && (
           <p className="text-xs text-gray-500 mb-3">
@@ -183,11 +198,12 @@ export default function DashboardPage() {
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Village</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Contacts</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Intake</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">GEC Matches</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Follow-Up</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Supporters</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Team Approved</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Public Approved</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Team Pending</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Public Pending</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Members</th>
               </tr>
             </thead>
             <tbody>
@@ -198,11 +214,12 @@ export default function DashboardPage() {
                         {v.villageName}
                       </Link>
                     </td>
-                    <td className="py-2 px-3 text-right font-semibold text-green-700">{v.supporters}</td>
-                    <td className="py-2 px-3 text-right text-gray-600">{v.teamApprovedCount}</td>
-                    <td className="py-2 px-3 text-right text-gray-600">{v.publicApprovedCount}</td>
-                    <td className="py-2 px-3 text-right text-amber-700">{v.teamPendingCount}</td>
-                    <td className="py-2 px-3 text-right text-amber-700">{v.publicPendingCount}</td>
+                    <td className="py-2 px-3 text-right font-semibold text-blue-700">{v.contacts}</td>
+                    <td className="py-2 px-3 text-right text-amber-700">{v.intake}</td>
+                    <td className="py-2 px-3 text-right text-green-700">{v.matched}</td>
+                    <td className="py-2 px-3 text-right text-red-700">{v.followUp}</td>
+                    <td className="py-2 px-3 text-right text-gray-600">{v.supporters}</td>
+                    <td className="py-2 px-3 text-right text-gray-600">{v.members}</td>
                   </tr>
               ))}
             </tbody>

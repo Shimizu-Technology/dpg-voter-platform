@@ -49,6 +49,7 @@ class Api::V1::VillagesControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       precinct: precinct_a,
       source: "staff_entry",
+      contact_classification: "supporter",
       status: "active",
       review_status: "approved",
       public_review_status: "not_applicable",
@@ -61,6 +62,7 @@ class Api::V1::VillagesControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       precinct: precinct_b,
       source: "bulk_import",
+      contact_classification: "member",
       status: "active",
       review_status: "approved",
       public_review_status: "not_applicable",
@@ -84,9 +86,9 @@ class Api::V1::VillagesControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       source: "public_signup",
       status: "active",
-      intake_status: "pending_public_review",
-      review_status: "pending",
-      public_review_status: "pending",
+      intake_status: "accepted",
+      review_status: "approved",
+      public_review_status: "not_applicable",
       verification_status: "unverified"
     )
 
@@ -96,8 +98,10 @@ class Api::V1::VillagesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     village = JSON.parse(response.body)["village"]
     assert_equal 2, village["official_supporters_count"]
+    assert_equal 4, village["total_contacts"]
+    assert_equal 2, village["new_intake_count"]
     assert_equal 1, village["matched_to_gec_count"]
-    assert_equal 1, village["team_pending_count"]
+    assert_equal 2, village["team_pending_count"]
     assert_equal 1, village["public_pending_count"]
     assert_equal 2, village["supporter_count"]
     assert_equal 1, village["precincts"].find { |row| row["number"] == "15A" }["supporter_count"]

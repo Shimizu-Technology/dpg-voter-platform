@@ -135,7 +135,7 @@ export default function SmsPage() {
 
         {!smsStatus?.live_enabled && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            Live SMS sending is disabled in this environment. Preview/dry-run is available; enable DPG_LIVE_OUTREACH_ENABLED only after DPG sender setup and approval.
+            Live SMS sending is off for this environment. Preview/dry-run is available; enable DPG_LIVE_OUTREACH_ENABLED only in approved DPG environments with sender credentials configured.
           </div>
         )}
 

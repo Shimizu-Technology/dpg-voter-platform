@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_08_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_11_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -99,6 +99,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_000000) do
     t.integer "number"
     t.datetime "updated_at", null: false
     t.index ["campaign_id"], name: "index_districts_on_campaign_id"
+  end
+
+  create_table "dpg_supporter_review_flow_backups", primary_key: "supporter_id", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "intake_status"
+    t.string "public_review_status"
+    t.string "review_status"
+    t.index ["supporter_id"], name: "index_dpg_supporter_review_flow_backups_on_supporter_id", unique: true
   end
 
   create_table "event_rsvps", force: :cascade do |t|
@@ -553,6 +561,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_000000) do
   create_table "supporters", force: :cascade do |t|
     t.string "attribution_method", default: "public_signup", null: false
     t.bigint "block_id"
+    t.datetime "classified_at"
+    t.bigint "classified_by_user_id"
+    t.string "contact_classification", default: "new_intake", null: false
     t.string "contact_number"
     t.datetime "created_at", null: false
     t.date "dob"
@@ -623,6 +634,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_000000) do
     t.index "village_id, lower(TRIM(BOTH FROM first_name)), lower(TRIM(BOTH FROM last_name))", name: "index_supporters_on_village_lower_first_last_name"
     t.index ["attribution_method"], name: "index_supporters_on_attribution_method"
     t.index ["block_id"], name: "index_supporters_on_block_id"
+    t.index ["classified_by_user_id"], name: "index_supporters_on_classified_by_user_id"
+    t.index ["contact_classification"], name: "index_supporters_on_contact_classification"
     t.index ["contact_number"], name: "index_supporters_on_contact_number_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["created_at"], name: "index_supporters_on_created_at"
     t.index ["duplicate_of_id"], name: "index_supporters_on_duplicate_of_id"
@@ -757,6 +770,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_000000) do
   add_foreign_key "supporters", "quota_periods"
   add_foreign_key "supporters", "referral_codes"
   add_foreign_key "supporters", "supporters", column: "duplicate_of_id"
+  add_foreign_key "supporters", "users", column: "classified_by_user_id"
   add_foreign_key "supporters", "users", column: "turnout_updated_by_user_id"
   add_foreign_key "supporters", "villages"
   add_foreign_key "supporters", "villages", column: "submitted_village_id"

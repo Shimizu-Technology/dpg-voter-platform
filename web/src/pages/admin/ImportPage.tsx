@@ -3,21 +3,9 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { uploadImportPreview, parseImportRows, confirmImport, getVillages } from '../../lib/api';
 import { captureAnalyticsEvent } from '../../lib/analytics';
 import { useSession } from '../../hooks/useSession';
-import { Upload, FileSpreadsheet, ArrowRight, ArrowLeft, Check, AlertTriangle, Loader2 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Upload, FileSpreadsheet, ArrowLeft, Check, AlertTriangle, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import WorkspacePage from '../../components/WorkspacePage';
-
-function DataOpsImportBanner() {
-  return (
-    <div className="mb-6 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-      <Upload className="w-4 h-4 shrink-0 text-blue-500" />
-      <span>For larger voter/contact data operations, use the <strong>Data Ops Workspace</strong>.</span>
-      <Link to="/data/import" className="ml-auto flex items-center gap-1 font-semibold text-blue-700 hover:text-blue-900 whitespace-nowrap">
-        Go to Data Ops <ArrowRight className="w-3.5 h-3.5" />
-      </Link>
-    </div>
-  );
-}
 
 // Types
 interface SheetInfo {
@@ -89,7 +77,6 @@ const REQUIRED_MAPPING_FIELDS = ['name', 'first_name', 'last_name'] as const;
 const OPTIONAL_MAPPING_FIELDS = IMPORTABLE_FIELDS.filter((field) => !REQUIRED_MAPPING_FIELDS.includes(field as (typeof REQUIRED_MAPPING_FIELDS)[number]));
 
 export default function ImportPage() {
-  const location = useLocation();
   const [step, setStep] = useState<Step>('upload');
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [selectedSheet, setSelectedSheet] = useState<number>(0);
@@ -248,9 +235,9 @@ export default function ImportPage() {
   const hasVillageSource = Boolean(villageId || columnMapping.village);
   const currentSheet = preview?.sheets.find(s => s.index === selectedSheet);
   const rawHeaders = currentSheet?.headers.raw_headers || [];
-  const reviewQueuePath = location.pathname.startsWith('/data') ? '/data/supporters' : '/admin/supporters';
-  const activeRowLabel = activeRows.length === 1 ? 'supporter' : 'supporters';
-  const createdLabel = importResult?.created === 1 ? 'supporter submission' : 'supporter submissions';
+  const reviewQueuePath = '/admin/supporters';
+  const activeRowLabel = activeRows.length === 1 ? 'contact' : 'contacts';
+  const createdLabel = importResult?.created === 1 ? 'contact' : 'contacts';
 
   const skipRowsMissingRequired = () => {
     setRows((prev) =>
@@ -271,10 +258,9 @@ export default function ImportPage() {
 
   return (
     <WorkspacePage width="full" className="space-y-6">
-      {location.pathname.startsWith('/admin') && sessionData?.permissions?.can_access_data_team && <DataOpsImportBanner />}
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Import Supporters</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Import Contacts</h1>
         <div className="flex items-center gap-2 mt-3 text-sm text-gray-500">
           {(['upload', 'select-sheet', 'map-columns', 'review', 'complete'] as Step[]).map((s, i) => (
             <span key={s} className={`flex items-center gap-1 ${step === s ? 'text-gray-900 font-medium' : ''}`}>
@@ -386,7 +372,7 @@ export default function ImportPage() {
               <div className="app-card p-4">
                 <h2 className="font-semibold text-[var(--text-primary)] mb-1">Assign Village</h2>
                 <p className="text-sm text-[var(--text-secondary)] mb-3">
-                  All imported supporters will be assigned to this village. Or map a "Village" column below to assign per-row.
+                  All imported contacts will be assigned to this village. Or map a "Village" column below to assign per-row.
                 </p>
                 <select
                   value={villageId}

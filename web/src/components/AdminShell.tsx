@@ -21,7 +21,6 @@ import {
   X,
   Home,
   Settings,
-  Database,
   Copy,
 } from 'lucide-react';
 import WorkspaceBrandPanel from './WorkspaceBrandPanel';
@@ -60,20 +59,21 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       label: 'Overview',
       items: [
         { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-        ...(permissions?.can_view_supporters ? [ { to: '/admin/supporters', label: 'Supporters', icon: Users } ] : []),
+        ...(permissions?.can_view_supporters ? [ { to: '/admin/supporters', label: 'Contacts', icon: Users } ] : []),
+        ...(permissions?.can_view_supporters ? [ { to: '/admin/intake', label: 'Intake', icon: ClipboardCheck, badge: sessionData?.counts?.new_intake } ] : []),
       ],
     },
     {
       label: 'Data Entry',
       items: [
         ...(permissions?.can_create_staff_supporters ? [ { to: '/admin/supporters/new', label: 'New Entry', icon: ClipboardPlus } ] : []),
-        ...(permissions?.can_import_supporters ? [ { to: '/admin/import', label: 'Excel Import', icon: Upload } ] : []),
+        ...(permissions?.can_import_supporters ? [ { to: '/admin/import', label: 'Import Contacts', icon: Upload } ] : []),
       ],
     },
     {
       label: 'Outreach',
       items: [
-        ...(permissions?.can_view_supporters ? [ { to: '/admin/outreach', label: 'Voter Help Follow-Up', icon: ClipboardCheck } ] : []),
+        ...(permissions?.can_view_supporters ? [ { to: '/admin/outreach', label: 'Follow-Up', icon: ClipboardCheck } ] : []),
         ...(permissions?.can_send_sms ? [ { to: '/admin/sms', label: 'SMS Blasts', icon: MessageSquare } ] : []),
         ...(permissions?.can_send_email ? [ { to: '/admin/email', label: 'Email Blasts', icon: Mail } ] : []),
       ],
@@ -224,13 +224,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </div>
         ))}
       </div>
-
-      {/* Data Ops link */}
-      {sessionData?.permissions?.can_access_data_team && (
-        <div className="px-3 pb-2">
-          {utilityLink('/data', 'Open Data Ops', Database, collapsed, 'border border-blue-200 bg-blue-50 font-semibold text-blue-700 hover:bg-blue-100')}
-        </div>
-      )}
 
       {/* View Public Site */}
       <div className="mt-auto border-t border-slate-200 px-3 pt-2 pb-2">

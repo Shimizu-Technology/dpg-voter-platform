@@ -67,7 +67,7 @@ The app is much cleaner, but the source still contains inherited internals that 
 - Villages and precincts.
 - Districts only if generated from public/DPG-defined mapping, not inherited Josh/Tina team/district mapping.
 - Audit logs.
-- SMS/email configuration pages, with live sends disabled until approved.
+- SMS/email configuration pages, with live sends enabled only in approved DPG environments after sender/provider setup.
 - GEC voter-list import/search/matching if it is based on public GEC data and DPG requirements, not Josh/Tina workflow assumptions.
 
 ## DPG requested functionality from transcripts

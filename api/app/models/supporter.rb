@@ -1,6 +1,18 @@
 class Supporter < ApplicationRecord
   ATTRIBUTION_METHODS = %w[qr_self_signup staff_manual staff_scan bulk_import public_signup].freeze
-  INTAKE_STATUSES = %w[accepted pending_public_review].freeze
+  INTAKE_STATUSES = %w[accepted].freeze
+  CONTACT_CLASSIFICATIONS = %w[
+    new_intake
+    active_contact
+    supporter
+    member
+    volunteer
+    undecided
+    not_supporting
+    duplicate
+    invalid
+    archived
+  ].freeze
   REVIEW_STATUSES = %w[pending approved rejected].freeze
   PUBLIC_REVIEW_STATUSES = %w[not_applicable pending approved rejected].freeze
   REGISTERED_VOTER_STATUSES = %w[yes no not_sure].freeze
@@ -33,6 +45,7 @@ class Supporter < ApplicationRecord
   belongs_to :verified_by, class_name: "User", foreign_key: :verified_by_user_id, optional: true
   belongs_to :reviewed_by, class_name: "User", foreign_key: :reviewed_by_user_id, optional: true
   belongs_to :public_reviewed_by, class_name: "User", foreign_key: :public_reviewed_by_user_id, optional: true
+  belongs_to :classified_by_user, class_name: "User", optional: true
   belongs_to :duplicate_of, class_name: "Supporter", foreign_key: :duplicate_of_id, optional: true
   has_many :duplicates, class_name: "Supporter", foreign_key: :duplicate_of_id, dependent: :nullify
 
@@ -66,6 +79,7 @@ class Supporter < ApplicationRecord
   validates :review_status, inclusion: { in: REVIEW_STATUSES }
   validates :public_review_status, inclusion: { in: PUBLIC_REVIEW_STATUSES }
   validates :registered_voter_status, inclusion: { in: REGISTERED_VOTER_STATUSES }
+  validates :contact_classification, inclusion: { in: CONTACT_CLASSIFICATIONS }
   validates :support_follow_up_status, inclusion: { in: SUPPORT_FOLLOW_UP_STATUSES }, allow_nil: true
   validates :turnout_status, inclusion: { in: TURNOUT_STATUSES }
   validates :turnout_source, inclusion: { in: TURNOUT_SOURCES }, allow_blank: true
@@ -75,6 +89,11 @@ class Supporter < ApplicationRecord
   validate :block_matches_village
 
   scope :active, -> { where(status: "active") }
+  scope :contacts, -> { active.where.not(contact_classification: %w[archived invalid duplicate]) }
+  scope :intake, -> { contacts.where(contact_classification: "new_intake") }
+  scope :classified_supporters, -> { contacts.where(contact_classification: "supporter") }
+  scope :members, -> { contacts.where(contact_classification: "member") }
+  scope :volunteers, -> { contacts.where(contact_classification: "volunteer") }
   scope :verified, -> { where(verification_status: "verified") }
   scope :unverified, -> { where(verification_status: "unverified") }
   scope :flagged, -> { where(verification_status: "flagged") }
@@ -94,12 +113,13 @@ class Supporter < ApplicationRecord
   scope :public_review_approved, -> { where(public_review_status: "approved", source: PUBLIC_SOURCES) }
   scope :public_review_rejected, -> { where(public_review_status: "rejected", source: PUBLIC_SOURCES) }
   scope :public_origin, -> { where(source: PUBLIC_SOURCES) }
-  scope :accepted_public_signups, -> { public_review_approved }
-  scope :official_supporters, -> { active.review_approved }
+  scope :accepted_public_signups, -> { public_origin.review_approved }
+  scope :engaged_contacts, -> { contacts.where(contact_classification: %w[active_contact supporter member volunteer undecided]) }
+  scope :official_supporters, -> { contacts.where(contact_classification: %w[supporter member volunteer]) }
   scope :pending_supporter_review, -> { active.review_pending.where(public_review_status: %w[approved not_applicable]) }
   scope :working_supporters, -> { official_supporters }
   scope :team_input, -> { official_supporters.where(source: TEAM_SOURCES) }
-  scope :public_signups, -> { pending_public_review }
+  scope :public_signups, -> { public_origin }
   scope :submitted_village_referrals, -> {
     where.not(submitted_village_id: nil)
       .where("supporters.submitted_village_id <> supporters.village_id")
@@ -194,17 +214,9 @@ class Supporter < ApplicationRecord
   end
 
   def sync_review_workflow_fields
-    if PUBLIC_SOURCES.include?(source)
-      if public_review_status == "rejected" || review_status == "rejected"
-        self.public_review_status = "rejected"
-        self.review_status = "rejected"
-      elsif intake_status == "pending_public_review"
-        self.public_review_status = "pending"
-        self.review_status = "pending"
-      else
-        self.public_review_status = "approved"
-        self.review_status = review_status.presence || "approved"
-      end
+    if public_review_status == "rejected" || review_status == "rejected"
+      self.public_review_status = "rejected"
+      self.review_status = "rejected"
     else
       self.public_review_status = "not_applicable"
       self.review_status = review_status.presence || "approved"

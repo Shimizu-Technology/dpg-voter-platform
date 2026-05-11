@@ -142,7 +142,7 @@ These are reusable Shimizu-built platform capabilities and should not be removed
 - audit logs
 - reports/export basics
 - villages and public precinct references
-- SMS/email settings/plumbing, but no live blasts without approval
+- SMS/email settings/plumbing, with live sending only in approved DPG environments and dry-run/preview first for normal testing
 
 ## Keep as generic foundation
 

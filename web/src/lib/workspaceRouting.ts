@@ -27,6 +27,7 @@ const PERMISSION_RULES: PermissionRule[] = [
   { prefix: '/admin/supporters/new', permission: 'can_create_staff_supporters' },
   { prefix: '/admin/import', permission: 'can_import_supporters' },
   { prefix: '/admin/supporters', permission: 'can_view_supporters' },
+  { prefix: '/admin/intake', permission: 'can_view_supporters' },
   { prefix: '/admin/reports', permission: 'can_access_reports' },
   { prefix: '/admin/duplicates', permission: 'can_access_duplicates' },
   { prefix: '/admin/sms/settings', permission: 'can_manage_configuration' },
@@ -37,13 +38,6 @@ const PERMISSION_RULES: PermissionRule[] = [
   { prefix: '/admin/precincts', permission: 'can_manage_configuration' },
   { prefix: '/admin/outreach', permission: 'can_view_supporters' },
   { prefix: '/admin/audit-logs', permission: 'can_access_audit_logs' },
-  { prefix: '/data/users', permission: 'can_manage_users' },
-  { prefix: '/data/districts', permission: 'can_manage_data_configuration' },
-  { prefix: '/data/precincts', permission: 'can_manage_data_configuration' },
-  { prefix: '/data/campaign-settings', permission: 'can_manage_configuration' },
-  { prefix: '/data/supporters', permission: 'can_view_supporters' },
-  { prefix: '/data/reports', permission: 'can_access_reports' },
-  { prefix: '/data/import', permission: 'can_import_supporters' },
 ];
 
 function splitRoute(route: string) {
@@ -77,30 +71,32 @@ function getPermissionForPath(pathname: string): PermissionKey | null {
 export function canonicalizeWorkspaceRoute(route: string) {
   const { pathname, search } = splitRoute(route);
 
-  if (pathname === '/team') return `/data${search}`;
+  if (pathname === '/data' || pathname === '/team') return `/admin${search}`;
+  if (pathname === '/data/entry' || pathname === '/team/entry') return `/admin/supporters/new${search}`;
+  if (pathname === '/data/campaign-settings' || pathname === '/team/campaign-settings') return `/admin/sms/settings${search}`;
+  if (pathname.startsWith('/data/')) {
+    return `/admin/${pathname.slice('/data/'.length)}${search}`;
+  }
   if (pathname.startsWith('/team/')) {
-    return `/data/${pathname.slice('/team/'.length)}${search}`;
+    return `/admin/${pathname.slice('/team/'.length)}${search}`;
   }
   return `${pathname}${search}`;
 }
 
 export function isWorkspaceRoute(route: string) {
   const { pathname } = splitRoute(canonicalizeWorkspaceRoute(route));
-  return pathname.startsWith('/admin') || pathname.startsWith('/data');
+  return pathname.startsWith('/admin');
 }
 
 export function canAccessDataWorkspace(session: SessionLike) {
-  return Boolean(session.permissions?.can_access_data_team);
+  return Boolean(session.permissions?.can_view_supporters);
 }
 
 export function isRouteAllowedForSession(route: string, session: SessionLike) {
   const normalized = canonicalizeWorkspaceRoute(route);
   const { pathname } = splitRoute(normalized);
 
-  if (pathname.startsWith('/data') && !canAccessDataWorkspace(session)) {
-    return false;
-  }
-  if (!pathname.startsWith('/admin') && !pathname.startsWith('/data')) {
+  if (!pathname.startsWith('/admin')) {
     return false;
   }
 
@@ -145,5 +141,5 @@ export function resolvePreferredRoute(session: SessionLike, currentRoute?: strin
 
 export function shouldAttemptInitialRouteRestore(route: string) {
   const { pathname } = splitRoute(canonicalizeWorkspaceRoute(route));
-  return pathname === '/admin' || pathname === '/data';
+  return pathname === '/admin';
 }

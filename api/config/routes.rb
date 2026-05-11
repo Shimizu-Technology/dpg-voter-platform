@@ -40,9 +40,7 @@ Rails.application.routes.draw do
       resources :audit_logs, only: [ :index ]
 
       # Authenticated staff
-      namespace :staff do
-        resources :supporters, only: [ :create ]
-      end
+      post "staff/supporters", to: "staff_supporters#create"
 
 
 

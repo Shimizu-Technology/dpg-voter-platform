@@ -38,15 +38,15 @@ module Api
             code: "village_access_required"
           )
         end
-        official_supporters_count = village.supporters.official_supporters.count
-        matched_to_gec_count = village.supporters.official_supporters.verified.count
-        total_count = village.supporters.active.count
-        team_pending_count = village.supporters.pending_supporter_review.where(source: Supporter::TEAM_SOURCES).count
-        public_pending_count = village.supporters.active.public_signups.count
-        precinct_supporter_counts = village.supporters.official_supporters.where.not(precinct_id: nil).group(:precinct_id).count
-        unassigned_precinct_count = village.supporters.official_supporters.where(precinct_id: nil).count
+        contacts = village.supporters.contacts
+        official_supporters_count = contacts.official_supporters.count
+        matched_to_gec_count = contacts.verified.count
+        total_count = contacts.count
+        intake_count = contacts.intake.count
+        public_pending_count = contacts.intake.public_origin.count
+        precinct_supporter_counts = contacts.where.not(precinct_id: nil).group(:precinct_id).count
+        unassigned_precinct_count = contacts.where(precinct_id: nil).count
         latest_gec_list_date = GecVoter.active.maximum(:gec_list_date)
-        pending_review_count = team_pending_count + public_pending_count
 
         render json: {
           village: {
@@ -55,17 +55,22 @@ module Api
             region: village.region,
             registered_voters: village.registered_voters,
             official_supporters_count: official_supporters_count,
+            total_contacts: total_count,
+            new_intake_count: intake_count,
+            supporter_count: official_supporters_count,
+            member_count: contacts.members.count,
+            volunteer_count: contacts.volunteers.count,
+            needs_follow_up_count: contacts.needs_follow_up.count,
             matched_to_gec_count: matched_to_gec_count,
-            team_approved_count: village.supporters.team_input.count,
-            public_approved_count: village.supporters.official_supporters.public_origin.count,
-            team_pending_count: team_pending_count,
+            team_approved_count: contacts.where(source: Supporter::TEAM_SOURCES).count,
+            public_approved_count: contacts.public_origin.count,
+            team_pending_count: intake_count,
             public_pending_count: public_pending_count,
             latest_gec_list_date: latest_gec_list_date,
             # Legacy compat
             verified_count: matched_to_gec_count,
             total_count: total_count,
-            unverified_count: pending_review_count,
-            supporter_count: official_supporters_count,
+            unverified_count: contacts.unverified.count,
             precincts: village.precincts.order(:number).map { |p|
               {
                 id: p.id,
@@ -81,9 +86,9 @@ module Api
               {
                 id: b.id,
                 name: b.name,
-                verified_count: b.supporters.official_supporters.verified.count,
-                total_count: b.supporters.active.count,
-                supporter_count: b.supporters.official_supporters.count
+                verified_count: b.supporters.contacts.verified.count,
+                total_count: b.supporters.contacts.count,
+                supporter_count: b.supporters.contacts.official_supporters.count
               }
             }
           }

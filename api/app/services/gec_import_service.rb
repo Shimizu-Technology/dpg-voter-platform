@@ -1105,7 +1105,7 @@ class GecImportService
   # disappear, or become newly resolvable in a newer monthly list.
   def re_vet_affected_supporters(_gec_import)
     count = 0
-    supporters = Supporter.working_supporters.includes(:village)
+    supporters = Supporter.contacts.includes(:village)
 
     supporters.find_each do |supporter|
       before = supporter.attributes.slice("verification_status", "registered_voter", "referred_from_village_id", "verified_at")

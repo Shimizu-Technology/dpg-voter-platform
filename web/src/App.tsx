@@ -6,7 +6,6 @@ import AdminLayout from './components/AdminLayout';
 import AnalyticsTracker from './components/AnalyticsTracker';
 import PublicHeadManager from './components/PublicHeadManager';
 import RoutePersistenceManager from './components/RoutePersistenceManager';
-import TeamLayout from './components/TeamLayout';
 import { useSession } from './hooks/useSession';
 import { resolvePreferredRoute } from './lib/workspaceRouting';
 
@@ -32,7 +31,6 @@ const DuplicatesPage = lazy(() => import('./pages/admin/DuplicatesPage'));
 const ImportPage = lazy(() => import('./pages/admin/ImportPage'));
 const AuditLogsPage = lazy(() => import('./pages/admin/AuditLogsPage'));
 const OutreachPage = lazy(() => import('./pages/admin/OutreachPage'));
-const TeamDashboardPage = lazy(() => import('./pages/team/TeamDashboardPage'));
 const TeamReportsPage = lazy(() => import('./pages/team/TeamReportsPage'));
 
 function LazyFallback() {
@@ -51,6 +49,16 @@ const queryClient = new QueryClient({
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   return <AdminLayout>{children}</AdminLayout>;
+}
+
+function LegacyWorkspaceRedirect() {
+  const location = useLocation();
+  const pathname = location.pathname
+    .replace(/^\/(data|team)(?=\/|$)/, '/admin')
+    .replace(/^\/admin\/entry(?=\/|$)/, '/admin/supporters/new')
+    .replace(/^\/admin\/campaign-settings(?=\/|$)/, '/admin/sms/settings');
+
+  return <Navigate to={`${pathname}${location.search}`} replace />;
 }
 
 type PermissionKey =
@@ -122,6 +130,7 @@ export default function App() {
             {/* Admin — requires Clerk auth */}
             <Route path="/admin" element={<AdminRoute><DashboardPage /></AdminRoute>} />
             <Route path="/admin/supporters" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupportersPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/intake" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupportersPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/supporters/:id" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupporterDetailPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/supporters/new" element={<AdminRoute><PermissionRoute permission="can_create_staff_supporters"><StaffEntryPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/import" element={<AdminRoute><PermissionRoute permission="can_import_supporters"><ImportPage /></PermissionRoute></AdminRoute>} />
@@ -137,32 +146,9 @@ export default function App() {
             <Route path="/admin/outreach" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><OutreachPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/audit-logs" element={<AdminRoute><PermissionRoute permission="can_access_audit_logs"><AuditLogsPage /></PermissionRoute></AdminRoute>} />
 
-            {/* Data Ops routes */}
-            <Route path="/data" element={<TeamLayout><TeamDashboardPage /></TeamLayout>} />
-            <Route path="/data/supporters" element={<TeamLayout><SupportersPage /></TeamLayout>} />
-            <Route path="/data/supporters/:id" element={<TeamLayout><PermissionRoute permission="can_view_supporters"><SupporterDetailPage /></PermissionRoute></TeamLayout>} />
-            <Route path="/data/reports" element={<TeamLayout><PermissionRoute permission="can_access_reports"><TeamReportsPage /></PermissionRoute></TeamLayout>} />
-            <Route path="/data/entry" element={<TeamLayout><StaffEntryPage /></TeamLayout>} />
-            <Route path="/data/import" element={<TeamLayout><PermissionRoute permission="can_import_supporters"><ImportPage /></PermissionRoute></TeamLayout>} />
-            <Route path="/data/duplicates" element={<TeamLayout><DuplicatesPage /></TeamLayout>} />
-            <Route path="/data/audit-logs" element={<TeamLayout><AuditLogsPage /></TeamLayout>} />
-            <Route path="/data/users" element={<TeamLayout><PermissionRoute permission="can_manage_users"><UsersPage /></PermissionRoute></TeamLayout>} />
-            <Route path="/data/districts" element={<TeamLayout><PermissionRoute permission="can_manage_data_configuration"><DistrictsPage /></PermissionRoute></TeamLayout>} />
-            <Route path="/data/precincts" element={<TeamLayout><PermissionRoute permission="can_manage_data_configuration"><PrecinctSettingsPage /></PermissionRoute></TeamLayout>} />
-            <Route path="/data/campaign-settings" element={<TeamLayout><PermissionRoute permission="can_manage_configuration"><SmsSettingsPage /></PermissionRoute></TeamLayout>} />
-
-            {/* Legacy /team aliases */}
-            <Route path="/team" element={<Navigate to="/data" replace />} />
-            <Route path="/team/supporters" element={<Navigate to="/data/supporters" replace />} />
-            <Route path="/team/reports" element={<Navigate to="/data/reports" replace />} />
-            <Route path="/team/entry" element={<Navigate to="/data/entry" replace />} />
-            <Route path="/team/import" element={<Navigate to="/data/import" replace />} />
-            <Route path="/team/duplicates" element={<Navigate to="/data/duplicates" replace />} />
-            <Route path="/team/audit-logs" element={<Navigate to="/data/audit-logs" replace />} />
-            <Route path="/team/users" element={<Navigate to="/data/users" replace />} />
-            <Route path="/team/districts" element={<Navigate to="/data/districts" replace />} />
-            <Route path="/team/precincts" element={<Navigate to="/data/precincts" replace />} />
-            <Route path="/team/campaign-settings" element={<Navigate to="/data/campaign-settings" replace />} />
+            {/* Legacy workspace aliases */}
+            <Route path="/data/*" element={<LegacyWorkspaceRedirect />} />
+            <Route path="/team/*" element={<LegacyWorkspaceRedirect />} />
           </Routes>
         </Suspense>
       </BrowserRouter>
