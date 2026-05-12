@@ -4,6 +4,7 @@ module Api
   module V1
     class EmailController < ApplicationController
       include Authenticatable
+      include OutreachGovernance
       before_action :authenticate_request
       before_action :require_coordinator_or_above!, only: [ :blast ]
 
@@ -21,15 +22,8 @@ module Api
           )
         end
 
-        supporters = Supporter.active
-                              .where.not(email: [ nil, "" ])
-                              .where(opt_in_email: true)
-
-        # Optional filters
-        supporters = supporters.where(village_id: params[:village_id]) if params[:village_id].present?
-        supporters = supporters.where(registered_voter: true) if params[:registered_voter] == "true"
-
-        count = supporters.count
+        filters = outreach_filters
+        supporters = OutreachRecipientQuery.email_scope(base_scope: Supporter.all, filters: filters)
 
         if params[:dry_run] == "true"
           sample_supporter = Supporter.new(
@@ -38,22 +32,21 @@ module Api
           )
           return render json: {
             dry_run: true,
-            recipient_count: count,
             subject: subject,
             preview_subject: SupporterEmailService.preview_subject(subject, sample_supporter),
             preview_html: SupporterEmailService.preview_html(body, sample_supporter)
-          }
+          }.merge(OutreachRecipientQuery.preview(supporters))
         end
 
+        count = supporters.count
         return live_outreach_disabled_response unless live_outreach_enabled?
+        return recipient_review_required_response(count) unless OutreachRecipientQuery.reviewed?(params, expected_count: count)
 
         SendEmailBlastJob.perform_later(
           subject: subject,
           body: body,
-          filters: {
-            "village_id" => params[:village_id],
-            "registered_voter" => params[:registered_voter]
-          }
+          filters: filters,
+          initiated_by_user_id: current_user.id
         )
 
         render json: {

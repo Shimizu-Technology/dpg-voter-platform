@@ -27,18 +27,19 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "coordinator can queue blast" do
-    Supporter.create!(
+    supporter = Supporter.create!(
       first_name: "Blast", last_name: "Target", print_name: "Blast Target",
       contact_number: "6715552000",
       village: Village.create!(name: "Blast Village"),
       source: "staff_entry",
+      opt_in_text: true,
       status: "active"
     )
 
     with_live_outreach_enabled do
       assert_enqueued_with(job: SmsBlastJob) do
         post "/api/v1/sms/blast",
-          params: { message: "DPG update" },
+          params: { message: "DPG update", recipient_reviewed: true, expected_recipient_count: 1 },
           headers: auth_headers(@coordinator)
       end
     end
@@ -46,9 +47,21 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
     assert_response :accepted
     payload = JSON.parse(response.body)
     assert_equal true, payload["queued"]
+    assert_equal 1, payload["total_targeted"]
+    assert_equal supporter.id, Supporter.find(supporter.id).id
   end
 
   test "coordinator can dry run blast" do
+    village = Village.create!(name: "Dry Run Village")
+    Supporter.create!(
+      first_name: "Preview", last_name: "Recipient", print_name: "Preview Recipient",
+      contact_number: "6715553000",
+      village: village,
+      source: "staff_entry",
+      opt_in_text: true,
+      status: "active"
+    )
+
     post "/api/v1/sms/blast",
       params: { message: "DPG update", dry_run: "true" },
       headers: auth_headers(@coordinator)
@@ -56,6 +69,31 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     payload = JSON.parse(response.body)
     assert_equal true, payload["dry_run"]
+    assert_equal 1, payload["recipient_count"]
+    assert_equal "Preview Recipient", payload["recipients"].first["name"]
+    assert_enqueued_jobs 0
+  end
+
+  test "coordinator live blast requires reviewed recipient count" do
+    Supporter.create!(
+      first_name: "Needs", last_name: "Review", print_name: "Needs Review",
+      contact_number: "6715554000",
+      village: Village.create!(name: "Review Village"),
+      source: "staff_entry",
+      opt_in_text: true,
+      status: "active"
+    )
+
+    with_live_outreach_enabled do
+      post "/api/v1/sms/blast",
+        params: { message: "DPG update", recipient_reviewed: true, expected_recipient_count: 99 },
+        headers: auth_headers(@coordinator)
+    end
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "recipient_review_required", payload["code"]
+    assert_equal 1, payload.dig("details", "current_recipient_count")
     assert_enqueued_jobs 0
   end
 

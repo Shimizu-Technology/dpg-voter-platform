@@ -147,7 +147,10 @@ DPG's requested platform includes:
 - SMS page works.
 - Email page works.
 - SMS/settings page works.
-- Dry-run/preview works.
+- Dry-run/preview works and now returns a reviewable recipient count plus a sample recipient list before any live blast.
+- Live SMS/email blasts now require recipient-review confirmation with the matching expected recipient count, so staff cannot accidentally bypass preview after filters or list data change.
+- SMS and email blast screens include starter DPG templates for registration reminders, events/community updates, and volunteer follow-up.
+- SMS and email blast jobs write structured contact-history records for each attempted recipient, so communication actions show up in the same timeline as calls, visits, and queue work.
 - Live SMS/email provider credentials have been configured for DPG, and `DPG_LIVE_OUTREACH_ENABLED=true` is expected in the active DPG environment.
 - Use dry-run/preview for normal smoke testing; run real sends only intentionally with DPG-approved recipients/content.
 - Default sender identity is DPG-specific.

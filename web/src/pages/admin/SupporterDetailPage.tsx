@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ChevronLeft, Loader2, MapPin, MessageSquare, Pencil, Phone, Plus, Save, StickyNote, UserRound, X } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, Loader2, Mail, MapPin, MessageSquare, Pencil, Phone, Plus, Save, StickyNote, UserRound, X } from 'lucide-react';
 import { createSupporterContactAttempt, getSupporter, getSupporterContactAttempts, getVillages, updateSupporter, verifySupporter, updateOutreachStatus } from '../../lib/api';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
@@ -267,6 +267,7 @@ const CONTACT_ATTEMPT_CHANNELS = [
   { value: 'in_person', label: 'In person', icon: MapPin },
   { value: 'call', label: 'Call', icon: Phone },
   { value: 'sms', label: 'SMS', icon: MessageSquare },
+  { value: 'email', label: 'Email', icon: Mail },
 ];
 
 const CONTACT_ATTEMPT_OUTCOMES = [

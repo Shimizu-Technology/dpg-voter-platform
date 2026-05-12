@@ -5,6 +5,7 @@ import { MessageSquare, Send, Users, Zap, DollarSign, CheckCircle, AlertTriangle
 import { getSmsStatus, sendTestSms, sendSmsBlast, getSmsBlasts, getSmsBlastStatus } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
 import { DEFAULT_GUAM_PHONE_PREFIX } from '../../lib/phone';
+import type { OutreachRecipient } from '../../lib/outreachTypes';
 import WorkspacePage from '../../components/WorkspacePage';
 
 type Tab = 'blast' | 'test';
@@ -15,6 +16,8 @@ interface SmsBlastResult {
   blast_id?: number;
   recipient_count?: number;
   total_targeted?: number;
+  recipients?: OutreachRecipient[];
+  preview_limit?: number;
   sent?: number;
   failed?: number;
   skipped?: number;
@@ -32,6 +35,21 @@ interface SmsStatus {
   balance?: number;
   sender_id?: string;
 }
+
+const SMS_TEMPLATES = [
+  {
+    label: 'Registration reminder',
+    message: "Hafa adai {first_name}, this is the Democratic Party of Guam. Do you need help checking your voter registration or getting registered? Reply YES and our team can follow up."
+  },
+  {
+    label: 'Event reminder',
+    message: "Hafa adai {first_name}, DPG has an upcoming community event and we would love to see you there. Reply if you would like details or help getting connected."
+  },
+  {
+    label: 'Volunteer follow-up',
+    message: "Hafa adai {first_name}, thank you for connecting with DPG. Are you interested in helping with voter outreach, events, or election-season volunteer work?"
+  }
+];
 
 export default function SmsPage() {
   const { data: sessionData } = useSession();
@@ -150,7 +168,13 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
   const [message, setMessage] = useState('');
   const [filters, setFilters] = useState({ registered: false });
   const [result, setResult] = useState<SmsBlastResult | null>(null);
+  const [recipientReviewAccepted, setRecipientReviewAccepted] = useState(false);
   const [activeBlastId, setActiveBlastId] = useState<number | null>(null);
+
+  const resetReview = () => {
+    setResult(null);
+    setRecipientReviewAccepted(false);
+  };
 
   // Poll active blast progress
   const { data: blastProgress } = useQuery({
@@ -178,13 +202,18 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
       registered_voter: filters.registered ? 'true' : undefined,
       dry_run: 'true',
     }),
-    onSuccess: (data) => setResult(data),
+    onSuccess: (data) => {
+      setResult(data);
+      setRecipientReviewAccepted(false);
+    },
   });
 
   const sendMutation = useMutation({
     mutationFn: () => sendSmsBlast({
       message,
       registered_voter: filters.registered ? 'true' : undefined,
+      recipient_reviewed: recipientReviewAccepted,
+      expected_recipient_count: result?.recipient_count || 0,
     }),
     onSuccess: (data) => {
       setResult(data);
@@ -195,6 +224,7 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
   const charCount = message.length;
   const smsSegments = Math.ceil(charCount / 160) || 1;
   const recentBlasts = blastsData?.blasts || [];
+  const canSend = Boolean(liveEnabled && message.trim() && result?.dry_run && recipientReviewAccepted);
 
   return (
     <div className="space-y-4">
@@ -203,7 +233,10 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
 
         <textarea
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            resetReview();
+          }}
           placeholder="Type your message to supporters..."
           className="w-full border border-[var(--border-soft)] rounded-xl p-3 h-32 text-sm resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
           maxLength={480}
@@ -211,6 +244,21 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
         <div className="flex justify-between text-xs text-[var(--text-muted)] mt-1">
           <span>{charCount}/480 characters</span>
           <span>{smsSegments} SMS segment{smsSegments > 1 ? 's' : ''}</span>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {SMS_TEMPLATES.map((template) => (
+            <button
+              key={template.label}
+              type="button"
+              onClick={() => {
+                setMessage(template.message);
+                resetReview();
+              }}
+              className="rounded-lg border border-[var(--border-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:border-primary hover:text-primary"
+            >
+              {template.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -221,7 +269,10 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
             <input
               type="checkbox"
               checked={filters.registered}
-              onChange={(e) => setFilters(f => ({ ...f, registered: e.target.checked }))}
+              onChange={(e) => {
+                setFilters(f => ({ ...f, registered: e.target.checked }));
+                resetReview();
+              }}
               className="rounded border-[var(--border-soft)] text-primary focus:ring-primary"
             />
             Registered voters only
@@ -244,7 +295,7 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
               sendMutation.mutate();
             }
           }}
-          disabled={!liveEnabled || !message.trim() || sendMutation.isPending || (activeBlastId !== null && !blastProgress?.finished)}
+          disabled={!canSend || sendMutation.isPending || (activeBlastId !== null && !blastProgress?.finished)}
           className="flex-1 bg-cta text-white py-3 rounded-xl font-semibold text-sm hover:bg-red-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
         >
           <Send className="w-4 h-4" />
@@ -254,13 +305,40 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
 
       {/* Dry run result */}
       {result?.dry_run && (
-        <div className="rounded-xl border p-4 bg-blue-50 border-blue-200">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            <span className="text-blue-800 font-medium">
-              Would send to <strong>{result.recipient_count}</strong> supporters
-            </span>
+        <div className="rounded-xl border p-4 bg-blue-50 border-blue-200 space-y-3">
+          <div className="flex items-start gap-2">
+            <Users className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div>
+              <p className="text-blue-800 font-medium">
+                Would send to <strong>{result.recipient_count}</strong> opted-in contacts
+              </p>
+              <p className="text-xs text-blue-700">
+                Showing the first {Math.min(result.recipients?.length || 0, result.preview_limit || 0)} recipients for review before live sending.
+              </p>
+            </div>
           </div>
+          {Boolean(result.recipients?.length) && (
+            <div className="max-h-56 overflow-auto rounded-lg border border-blue-100 bg-white">
+              {result.recipients!.map((recipient) => (
+                <div key={recipient.id} className="flex items-center justify-between gap-3 border-b border-blue-50 px-3 py-2 text-sm last:border-b-0">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-800">{recipient.name}</p>
+                    <p className="truncate text-xs text-slate-500">{recipient.village_name || 'Unknown village'} · {recipient.contact_classification?.replaceAll('_', ' ') || 'contact'}</p>
+                  </div>
+                  <span className="shrink-0 text-xs font-medium text-slate-600">{recipient.contact_number || 'No phone'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <label className="flex min-h-[44px] items-center gap-2 text-sm font-medium text-blue-900">
+            <input
+              type="checkbox"
+              checked={recipientReviewAccepted}
+              onChange={(e) => setRecipientReviewAccepted(e.target.checked)}
+              className="rounded border-blue-300 text-primary focus:ring-primary"
+            />
+            I reviewed this recipient count and sample list.
+          </label>
         </div>
       )}
 

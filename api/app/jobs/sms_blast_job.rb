@@ -32,7 +32,7 @@ class SmsBlastJob < ApplicationJob
 
       phones_and_bodies = batch.filter_map do |supporter|
         next if supporter.contact_number.blank?
-        { to: supporter.contact_number, body: blast.message }
+        { to: supporter.contact_number, body: blast.message, supporter_id: supporter.id }
       end
 
       next if phones_and_bodies.empty?
@@ -51,6 +51,12 @@ class SmsBlastJob < ApplicationJob
       result[:results].select { |r| !r[:success] }.each do |failure|
         blast.append_error("#{failure[:to]}: #{failure[:error]}")
       end
+
+      begin
+        log_contact_attempts!(batch, phones_and_bodies, result[:results], blast)
+      rescue StandardError => e
+        Rails.logger.error("[SmsBlastJob] Failed to log contact attempts for blast #{blast.id}: #{e.message}")
+      end
     end
 
     blast.update!(status: "completed", completed_at: Time.current)
@@ -64,12 +70,51 @@ class SmsBlastJob < ApplicationJob
   private
 
   def build_scope(filters)
-    supporters = Supporter.active
-      .where.not(contact_number: [ nil, "" ])
-      .where("TRIM(contact_number) != ''")
-      .where(opt_in_text: true)
-    supporters = supporters.where(village_id: filters["village_id"]) if filters["village_id"].present?
-    supporters = supporters.where(registered_voter: true) if filters["registered_voter"] == "true"
-    supporters
+    OutreachRecipientQuery.sms_scope(base_scope: Supporter.all, filters: filters)
+  end
+
+  def log_contact_attempts!(supporters, phones_and_bodies, result_rows, blast)
+    return if blast.initiated_by_user_id.blank?
+
+    messages_by_phone = phones_and_bodies.each_with_object({}) do |message, memo|
+      key = normalized_phone_key(message[:to])
+      memo[key] ||= []
+      memo[key] << message
+    end
+
+    result_rows_by_supporter_id = result_rows.each_with_object({}) do |row, memo|
+      supporter_id = row[:supporter_id] || messages_by_phone[normalized_phone_key(row[:to])]&.shift&.dig(:supporter_id)
+      memo[supporter_id] = row if supporter_id
+    end
+    now = Time.current
+
+    attempts = supporters.filter_map do |supporter|
+      result = result_rows_by_supporter_id[supporter.id]
+      next unless result
+
+      {
+        supporter_id: supporter.id,
+        recorded_by_user_id: blast.initiated_by_user_id,
+        channel: "sms",
+        outcome: result[:success] ? "attempted" : "unavailable",
+        note: contact_attempt_note(blast, result),
+        recorded_at: now,
+        created_at: now,
+        updated_at: now
+      }
+    end
+
+    SupporterContactAttempt.insert_all!(attempts) if attempts.any?
+  end
+
+  def normalized_phone_key(phone)
+    phone.to_s.gsub(/\D/, "").sub(/\A1(?=\d{10}\z)/, "")
+  end
+
+  def contact_attempt_note(blast, result)
+    prefix = result[:success] ? "SMS blast queued/sent" : "SMS blast failed"
+    suffix = result[:message_id].present? ? " Provider ID: #{result[:message_id]}." : ""
+    error = result[:error].present? ? " Error: #{result[:error]}." : ""
+    "#{prefix}: #{blast.message.to_s.truncate(120)}#{suffix}#{error}"
   end
 end

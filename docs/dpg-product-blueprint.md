@@ -285,10 +285,10 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 
 ### Phase 5: Communications
 
-- SMS/email templates.
-- Recipient review before blasts.
+- SMS/email templates. **Implemented as starter templates on the SMS and Email Center compose screens.**
+- Recipient review before blasts. **Implemented for live SMS/email blasts: staff must run dry-run preview and confirm the matching recipient count before queueing a send.**
 - Opt-in/legal language and suppression handling.
-- Contact attempts generated from outreach actions.
+- Contact attempts generated from outreach actions. **Implemented for SMS/email blast jobs so attempted sends appear in the contact-history timeline.**
 - Autodialer export/integration if DPG chooses a provider.
 
 ### Phase 6: Election Operations

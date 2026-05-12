@@ -1,6 +1,6 @@
 class SupporterContactAttempt < ApplicationRecord
   OUTCOMES = %w[attempted reached wrong_number unavailable refused].freeze
-  CHANNELS = %w[call sms in_person].freeze
+  CHANNELS = %w[call sms email in_person].freeze
 
   belongs_to :supporter
   belongs_to :recorded_by_user, class_name: "User"

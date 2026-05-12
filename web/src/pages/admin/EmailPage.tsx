@@ -3,12 +3,15 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Mail, Send, Users, Zap, CheckCircle, AlertTriangle, Eye } from 'lucide-react';
 import { getEmailStatus, sendEmailBlast, getVillages } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
+import type { OutreachRecipient } from '../../lib/outreachTypes';
 import WorkspacePage from '../../components/WorkspacePage';
 
 interface EmailBlastResult {
   dry_run?: boolean;
   recipient_count?: number;
   total_targeted?: number;
+  recipients?: OutreachRecipient[];
+  preview_limit?: number;
   queued?: boolean;
   subject?: string;
   preview_subject?: string;
@@ -20,6 +23,24 @@ interface Village {
   name: string;
 }
 
+const EMAIL_TEMPLATES = [
+  {
+    label: 'Registration help',
+    subject: 'Do you need help with voter registration?',
+    body: '<p>Hafa adai {first_name},</p><p>The Democratic Party of Guam is checking in to see whether you need help confirming your voter registration or getting registered.</p><p>Reply to this email and our team can follow up.</p>'
+  },
+  {
+    label: 'Volunteer invite',
+    subject: 'Help DPG with voter outreach',
+    body: '<p>Hafa adai {first_name},</p><p>Thank you for connecting with the Democratic Party of Guam. We are organizing voter outreach and community events across the island.</p><p>If you would like to volunteer, reply here and we will help you get connected.</p>'
+  },
+  {
+    label: 'Community update',
+    subject: 'DPG community update',
+    body: '<p>Hafa adai {first_name},</p><p>We wanted to share a quick update from the Democratic Party of Guam and stay connected as election season approaches.</p><p>Thank you for being part of this work.</p>'
+  }
+];
+
 export default function EmailPage() {
   const { data: sessionData } = useSession();
   const [subject, setSubject] = useState('');
@@ -28,6 +49,13 @@ export default function EmailPage() {
   const [registeredVoter, setRegisteredVoter] = useState(false);
   const [previewResult, setPreviewResult] = useState<EmailBlastResult | null>(null);
   const [sentResult, setSentResult] = useState<EmailBlastResult | null>(null);
+  const [recipientReviewAccepted, setRecipientReviewAccepted] = useState(false);
+
+  const resetReview = () => {
+    setPreviewResult(null);
+    setSentResult(null);
+    setRecipientReviewAccepted(false);
+  };
 
   const { data: emailStatus, isLoading: statusLoading } = useQuery({
     queryKey: ['emailStatus'],
@@ -57,6 +85,7 @@ export default function EmailPage() {
     onSuccess: (data) => {
       setPreviewResult(data);
       setSentResult(null);
+      setRecipientReviewAccepted(false);
     },
   });
 
@@ -67,10 +96,13 @@ export default function EmailPage() {
         body,
         village_id: villageId ? Number(villageId) : undefined,
         registered_voter: registeredVoter ? 'true' : undefined,
+        recipient_reviewed: recipientReviewAccepted,
+        expected_recipient_count: previewResult?.recipient_count || 0,
       }),
     onSuccess: (data) => {
       setSentResult(data);
       setPreviewResult(null);
+      setRecipientReviewAccepted(false);
     },
   });
 
@@ -84,6 +116,7 @@ export default function EmailPage() {
 
   const isConfigured = emailStatus?.configured;
   const fromEmail = emailStatus?.from_email || '(not set)';
+  const canSend = Boolean(subject && body && previewResult?.dry_run && recipientReviewAccepted && isConfigured && emailStatus?.live_enabled);
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -132,7 +165,10 @@ export default function EmailPage() {
               <input
                 type="text"
                 value={subject}
-                onChange={(e) => setSubject(e.target.value)}
+                onChange={(e) => {
+                  setSubject(e.target.value);
+                  resetReview();
+                }}
                 placeholder="e.g., Join us for the community meeting this Saturday!"
                 className="app-input"
                 maxLength={200}
@@ -146,7 +182,10 @@ export default function EmailPage() {
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Body (HTML supported)</label>
               <textarea
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
+                onChange={(e) => {
+                  setBody(e.target.value);
+                  resetReview();
+                }}
                 placeholder="Write your message here..."
                 className="app-input min-h-[200px] font-mono text-sm"
                 maxLength={10000}
@@ -154,6 +193,22 @@ export default function EmailPage() {
               <p className="text-xs text-[var(--text-secondary)] mt-1">
                 Tip: Use {'{first_name}'}, {'{last_name}'}, or {'{village}'} to personalize. Basic HTML allowed.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {EMAIL_TEMPLATES.map((template) => (
+                  <button
+                    key={template.label}
+                    type="button"
+                    onClick={() => {
+                      setSubject(template.subject);
+                      setBody(template.body);
+                      resetReview();
+                    }}
+                    className="rounded-lg border border-[var(--border-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:border-primary hover:text-primary"
+                  >
+                    {template.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="border-t pt-4">
@@ -165,7 +220,10 @@ export default function EmailPage() {
                   <label className="block text-sm text-[var(--text-secondary)] mb-1">Village (optional)</label>
                   <select
                     value={villageId}
-                    onChange={(e) => setVillageId(e.target.value)}
+                    onChange={(e) => {
+                      setVillageId(e.target.value);
+                      resetReview();
+                    }}
                     className="app-select"
                   >
                     <option value="">{scopedVillageIds === null ? 'All villages' : 'All accessible villages'}</option>
@@ -181,7 +239,10 @@ export default function EmailPage() {
                     <input
                       type="checkbox"
                       checked={registeredVoter}
-                      onChange={(e) => setRegisteredVoter(e.target.checked)}
+                      onChange={(e) => {
+                        setRegisteredVoter(e.target.checked);
+                        resetReview();
+                      }}
                       className="rounded border-[var(--border-soft)]"
                     />
                     Registered voters only
@@ -216,7 +277,7 @@ export default function EmailPage() {
                     sendMutation.mutate();
                   }
                 }}
-                disabled={!subject || !body || sendMutation.isPending || !isConfigured || !emailStatus?.live_enabled}
+                disabled={!canSend || sendMutation.isPending}
                 className="btn-primary flex-1 flex items-center justify-center gap-2"
               >
                 {sendMutation.isPending ? (
@@ -271,6 +332,30 @@ export default function EmailPage() {
                   </ul>
                 </div>
               </div>
+
+              {Boolean(previewResult.recipients?.length) && (
+                <div className="max-h-60 overflow-auto rounded-lg border border-[var(--border-subtle)] bg-white">
+                  {previewResult.recipients!.map((recipient) => (
+                    <div key={recipient.id} className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-3 py-2 text-sm last:border-b-0">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-[var(--text-primary)]">{recipient.name}</p>
+                        <p className="truncate text-xs text-[var(--text-secondary)]">{recipient.village_name || 'Unknown village'} · {recipient.contact_classification?.replaceAll('_', ' ') || 'contact'}</p>
+                      </div>
+                      <span className="shrink-0 text-xs font-medium text-[var(--text-secondary)]">{recipient.email || 'No email'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <label className="flex min-h-[44px] items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
+                <input
+                  type="checkbox"
+                  checked={recipientReviewAccepted}
+                  onChange={(e) => setRecipientReviewAccepted(e.target.checked)}
+                  className="rounded border-[var(--border-soft)] text-primary focus:ring-primary"
+                />
+                I reviewed this recipient count and sample list.
+              </label>
 
               {previewResult.preview_subject && (
                 <div className="border rounded-lg p-3 bg-[var(--surface-bg)]">

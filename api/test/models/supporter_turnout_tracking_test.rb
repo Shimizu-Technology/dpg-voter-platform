@@ -66,12 +66,24 @@ class SupporterTurnoutTrackingTest < ActiveSupport::TestCase
     assert_includes attempt.errors[:outcome], "is not included in the list"
   end
 
-  test "supporter contact attempt rejects unsupported channel" do
+  test "supporter contact attempt accepts email channel" do
     attempt = SupporterContactAttempt.new(
       supporter: @supporter,
       recorded_by_user: @watcher,
       outcome: "attempted",
       channel: "email",
+      recorded_at: Time.current
+    )
+
+    assert attempt.valid?
+  end
+
+  test "supporter contact attempt rejects unsupported channel" do
+    attempt = SupporterContactAttempt.new(
+      supporter: @supporter,
+      recorded_by_user: @watcher,
+      outcome: "attempted",
+      channel: "fax",
       recorded_at: Time.current
     )
 
