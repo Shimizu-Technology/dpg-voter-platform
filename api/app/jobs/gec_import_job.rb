@@ -34,6 +34,7 @@ class GecImportJob < ApplicationJob
       source_tmp.write(upload.file_data)
       source_tmp.flush
       source_tmp.close
+      preserve_raw_upload!(gec_import, upload)
 
       service_file_path = source_tmp.path
       artifact_filename = upload.filename.to_s
@@ -136,6 +137,25 @@ class GecImportJob < ApplicationJob
     )
   rescue StandardError => e
     Rails.logger.warn("GecImportJob #{gec_import.id}: import artifact preservation failed: #{e.class}: #{e.message}")
+  end
+
+  def preserve_raw_upload!(gec_import, upload)
+    return unless S3Service.enabled?
+
+    filename = File.basename(upload.filename.to_s.presence || "gec-import-upload")
+    content_type = upload.content_type.presence || "application/octet-stream"
+    safe_filename = S3Service.safe_filename(filename, fallback: "gec-import-upload")
+    s3_key = "gec-imports/#{gec_import.id}/raw/#{safe_filename}"
+    uploaded = S3Service.upload(s3_key, StringIO.new(upload.file_data), content_type: content_type)
+    return unless uploaded
+
+    gec_import.update_columns(
+      raw_file_s3_key: s3_key,
+      raw_filename: filename,
+      raw_content_type: content_type
+    )
+  rescue StandardError => e
+    Rails.logger.warn("GecImportJob #{gec_import.id}: raw upload preservation failed: #{e.class}: #{e.message}")
   end
 
   def write_audit_log!(gec_import, user, stats, gec_list_date, import_type)

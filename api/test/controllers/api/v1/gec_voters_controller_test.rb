@@ -312,6 +312,70 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     pdf&.close!
   end
 
+  test "admin can inspect import changes and skipped rows" do
+    import = GecImport.create!(
+      gec_list_date: Date.new(2026, 2, 25),
+      filename: "gec-voters.csv",
+      status: "completed",
+      import_type: "full_list"
+    )
+    GecImportChange.create!(
+      gec_import: import,
+      change_type: "new",
+      row_number: 2,
+      first_name: "New",
+      last_name: "Voter",
+      village_name: @village.name,
+      voter_registration_number: "NEW-123"
+    )
+    skipped_row = GecImportSkippedRow.create!(
+      gec_import: import,
+      row_number: 3,
+      message: "Missing birth year",
+      source_name: "Skipped Voter",
+      first_name: "Skipped",
+      last_name: "Voter",
+      village_name: @village.name
+    )
+
+    get "/api/v1/gec_voters/imports/#{import.id}/changes",
+      params: { type: "new" },
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal 1, payload["changes"].length
+    assert_equal "NEW-123", payload["changes"].first["voter_registration_number"]
+
+    get "/api/v1/gec_voters/imports/#{import.id}/skipped_rows",
+      params: { status: "pending" },
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal skipped_row.id, payload["skipped_rows"].first["id"]
+
+    post "/api/v1/gec_voters/imports/#{import.id}/skipped_rows/#{skipped_row.id}/dismiss",
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    assert_equal "dismissed", skipped_row.reload.resolution_status
+  end
+
+  test "import data endpoint reports unavailable parsed artifact cleanly" do
+    import = GecImport.create!(
+      gec_list_date: Date.new(2026, 2, 25),
+      filename: "gec-voters.csv",
+      status: "completed",
+      import_type: "full_list"
+    )
+
+    get "/api/v1/gec_voters/imports/#{import.id}/view_data", headers: auth_headers(@admin)
+
+    assert_response :not_found
+    assert_equal "parsed_data_not_available", JSON.parse(response.body)["code"]
+  end
+
   test "activate import audit log records actual previous active state" do
     import = GecImport.create!(
       gec_list_date: Date.new(2026, 1, 25),

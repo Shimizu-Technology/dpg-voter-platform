@@ -4,6 +4,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   Database,
+  Download,
+  Eye,
+  FileText,
   Home,
   Link as LinkIcon,
   Loader2,
@@ -14,14 +17,22 @@ import {
 import {
   activateGecImport,
   createContactFromGecVoter,
+  dismissGecImportSkippedRow,
+  downloadGecImportFile,
+  getGecImportChanges,
+  getGecImportData,
+  getGecImportSkippedRows,
   getGecHouseholds,
   getGecImports,
   getGecPdfPreviewStatus,
   getGecStats,
   getGecVoters,
   getSupporters,
+  openGecImportOriginal,
   linkContactToGecVoter,
   previewGecList,
+  previewGecImportSkippedRowResolution,
+  resolveGecImportSkippedRow,
   uploadGecList,
 } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
@@ -59,15 +70,104 @@ type GecImport = {
   id: number;
   gec_list_date: string;
   filename: string;
+  import_type?: string;
   total_records: number;
   new_records: number;
   updated_records: number;
   removed_records: number;
   transferred_records: number;
+  skipped_rows_count?: number;
+  pending_skipped_rows_count?: number;
   status: string;
   created_at: string;
   uploaded_by_email?: string | null;
   active_election_day?: boolean;
+  has_import_artifact?: boolean;
+  has_original_file?: boolean;
+  has_downloadable_file?: boolean;
+  metadata?: Record<string, unknown>;
+};
+
+type ImportViewerTab = 'data' | 'changes' | 'skipped';
+
+type ImportPreviewRow = Record<string, unknown>;
+
+type ImportChange = {
+  id: number | string;
+  change_type: string;
+  row_number?: number | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  village_name?: string | null;
+  previous_village_name?: string | null;
+  voter_registration_number?: string | null;
+  birth_year?: number | string | null;
+  dob?: string | null;
+  details?: Record<string, unknown>;
+};
+
+type ImportSkippedRow = {
+  id: number;
+  row_number: number;
+  message: string;
+  raw_values?: string[];
+  corrected_values?: Record<string, unknown>;
+  source_name?: string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  village_name?: string | null;
+  voter_registration_number?: string | null;
+  birth_year?: number | string | null;
+  dob?: string | null;
+  resolution_status: string;
+  resolved_at?: string | null;
+  resolved_by_email?: string | null;
+  resolved_gec_voter?: {
+    id: number;
+    first_name?: string | null;
+    last_name?: string | null;
+    village_name?: string | null;
+    voter_registration_number?: string | null;
+    birth_year?: number | string | null;
+    dob?: string | null;
+  } | null;
+};
+
+type SkippedRowResolutionPreview = {
+  status: string;
+  errors?: string[];
+  target_voter?: ImportSkippedRow['resolved_gec_voter'];
+  candidate_matches?: Array<{
+    confidence: string;
+    match_type: string;
+    gec_voter: NonNullable<ImportSkippedRow['resolved_gec_voter']>;
+  }>;
+};
+
+type ImportDataResponse = {
+  preview?: {
+    preview_rows?: ImportPreviewRow[];
+    available_villages?: string[];
+    pagination?: Pagination;
+  };
+};
+
+type ImportChangesResponse = {
+  changes?: ImportChange[];
+  pagination?: Pagination;
+};
+
+type ImportSkippedRowsResponse = {
+  skipped_rows?: ImportSkippedRow[];
+  pagination?: Pagination;
+};
+
+type Pagination = {
+  page?: number;
+  total_pages?: number;
+  total_rows?: number;
 };
 
 type ContactResult = {
@@ -116,6 +216,12 @@ function formatDate(value?: string | null) {
   return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'Pacific/Guam' });
 }
 
+function displayValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
 function createPreviewRequestId() {
   return globalThis.crypto?.randomUUID?.() ?? `gec-preview-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -145,6 +251,14 @@ export default function GecVotersPage() {
   const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
   const [confirmReview, setConfirmReview] = useState(false);
   const [pdfPreviewStatus, setPdfPreviewStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed'>('idle');
+  const [selectedImportId, setSelectedImportId] = useState<number | null>(null);
+  const [viewerTab, setViewerTab] = useState<ImportViewerTab>('data');
+  const [viewerSearch, setViewerSearch] = useState('');
+  const [submittedViewerSearch, setSubmittedViewerSearch] = useState('');
+  const [viewerVillage, setViewerVillage] = useState('');
+  const [changeType, setChangeType] = useState('all');
+  const [skippedStatus, setSkippedStatus] = useState('all');
+  const [viewerPage, setViewerPage] = useState(1);
   const activePreviewRequestRef = useRef<string | null>(null);
 
   const statsQuery = useQuery({ queryKey: ['gec-stats'], queryFn: getGecStats });
@@ -297,6 +411,22 @@ export default function GecVotersPage() {
     },
   });
 
+  const openOriginalMutation = useMutation({
+    mutationFn: (importId: number) => openGecImportOriginal(importId),
+    onError: (error: unknown) => {
+      setActionMessage(null);
+      setActionError(getErrorMessage(error));
+    },
+  });
+
+  const downloadImportMutation = useMutation({
+    mutationFn: (importId: number) => downloadGecImportFile(importId),
+    onError: (error: unknown) => {
+      setActionMessage(null);
+      setActionError(getErrorMessage(error));
+    },
+  });
+
   const linkContactMutation = useMutation({
     mutationFn: ({ voterId, supporterId }: { voterId: number; supporterId: number }) => linkContactToGecVoter(voterId, supporterId),
     onSuccess: () => {
@@ -319,6 +449,40 @@ export default function GecVotersPage() {
   const households = useMemo<Household[]>(() => householdsQuery.data?.households ?? [], [householdsQuery.data]);
   const imports = useMemo<GecImport[]>(() => importsQuery.data?.imports ?? [], [importsQuery.data]);
   const contactResults = useMemo<ContactResult[]>(() => contactResultsQuery.data?.supporters ?? [], [contactResultsQuery.data]);
+  const selectedImport = useMemo(
+    () => imports.find((row) => row.id === selectedImportId) ?? null,
+    [imports, selectedImportId]
+  );
+  const importDataQuery = useQuery({
+    queryKey: ['gec-import-data', selectedImportId, viewerPage, submittedViewerSearch, viewerVillage],
+    queryFn: () => getGecImportData(selectedImportId!, {
+      page: viewerPage,
+      per_page: 50,
+      q: submittedViewerSearch,
+      village: viewerVillage,
+    }),
+    enabled: canUploadGec && viewerTab === 'data' && Boolean(selectedImportId && selectedImport?.has_import_artifact),
+  });
+  const importChangesQuery = useQuery({
+    queryKey: ['gec-import-changes', selectedImportId, viewerPage, submittedViewerSearch, changeType],
+    queryFn: () => getGecImportChanges(selectedImportId!, {
+      page: viewerPage,
+      per_page: 50,
+      q: submittedViewerSearch,
+      type: changeType,
+    }),
+    enabled: canUploadGec && viewerTab === 'changes' && Boolean(selectedImportId),
+  });
+  const importSkippedRowsQuery = useQuery({
+    queryKey: ['gec-import-skipped-rows', selectedImportId, viewerPage, submittedViewerSearch, skippedStatus],
+    queryFn: () => getGecImportSkippedRows(selectedImportId!, {
+      page: viewerPage,
+      per_page: 25,
+      q: submittedViewerSearch,
+      status: skippedStatus,
+    }),
+    enabled: canUploadGec && viewerTab === 'skipped' && Boolean(selectedImportId),
+  });
   const isPreviewBusy = previewMutation.isPending || pdfPreviewStatus === 'pending' || pdfPreviewStatus === 'processing';
   const canImport = Boolean(file && listDate && !uploadMutation.isPending && (!selectedFileIsPdf || (previewData?.source_type === 'pdf' && confirmReview)));
 
@@ -661,14 +825,54 @@ export default function GecVotersPage() {
                 {imports.length === 0 ? (
                   <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No GEC imports yet.</div>
                 ) : imports.slice(0, 6).map((row) => (
-                  <div key={row.id} className="rounded-xl border border-slate-200 p-3">
+                  <div key={row.id} className={`rounded-xl border p-3 ${selectedImportId === row.id ? 'border-blue-300 bg-blue-50/40' : 'border-slate-200'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate font-semibold text-slate-900">{row.filename}</div>
-                        <div className="text-xs text-slate-500">{formatDate(row.gec_list_date)} · {row.status}{row.active_election_day ? ' · Active' : ''}</div>
+                        <div className="text-xs text-slate-500">
+                          {formatDate(row.gec_list_date)} · {row.status}{row.active_election_day ? ' · Active' : ''}{row.pending_skipped_rows_count ? ` · ${row.pending_skipped_rows_count} skipped pending` : ''}
+                        </div>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-2">
                         <div className="text-right text-xs font-semibold text-slate-500">{row.total_records || 0} rows</div>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedImportId(row.id);
+                              setViewerTab('data');
+                              setViewerPage(1);
+                              setSubmittedViewerSearch('');
+                              setViewerSearch('');
+                            }}
+                            className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Review
+                          </button>
+                          {row.has_original_file ? (
+                            <button
+                              type="button"
+                              disabled={openOriginalMutation.isPending}
+                              onClick={() => openOriginalMutation.mutate(row.id)}
+                              className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              Original
+                            </button>
+                          ) : null}
+                          {row.has_downloadable_file ? (
+                            <button
+                              type="button"
+                              disabled={downloadImportMutation.isPending}
+                              onClick={() => downloadImportMutation.mutate(row.id)}
+                              className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              Download
+                            </button>
+                          ) : null}
+                        </div>
                         {row.status === 'completed' && !row.active_election_day ? (
                           <button
                             type="button"
@@ -684,11 +888,533 @@ export default function GecVotersPage() {
                   </div>
                 ))}
               </div>
+              {selectedImport && (
+                <ImportReviewPanel
+                  selectedImport={selectedImport}
+                  viewerTab={viewerTab}
+                  setViewerTab={(tab) => {
+                    setViewerTab(tab);
+                    setViewerPage(1);
+                  }}
+                  viewerSearch={viewerSearch}
+                  setViewerSearch={setViewerSearch}
+                  submitSearch={() => {
+                    setSubmittedViewerSearch(viewerSearch.trim());
+                    setViewerPage(1);
+                  }}
+                  viewerVillage={viewerVillage}
+                  setViewerVillage={(value) => {
+                    setViewerVillage(value);
+                    setViewerPage(1);
+                  }}
+                  changeType={changeType}
+                  setChangeType={(value) => {
+                    setChangeType(value);
+                    setViewerPage(1);
+                  }}
+                  skippedStatus={skippedStatus}
+                  setSkippedStatus={(value) => {
+                    setSkippedStatus(value);
+                    setViewerPage(1);
+                  }}
+                  viewerPage={viewerPage}
+                  setViewerPage={setViewerPage}
+                  dataQuery={importDataQuery}
+                  changesQuery={importChangesQuery}
+                  skippedRowsQuery={importSkippedRowsQuery}
+                />
+              )}
             </section>
           )}
         </div>
       </section>
     </WorkspacePage>
+  );
+}
+
+type ImportReviewPanelProps = {
+  selectedImport: GecImport;
+  viewerTab: ImportViewerTab;
+  setViewerTab: (tab: ImportViewerTab) => void;
+  viewerSearch: string;
+  setViewerSearch: (value: string) => void;
+  submitSearch: () => void;
+  viewerVillage: string;
+  setViewerVillage: (value: string) => void;
+  changeType: string;
+  setChangeType: (value: string) => void;
+  skippedStatus: string;
+  setSkippedStatus: (value: string) => void;
+  viewerPage: number;
+  setViewerPage: (page: number) => void;
+  dataQuery: { data?: ImportDataResponse; isFetching: boolean; isError: boolean; error: unknown };
+  changesQuery: { data?: ImportChangesResponse; isFetching: boolean; isError: boolean; error: unknown };
+  skippedRowsQuery: { data?: ImportSkippedRowsResponse; isFetching: boolean; isError: boolean; error: unknown };
+};
+
+function ImportReviewPanel({
+  selectedImport,
+  viewerTab,
+  setViewerTab,
+  viewerSearch,
+  setViewerSearch,
+  submitSearch,
+  viewerVillage,
+  setViewerVillage,
+  changeType,
+  setChangeType,
+  skippedStatus,
+  setSkippedStatus,
+  viewerPage,
+  setViewerPage,
+  dataQuery,
+  changesQuery,
+  skippedRowsQuery,
+}: ImportReviewPanelProps) {
+  const dataPreview = dataQuery.data?.preview;
+  const dataRows = (dataPreview?.preview_rows ?? []) as ImportPreviewRow[];
+  const dataVillages = (dataPreview?.available_villages ?? []) as string[];
+  const dataPagination = dataPreview?.pagination;
+  const changeRows = (changesQuery.data?.changes ?? []) as ImportChange[];
+  const changePagination = changesQuery.data?.pagination;
+  const skippedRows = (skippedRowsQuery.data?.skipped_rows ?? []) as ImportSkippedRow[];
+  const skippedPagination = skippedRowsQuery.data?.pagination;
+  const activeQuery = viewerTab === 'data' ? dataQuery : viewerTab === 'changes' ? changesQuery : skippedRowsQuery;
+  const activePagination = viewerTab === 'data' ? dataPagination : viewerTab === 'changes' ? changePagination : skippedPagination;
+
+  return (
+    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+      <div className="flex flex-col gap-3 border-b border-slate-100 pb-3">
+        <div>
+          <div className="text-sm font-semibold text-slate-950">Review import</div>
+          <div className="mt-1 text-xs text-slate-500">
+            {selectedImport.filename} · {formatDate(selectedImport.gec_list_date)} · {selectedImport.status}
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 text-xs font-semibold">
+          {(['data', 'changes', 'skipped'] as ImportViewerTab[]).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setViewerTab(tab)}
+              className={`rounded-lg px-2 py-2 capitalize ${viewerTab === tab ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}
+            >
+              {tab === 'data' ? 'Data' : tab === 'changes' ? 'Changes' : 'Skipped'}
+            </button>
+          ))}
+        </div>
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitSearch();
+          }}
+        >
+          <input
+            value={viewerSearch}
+            onChange={(event) => setViewerSearch(event.target.value)}
+            placeholder="Search this import"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+          />
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            {viewerTab === 'data' && (
+              <select
+                value={viewerVillage}
+                onChange={(event) => setViewerVillage(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">All villages</option>
+                {dataVillages.map((village) => (
+                  <option key={village} value={village}>{village}</option>
+                ))}
+              </select>
+            )}
+            {viewerTab === 'changes' && (
+              <select
+                value={changeType}
+                onChange={(event) => setChangeType(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="all">All changes</option>
+                <option value="new">New</option>
+                <option value="changed">Changed</option>
+                <option value="updated">Updated</option>
+                <option value="removed">Removed</option>
+                <option value="transferred">Transferred</option>
+                <option value="routed_to_unassigned">Routed to Unassigned</option>
+              </select>
+            )}
+            {viewerTab === 'skipped' && (
+              <select
+                value={skippedStatus}
+                onChange={(event) => setSkippedStatus(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="all">All skipped rows</option>
+                <option value="pending">Pending</option>
+                <option value="resolved">Resolved</option>
+                <option value="dismissed">Dismissed</option>
+              </select>
+            )}
+            <button type="submit" className="app-btn-secondary min-h-10 justify-center">
+              <Search className="h-4 w-4" />
+              Search
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="mt-3">
+        {activeQuery.isFetching ? (
+          <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading import review...
+          </div>
+        ) : activeQuery.isError ? (
+          <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">{getErrorMessage(activeQuery.error)}</div>
+        ) : viewerTab === 'data' ? (
+          <ImportDataRows rows={dataRows} />
+        ) : viewerTab === 'changes' ? (
+          <ImportChangeRows rows={changeRows} />
+        ) : (
+          <ImportSkippedRows importId={selectedImport.id} rows={skippedRows} />
+        )}
+      </div>
+
+      {activePagination && (
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+          <span>
+            Page {activePagination.page ?? viewerPage} of {activePagination.total_pages ?? 1} · {activePagination.total_rows ?? 0} rows
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={viewerPage <= 1}
+              onClick={() => setViewerPage(Math.max(1, viewerPage - 1))}
+              className="rounded-lg border border-slate-200 px-2 py-1 font-semibold text-slate-700 disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              disabled={viewerPage >= (activePagination.total_pages ?? 1)}
+              onClick={() => setViewerPage(viewerPage + 1)}
+              className="rounded-lg border border-slate-200 px-2 py-1 font-semibold text-slate-700 disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImportDataRows({ rows }: { rows: ImportPreviewRow[] }) {
+  if (rows.length === 0) return <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No rows to show for this import.</div>;
+
+  return (
+    <div className="space-y-2">
+      {rows.slice(0, 20).map((row, index) => (
+        <div key={index} className="rounded-xl border border-slate-200 p-3 text-sm">
+          <div className="font-semibold text-slate-900">
+            {displayValue(row.name) !== '—'
+              ? displayValue(row.name)
+              : [row.first_name, row.middle_name, row.last_name].map(displayValue).filter((value) => value !== '—').join(' ') || 'Unnamed voter'}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {[row.address, row.village_name || row.village, row.precinct_number, row.voter_registration_number || row.registration_number]
+              .map(displayValue)
+              .filter((value) => value !== '—')
+              .join(' · ') || 'No extra details'}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ImportChangeRows({ rows }: { rows: ImportChange[] }) {
+  if (rows.length === 0) return <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No change rows match the current filters.</div>;
+
+  return (
+    <div className="space-y-2">
+      {rows.map((row) => (
+        <div key={row.id} className="rounded-xl border border-slate-200 p-3 text-sm">
+          <div className="flex items-start justify-between gap-2">
+            <div className="font-semibold text-slate-900">
+              {[row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' ') || displayValue(row.details?.source_name) || 'GEC row'}
+            </div>
+            <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{row.change_type}</span>
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {[row.previous_village_name && `From ${row.previous_village_name}`, row.village_name && `To ${row.village_name}`, row.voter_registration_number, row.birth_year || row.dob]
+              .filter(Boolean)
+              .join(' · ') || `Row ${row.row_number ?? 'unknown'}`}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ImportSkippedRows({
+  importId,
+  rows,
+}: {
+  importId: number;
+  rows: ImportSkippedRow[];
+}) {
+  const queryClient = useQueryClient();
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
+  const [drafts, setDrafts] = useState<Record<number, Record<string, string>>>({});
+  const [previews, setPreviews] = useState<Record<number, SkippedRowResolutionPreview>>({});
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<Record<number, number | null>>({});
+  const [rowFeedback, setRowFeedback] = useState<Record<number, string | null>>({});
+
+  const previewMutation = useMutation({
+    mutationFn: ({ skippedRowId, correctedValues, selectedGecVoterId }: { skippedRowId: number; correctedValues: Record<string, unknown>; selectedGecVoterId?: number | null }) =>
+      previewGecImportSkippedRowResolution(importId, skippedRowId, correctedValues, selectedGecVoterId),
+    onSuccess: (response, variables) => {
+      setPreviews((current) => ({ ...current, [variables.skippedRowId]: response.preview }));
+      setRowFeedback((current) => ({ ...current, [variables.skippedRowId]: null }));
+    },
+    onError: (error, variables) => {
+      setRowFeedback((current) => ({ ...current, [variables.skippedRowId]: getErrorMessage(error) }));
+    },
+  });
+
+  const resolveMutation = useMutation({
+    mutationFn: ({ skippedRowId, correctedValues, selectedGecVoterId }: { skippedRowId: number; correctedValues: Record<string, unknown>; selectedGecVoterId?: number | null }) =>
+      resolveGecImportSkippedRow(importId, skippedRowId, correctedValues, selectedGecVoterId),
+    onSuccess: (_, variables) => {
+      setRowFeedback((current) => ({ ...current, [variables.skippedRowId]: 'Skipped row fixed.' }));
+      setPreviews((current) => {
+        const next = { ...current };
+        delete next[variables.skippedRowId];
+        return next;
+      });
+      void queryClient.invalidateQueries({ queryKey: ['gec-import-skipped-rows'] });
+      void queryClient.invalidateQueries({ queryKey: ['gec-imports'] });
+      void queryClient.invalidateQueries({ queryKey: ['gec-stats'] });
+    },
+    onError: (error, variables) => {
+      setRowFeedback((current) => ({ ...current, [variables.skippedRowId]: getErrorMessage(error) }));
+    },
+  });
+
+  const dismissMutation = useMutation({
+    mutationFn: (skippedRowId: number) => dismissGecImportSkippedRow(importId, skippedRowId),
+    onSuccess: (_, skippedRowId) => {
+      setRowFeedback((current) => ({ ...current, [skippedRowId]: 'Skipped row dismissed.' }));
+      void queryClient.invalidateQueries({ queryKey: ['gec-import-skipped-rows'] });
+      void queryClient.invalidateQueries({ queryKey: ['gec-imports'] });
+    },
+    onError: (error, skippedRowId) => {
+      setRowFeedback((current) => ({ ...current, [skippedRowId]: getErrorMessage(error) }));
+    },
+  });
+
+  const buildDraft = (row: ImportSkippedRow) => {
+    const existing = drafts[row.id];
+    if (existing) return existing;
+
+    return {
+      first_name: String(row.corrected_values?.first_name ?? row.first_name ?? ''),
+      middle_name: String(row.corrected_values?.middle_name ?? row.middle_name ?? ''),
+      last_name: String(row.corrected_values?.last_name ?? row.last_name ?? ''),
+      village_name: String(row.corrected_values?.village_name ?? row.village_name ?? ''),
+      voter_registration_number: String(row.corrected_values?.voter_registration_number ?? row.voter_registration_number ?? ''),
+      birth_year: String(row.corrected_values?.birth_year ?? row.birth_year ?? ''),
+      dob: String(row.corrected_values?.dob ?? row.dob ?? ''),
+    };
+  };
+
+  const updateDraft = (rowId: number, field: string, value: string) => {
+    setDrafts((current) => ({
+      ...current,
+      [rowId]: {
+        ...(current[rowId] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handlePreview = (row: ImportSkippedRow, selectedGecVoterId?: number | null) => {
+    previewMutation.mutate({
+      skippedRowId: row.id,
+      correctedValues: buildDraft(row),
+      selectedGecVoterId,
+    });
+  };
+
+  const handleResolve = (row: ImportSkippedRow) => {
+    resolveMutation.mutate({
+      skippedRowId: row.id,
+      correctedValues: buildDraft(row),
+      selectedGecVoterId: selectedCandidateIds[row.id],
+    });
+  };
+
+  if (rows.length === 0) return <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No skipped rows match the current filters.</div>;
+
+  return (
+    <div className="space-y-2">
+      {rows.map((row) => {
+        const draft = buildDraft(row);
+        const preview = previews[row.id];
+        const isExpanded = expandedRowId === row.id;
+        const isPending = row.resolution_status === 'pending';
+        const isBusy = previewMutation.isPending || resolveMutation.isPending || dismissMutation.isPending;
+
+        return (
+          <div key={row.id} className="rounded-xl border border-slate-200 text-sm">
+            <button
+              type="button"
+              onClick={() => setExpandedRowId(isExpanded ? null : row.id)}
+              className="flex w-full items-start justify-between gap-3 p-3 text-left hover:bg-slate-50"
+            >
+              <div>
+                <div className="font-semibold text-slate-900">
+                  {[row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' ') || row.source_name || `Row ${row.row_number}`}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">{row.message}</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {[row.village_name, row.voter_registration_number, row.birth_year || row.dob, row.resolution_status].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                {isExpanded ? 'Hide' : 'Review'}
+              </span>
+            </button>
+
+            {isExpanded && (
+              <div className="space-y-3 border-t border-slate-100 bg-slate-50 p-3">
+                <div className="rounded-xl bg-white p-3 text-xs text-slate-600">
+                  <div className="font-semibold uppercase tracking-[0.1em] text-slate-400">Original skipped row</div>
+                  <div className="mt-2">{row.raw_values?.length ? row.raw_values.join(' | ') : row.message}</div>
+                </div>
+
+                {isPending ? (
+                  <>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {[
+                        ['first_name', 'First name'],
+                        ['middle_name', 'Middle name'],
+                        ['last_name', 'Last name'],
+                        ['village_name', 'Village'],
+                        ['voter_registration_number', 'Registration #'],
+                        ['birth_year', 'Birth year'],
+                        ['dob', 'DOB'],
+                      ].map(([field, label]) => (
+                        <label key={field} className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                          {label}
+                          <input
+                            type={field === 'dob' ? 'date' : 'text'}
+                            value={draft[field] ?? ''}
+                            onChange={(event) => updateDraft(row.id, field, event.target.value)}
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
+                          />
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handlePreview(row)}
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-50"
+                      >
+                        Check Fix
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => dismissMutation.mutate(row.id)}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                      >
+                        Dismiss Row
+                      </button>
+                    </div>
+
+                    {preview && (
+                      <div className={`rounded-xl border p-3 text-xs ${
+                        ['ready_to_create', 'ready_to_update'].includes(preview.status)
+                          ? 'border-green-200 bg-green-50 text-green-800'
+                          : preview.status === 'ambiguous'
+                          ? 'border-amber-200 bg-amber-50 text-amber-800'
+                          : 'border-red-200 bg-red-50 text-red-700'
+                      }`}>
+                        <div className="font-semibold">{preview.status.replace(/_/g, ' ')}</div>
+                        {preview.errors?.map((error, index) => (
+                          <div key={index} className="mt-1">{error}</div>
+                        ))}
+
+                        {preview.status === 'ambiguous' && preview.candidate_matches && preview.candidate_matches.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {preview.candidate_matches.map((candidate) => (
+                              <label key={candidate.gec_voter.id} className="flex gap-2 rounded-lg border border-amber-200 bg-white p-2 text-slate-700">
+                                <input
+                                  type="radio"
+                                  checked={selectedCandidateIds[row.id] === candidate.gec_voter.id}
+                                  onChange={() => setSelectedCandidateIds((current) => ({ ...current, [row.id]: candidate.gec_voter.id }))}
+                                />
+                                <span>
+                                  <strong>{candidate.gec_voter.first_name} {candidate.gec_voter.last_name}</strong>
+                                  {candidate.gec_voter.village_name ? ` · ${candidate.gec_voter.village_name}` : ''}
+                                  <span className="block text-amber-700">{candidate.match_type.replace(/_/g, ' ')} · {candidate.confidence}</span>
+                                </span>
+                              </label>
+                            ))}
+                            <button
+                              type="button"
+                              disabled={!selectedCandidateIds[row.id] || isBusy}
+                              onClick={() => handlePreview(row, selectedCandidateIds[row.id])}
+                              className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50"
+                            >
+                              Use Selected Voter
+                            </button>
+                          </div>
+                        )}
+
+                        {['ready_to_create', 'ready_to_update'].includes(preview.status) && (
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => handleResolve(row)}
+                            className="mt-3 rounded-lg border border-green-200 bg-white px-3 py-2 text-xs font-semibold text-green-800 disabled:opacity-50"
+                          >
+                            Apply Fix
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="rounded-xl bg-white p-3 text-xs text-slate-600">
+                    <strong>{row.resolution_status.replace(/_/g, ' ')}</strong>
+                    {row.resolved_at ? ` on ${formatDate(row.resolved_at.slice(0, 10))}` : ''}
+                    {row.resolved_by_email ? ` by ${row.resolved_by_email}` : ''}
+                    {row.resolved_gec_voter && (
+                      <div className="mt-1">
+                        Result voter: {row.resolved_gec_voter.first_name} {row.resolved_gec_voter.last_name}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {rowFeedback[row.id] && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
+                    {rowFeedback[row.id]}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

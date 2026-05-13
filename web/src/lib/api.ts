@@ -122,6 +122,36 @@ export const uploadGecList = (file: File, gecListDate: string, importType = 'ful
 };
 export const activateGecImport = (importId: number) =>
   api.post(`/gec_voters/imports/${importId}/activate`).then(r => r.data);
+export const getGecImportData = (importId: number, params?: QueryParams) =>
+  api.get(`/gec_voters/imports/${importId}/view_data`, { params }).then(r => r.data);
+export const getGecImportChanges = (importId: number, params?: QueryParams) =>
+  api.get(`/gec_voters/imports/${importId}/changes`, { params }).then(r => r.data);
+export const getGecImportSkippedRows = (importId: number, params?: QueryParams) =>
+  api.get(`/gec_voters/imports/${importId}/skipped_rows`, { params }).then(r => r.data);
+export const previewGecImportSkippedRowResolution = (importId: number, skippedRowId: number, data: JsonRecord) =>
+  api.post(`/gec_voters/imports/${importId}/skipped_rows/${skippedRowId}/preview_resolution`, data).then(r => r.data);
+export const resolveGecImportSkippedRow = (importId: number, skippedRowId: number, data: JsonRecord) =>
+  api.post(`/gec_voters/imports/${importId}/skipped_rows/${skippedRowId}/resolve`, data).then(r => r.data);
+export const dismissGecImportSkippedRow = (importId: number, skippedRowId: number) =>
+  api.post(`/gec_voters/imports/${importId}/skipped_rows/${skippedRowId}/dismiss`).then(r => r.data);
+export const openGecImportOriginal = (importId: number) =>
+  api.get(`/gec_voters/imports/${importId}/view_original`).then(r => {
+    if (r.data?.view_url) window.open(r.data.view_url, '_blank', 'noopener,noreferrer');
+    return r.data;
+  });
+export const downloadGecImportFile = (importId: number) =>
+  api.get(`/gec_voters/imports/${importId}/download`).then(r => {
+    const url = r.data?.download_url;
+    if (!url) return r.data;
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = r.data?.filename || `gec-import-${importId}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return r.data;
+  });
 export const createContactFromGecVoter = (gecVoterId: number, contactClassification = 'active_contact') =>
   api.post(`/gec_voters/${gecVoterId}/create_contact`, { contact_classification: contactClassification }).then(r => r.data);
 export const linkContactToGecVoter = (gecVoterId: number, supporterId: number) =>

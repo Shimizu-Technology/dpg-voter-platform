@@ -12,6 +12,8 @@ class GecPdfPreviewJob < ApplicationJob
     temp = Tempfile.new([ "gec_pdf_preview", ".pdf" ])
     temp.binmode
 
+    preview.update!(status: "processing", error_message: nil)
+
     unless write_source_to_tempfile(preview, temp, source_s3_key)
       finalize_preview!(
         preview,
@@ -23,7 +25,6 @@ class GecPdfPreviewJob < ApplicationJob
       return
     end
 
-    preview.update!(status: "processing", error_message: nil)
     parsed = GecPdfParserService.new(file_path: temp.path).parse_preview_sample
 
     if parsed.errors.any?
@@ -49,6 +50,22 @@ class GecPdfPreviewJob < ApplicationJob
       },
       source_s3_key: source_s3_key
     )
+  rescue StandardError => e
+    begin
+      finalize_preview!(
+        preview,
+        status: "failed",
+        error_message: e.message,
+        result_data: {},
+        source_s3_key: source_s3_key || preview&.file_s3_key.presence
+      ) unless preview&.completed? || preview&.failed?
+    rescue StandardError => finalize_error
+      Rails.logger.warn(
+        "GecPdfPreviewJob preview #{preview&.id}: failed to persist terminal state after #{e.class}: #{e.message}: " \
+        "#{finalize_error.class}: #{finalize_error.message}"
+      )
+    end
+    raise e
   ensure
     temp&.close!
   end
@@ -80,7 +97,7 @@ class GecPdfPreviewJob < ApplicationJob
   end
 
   def cleanup_preview_source!(preview, source_s3_key)
-    return if source_s3_key.blank?
+    return if preview.blank? || source_s3_key.blank?
 
     deleted = S3Service.delete(source_s3_key)
     preview.update_column(:file_s3_key, nil) if deleted
