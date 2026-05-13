@@ -8,6 +8,8 @@ module Api
       include Authenticatable
       include AuditLoggable
 
+      MAX_GEC_UPLOAD_BYTES = 50.megabytes
+
       before_action :authenticate_request
       before_action :require_supporter_access!, only: [ :index, :stats, :households, :create_contact, :link_contact ]
       before_action :require_gec_upload_access!, only: [
@@ -31,10 +33,12 @@ module Api
         scope = apply_search(scope, params[:q]) if params[:q].present?
         scope = scope.where(village_id: params[:village_id]) if params[:village_id].present?
         scope = scope.where(precinct_id: params[:precinct_id]) if params[:precinct_id].present?
+        scope = scope.where(precinct_number: params[:precinct_number].to_s.strip) if params[:precinct_number].present?
         scope = scope.where("LOWER(gec_voters.village_name) = ?", params[:village].to_s.downcase.strip) if params[:village].present?
         scope = scope.for_list_date(parsed_date(params[:list_date])) if params[:list_date].present?
+        scope = apply_linked_filter(scope, params[:linked_status])
 
-        scope = scope.order(:village_name, :last_name, :first_name, :id)
+        scope = apply_voter_sort(scope, params[:sort], params[:direction])
         page = [ params.fetch(:page, 1).to_i, 1 ].max
         per_page = [ [ params.fetch(:per_page, 50).to_i, 1 ].max, 200 ].min
         total = scope.count
@@ -105,8 +109,8 @@ module Api
         return render_api_error(message: "No file uploaded", status: :unprocessable_entity, code: "missing_file") unless file.respond_to?(:tempfile)
 
         if pdf_file?(file)
-          return render_api_error(message: "Uploaded PDF preview is empty", status: :unprocessable_entity, code: "empty_file") if File.zero?(file.tempfile.path)
-          return render_api_error(message: "Uploaded PDF preview is too large (max 50 MB)", status: :unprocessable_entity, code: "file_too_large") if File.size(file.tempfile.path) > 50.megabytes
+          file_size_error = validate_gec_upload_size(file, label: "PDF preview")
+          return file_size_error if file_size_error
 
           preview_request_id = params[:preview_request_id].to_s.strip.presence || SecureRandom.uuid
           preview = GecPdfPreview.find_by(preview_request_id: preview_request_id, uploaded_by_user: current_user)
@@ -156,6 +160,9 @@ module Api
 
         import_type = %w[full_list changes_only].include?(params[:import_type]) ? params[:import_type] : "full_list"
         if pdf_file?(file)
+          file_size_error = validate_gec_upload_size(file, label: "PDF import")
+          return file_size_error if file_size_error
+
           confirm_review = ActiveModel::Type::Boolean.new.cast(params[:confirm_review])
           return render_api_error(message: "PDF preview is a sample. Confirm review before starting the background import.", status: :unprocessable_entity, code: "pdf_review_confirmation_required") unless confirm_review
 
@@ -557,6 +564,13 @@ module Api
         filename.downcase.end_with?(".pdf") || content_type.include?("pdf")
       end
 
+      def validate_gec_upload_size(file, label:)
+        return render_api_error(message: "Uploaded #{label} is empty", status: :unprocessable_entity, code: "empty_file") if File.zero?(file.tempfile.path)
+        return render_api_error(message: "Uploaded #{label} is too large (max 50 MB)", status: :unprocessable_entity, code: "file_too_large") if File.size(file.tempfile.path) > MAX_GEC_UPLOAD_BYTES
+
+        nil
+      end
+
       def pdf_preview_storage_attributes(file, preview_request_id)
         return { file_data: File.binread(file.tempfile.path) } if Rails.env.development? || !S3Service.enabled?
 
@@ -619,6 +633,33 @@ module Api
             SQL
             pattern: pattern
           )
+        end
+      end
+
+      def apply_linked_filter(scope, linked_status)
+        case linked_status.to_s
+        when "linked"
+          scope.where(id: Supporter.contacts.where.not(gec_voter_id: nil).select(:gec_voter_id))
+        when "unlinked"
+          scope.where.not(id: Supporter.contacts.where.not(gec_voter_id: nil).select(:gec_voter_id))
+        else
+          scope
+        end
+      end
+
+      def apply_voter_sort(scope, sort, direction)
+        direction_sql = direction.to_s.downcase == "desc" ? "DESC" : "ASC"
+        case sort.to_s
+        when "name"
+          scope.order(Arel.sql("LOWER(gec_voters.last_name) #{direction_sql}, LOWER(gec_voters.first_name) #{direction_sql}, gec_voters.id ASC"))
+        when "village"
+          scope.order(Arel.sql("LOWER(gec_voters.village_name) #{direction_sql}, LOWER(gec_voters.last_name) ASC, LOWER(gec_voters.first_name) ASC, gec_voters.id ASC"))
+        when "precinct"
+          scope.order(Arel.sql("gec_voters.precinct_number #{direction_sql} NULLS LAST, LOWER(gec_voters.village_name) ASC, LOWER(gec_voters.last_name) ASC, gec_voters.id ASC"))
+        when "birth_year"
+          scope.order(Arel.sql("gec_voters.birth_year #{direction_sql} NULLS LAST, LOWER(gec_voters.last_name) ASC, gec_voters.id ASC"))
+        else
+          scope.order(:village_name, :last_name, :first_name, :id)
         end
       end
 

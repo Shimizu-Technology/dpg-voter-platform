@@ -181,6 +181,8 @@ type ImportSkippedRowsResponse = {
 
 type Pagination = {
   page?: number;
+  per_page?: number;
+  total?: number;
   total_pages?: number;
   total_rows?: number;
 };
@@ -344,6 +346,12 @@ export default function GecVotersPage() {
   const canUploadGec = Boolean(session?.permissions?.can_upload_gec);
   const [search, setSearch] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState('');
+  const [voterVillage, setVoterVillage] = useState('');
+  const [voterPrecinct, setVoterPrecinct] = useState('');
+  const [voterLinkedStatus, setVoterLinkedStatus] = useState('');
+  const [voterSort, setVoterSort] = useState('default');
+  const [voterDirection, setVoterDirection] = useState<'asc' | 'desc'>('asc');
+  const [voterPage, setVoterPage] = useState(1);
   const [householdSearch, setHouseholdSearch] = useState('');
   const [submittedHouseholdSearch, setSubmittedHouseholdSearch] = useState('');
   const [showImportPanel, setShowImportPanel] = useState(false);
@@ -382,8 +390,17 @@ export default function GecVotersPage() {
     },
   });
   const votersQuery = useQuery({
-    queryKey: ['gec-voters', submittedSearch],
-    queryFn: () => getGecVoters({ q: submittedSearch, per_page: 50 }),
+    queryKey: ['gec-voters', submittedSearch, voterVillage, voterPrecinct, voterLinkedStatus, voterSort, voterDirection, voterPage],
+    queryFn: () => getGecVoters({
+      q: submittedSearch,
+      village: voterVillage || undefined,
+      precinct_number: voterPrecinct || undefined,
+      linked_status: voterLinkedStatus || undefined,
+      sort: voterSort === 'default' ? undefined : voterSort,
+      direction: voterDirection,
+      page: voterPage,
+      per_page: 50,
+    }),
   });
   const householdsQuery = useQuery({
     queryKey: ['gec-households', submittedHouseholdSearch],
@@ -559,6 +576,17 @@ export default function GecVotersPage() {
   });
 
   const voters = useMemo<GecVoter[]>(() => votersQuery.data?.gec_voters ?? [], [votersQuery.data]);
+  const voterPagination = votersQuery.data?.pagination as Pagination | undefined;
+  const voterVillages = useMemo(
+    () => ((statsQuery.data?.villages ?? []) as Array<{ name?: string; count?: number }>)
+      .map((row) => row.name)
+      .filter((name): name is string => Boolean(name)),
+    [statsQuery.data]
+  );
+  const voterPrecincts = useMemo(
+    () => Array.from(new Set(voters.map((voter) => voter.precinct_number).filter((value): value is string => Boolean(value)))).sort(),
+    [voters]
+  );
   const households = useMemo<Household[]>(() => householdsQuery.data?.households ?? [], [householdsQuery.data]);
   const imports = useMemo<GecImport[]>(() => importsQuery.data?.imports ?? [], [importsQuery.data]);
   const activeImports = imports.filter((row) => row.status === 'processing' || row.status === 'pending');
@@ -726,8 +754,10 @@ export default function GecVotersPage() {
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"
+                        disabled={row.status !== 'completed'}
                         onClick={() => openImportViewer(row)}
-                        className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                        title={row.status === 'completed' ? undefined : 'Import review is available after the import completes'}
+                        className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:border-slate-200 disabled:text-slate-400 disabled:opacity-60"
                       >
                         <Eye className="h-3.5 w-3.5" />
                         Open
@@ -759,7 +789,7 @@ export default function GecVotersPage() {
                             <div className="text-sm text-slate-700">Skipped rows: <span className="font-semibold text-slate-900">{row.skipped_rows_count || 0}</span></div>
                             <div className="text-sm text-slate-700">Pending fixes: <span className="font-semibold text-slate-900">{row.pending_skipped_rows_count || 0}</span></div>
                             <div className="flex flex-wrap gap-2 pt-1">
-                              <button type="button" onClick={() => openImportViewer(row)} className="app-btn-secondary min-h-10">
+                              <button type="button" disabled={row.status !== 'completed'} onClick={() => openImportViewer(row)} className="app-btn-secondary min-h-10">
                                 <Eye className="h-4 w-4" />
                                 Open Import
                               </button>
@@ -1078,6 +1108,7 @@ export default function GecVotersPage() {
               onSubmit={(event) => {
                 event.preventDefault();
                 setSubmittedSearch(search.trim());
+                setVoterPage(1);
               }}
             >
               <div className="relative flex-1">
@@ -1094,6 +1125,73 @@ export default function GecVotersPage() {
                 Search
               </button>
             </form>
+            <div className="mt-3 grid gap-2 md:grid-cols-5">
+              <select
+                value={voterVillage}
+                onChange={(event) => {
+                  setVoterVillage(event.target.value);
+                  setVoterPage(1);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="">All villages</option>
+                {voterVillages.map((village) => (
+                  <option key={village} value={village}>{village}</option>
+                ))}
+              </select>
+              <input
+                value={voterPrecinct}
+                onChange={(event) => {
+                  setVoterPrecinct(event.target.value);
+                  setVoterPage(1);
+                }}
+                list="gec-precinct-options"
+                placeholder="Precinct"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              />
+              <datalist id="gec-precinct-options">
+                {voterPrecincts.map((precinct) => (
+                  <option key={precinct} value={precinct} />
+                ))}
+              </datalist>
+              <select
+                value={voterLinkedStatus}
+                onChange={(event) => {
+                  setVoterLinkedStatus(event.target.value);
+                  setVoterPage(1);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="">All link statuses</option>
+                <option value="linked">Linked to DPG contact</option>
+                <option value="unlinked">Not linked</option>
+              </select>
+              <select
+                value={voterSort}
+                onChange={(event) => {
+                  setVoterSort(event.target.value);
+                  setVoterPage(1);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="default">Default order</option>
+                <option value="name">Name</option>
+                <option value="village">Village</option>
+                <option value="precinct">Precinct</option>
+                <option value="birth_year">Birth year</option>
+              </select>
+              <select
+                value={voterDirection}
+                onChange={(event) => {
+                  setVoterDirection(event.target.value as 'asc' | 'desc');
+                  setVoterPage(1);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -1207,6 +1305,31 @@ export default function GecVotersPage() {
               </tbody>
             </table>
           </div>
+          {voterPagination && (
+            <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Page {voterPagination.page ?? voterPage} of {voterPagination.total_pages ?? 1} · {voterPagination.total ?? 0} voters
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={voterPage <= 1}
+                  onClick={() => setVoterPage((page) => Math.max(1, page - 1))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-700 disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  disabled={voterPage >= (voterPagination.total_pages ?? 1)}
+                  onClick={() => setVoterPage((page) => page + 1)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-700 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -1272,7 +1395,7 @@ export default function GecVotersPage() {
 
       {selectedImport && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/55 px-3 py-6 backdrop-blur-sm sm:px-6">
-          <div className="my-auto w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="my-auto flex h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
               <div className="min-w-0">
                 <div className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">Import transparency</div>
@@ -1290,7 +1413,7 @@ export default function GecVotersPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="max-h-[78vh] overflow-y-auto p-4 sm:p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               <ImportReviewPanel
                 selectedImport={selectedImport}
                 viewerTab={viewerTab}

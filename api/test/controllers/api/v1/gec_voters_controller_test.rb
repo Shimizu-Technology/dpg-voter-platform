@@ -49,6 +49,38 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal @voter.id, payload["gec_voters"].first["id"]
   end
 
+  test "index filters by village precinct and link status" do
+    other_village = Village.find_or_create_by!(name: "Dededo")
+    GecVoter.create!(
+      first_name: "Other",
+      last_name: "Voter",
+      village: other_village,
+      village_name: other_village.name,
+      precinct_number: "22",
+      gec_list_date: Date.new(2026, 1, 25),
+      imported_at: Time.current
+    )
+    contact = Supporter.create!(
+      first_name: "Juan",
+      last_name: "Contact",
+      contact_number: "671-555-0102",
+      village: @village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "supporter",
+      status: "active"
+    )
+    contact.update!(gec_voter: @voter)
+
+    get "/api/v1/gec_voters",
+      params: { village: @village.name, precinct_number: @voter.precinct_number, linked_status: "linked", sort: "name", direction: "desc" },
+      headers: auth_headers(@leader)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal [ @voter.id ], payload["gec_voters"].map { |row| row["id"] }
+  end
+
   test "households groups GEC voters and DPG contacts at an address" do
     Supporter.create!(
       first_name: "Maria",
@@ -304,6 +336,32 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_equal "pdf_review_confirmation_required", JSON.parse(response.body)["code"]
+  ensure
+    pdf&.close!
+  end
+
+  test "PDF upload rejects files over the import size limit before storing payload" do
+    pdf = Tempfile.new([ "gec-upload-large", ".pdf" ])
+    pdf.binmode
+    pdf.truncate(Api::V1::GecVotersController::MAX_GEC_UPLOAD_BYTES + 1)
+    pdf.rewind
+    upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-large.pdf")
+
+    assert_no_difference -> { GecImport.count } do
+      assert_no_difference -> { GecImportUpload.count } do
+        post "/api/v1/gec_voters/upload",
+          params: {
+            file: upload,
+            gec_list_date: "2026-02-25",
+            import_type: "full_list",
+            confirm_review: "true"
+          },
+          headers: auth_headers(@admin)
+      end
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal "file_too_large", JSON.parse(response.body)["code"]
   ensure
     pdf&.close!
   end
