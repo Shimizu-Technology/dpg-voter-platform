@@ -65,7 +65,6 @@ class GecPdfPreviewJob < ApplicationJob
         "#{finalize_error.class}: #{finalize_error.message}"
       )
     end
-    raise e
   ensure
     temp&.close!
   end

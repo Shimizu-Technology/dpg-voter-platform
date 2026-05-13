@@ -32,4 +32,36 @@ class GecPdfPreviewJobTest < ActiveSupport::TestCase
     assert_match "processor exploded", preview.error_message
     assert_nil preview.file_data
   end
+
+  test "does not re-raise when terminal failure persistence also fails" do
+    user = User.create!(
+      clerk_id: "clerk-gec-preview-finalize-failure",
+      email: "gec-preview-finalize-failure@example.com",
+      name: "GEC Preview Finalize Failure User",
+      role: "campaign_admin"
+    )
+    preview = GecPdfPreview.create!(
+      preview_request_id: "finalize-failure-preview",
+      uploaded_by_user: user,
+      filename: "gec-preview.pdf",
+      content_type: "application/pdf",
+      status: "pending",
+      file_data: "%PDF-1.4\n%%EOF\n"
+    )
+    original_write_source = GecPdfPreviewJob.instance_method(:write_source_to_tempfile)
+    original_finalize = GecPdfPreviewJob.instance_method(:finalize_preview!)
+    GecPdfPreviewJob.define_method(:write_source_to_tempfile) do |_preview, _tempfile, _source_s3_key|
+      raise "processor exploded"
+    end
+    GecPdfPreviewJob.define_method(:finalize_preview!) do |_preview, **_attrs|
+      raise ActiveRecord::StatementInvalid, "database temporarily unavailable"
+    end
+
+    assert_nothing_raised do
+      GecPdfPreviewJob.perform_now(gec_pdf_preview_id: preview.id)
+    end
+  ensure
+    GecPdfPreviewJob.define_method(:write_source_to_tempfile, original_write_source) if original_write_source
+    GecPdfPreviewJob.define_method(:finalize_preview!, original_finalize) if original_finalize
+  end
 end

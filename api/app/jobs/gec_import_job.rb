@@ -9,6 +9,7 @@ class GecImportJob < ApplicationJob
     gec_import = GecImport.find_by(id: gec_import_id)
     upload = GecImportUpload.find_by(id: upload_id)
     return unless gec_import
+    return if gec_import.completed?
 
     unless upload
       fail_import_safely!(gec_import, "Missing upload payload", gec_import_id)
@@ -91,7 +92,7 @@ class GecImportJob < ApplicationJob
     ensure
       source_tmp&.close!
       csv_tempfile&.close!
-      upload&.destroy
+      destroy_upload_safely!(upload, gec_import_id)
     end
   end
 
@@ -114,6 +115,12 @@ class GecImportJob < ApplicationJob
 
     raise "Missing upload payload" if upload.file_s3_key.blank?
     raise "Could not download upload payload" unless S3Service.download_to_io(upload.file_s3_key, tempfile)
+  end
+
+  def destroy_upload_safely!(upload, import_id)
+    upload&.destroy
+  rescue StandardError => e
+    Rails.logger.warn("GecImportJob #{import_id}: upload cleanup failed: #{e.class}: #{e.message}")
   end
 
   def merge_metadata!(gec_import, **attrs)

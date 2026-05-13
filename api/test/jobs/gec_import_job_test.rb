@@ -20,6 +20,17 @@ class GecImportJobTest < ActiveSupport::TestCase
     GecImportJob.define_method(:fail_import!, original_fail_import) if original_fail_import
   end
 
+  test "upload cleanup does not re-raise and trigger a retry" do
+    upload = GecImportUpload.new(filename: "gec-import.pdf", file_data: "payload")
+    upload.define_singleton_method(:destroy) do
+      raise ActiveRecord::StatementInvalid, "database temporarily unavailable"
+    end
+
+    assert_nothing_raised do
+      GecImportJob.new.send(:destroy_upload_safely!, upload, 123)
+    end
+  end
+
   test "preserves import artifact locally when S3 is disabled" do
     gec_import = GecImport.create!(
       filename: "gec-import.csv",
