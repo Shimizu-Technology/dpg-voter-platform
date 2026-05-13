@@ -179,12 +179,25 @@ module Api
               "source_type" => "pdf"
             }
           )
-          upload_payload = GecImportUpload.create!(
-            gec_import: gec_import,
-            filename: File.basename(file.original_filename.to_s.presence || "gec-list.pdf"),
-            content_type: file.content_type.presence || "application/pdf",
-            file_data: File.binread(file.tempfile.path)
-          )
+          begin
+            upload_payload = GecImportUpload.create!(
+              gec_import: gec_import,
+              filename: File.basename(file.original_filename.to_s.presence || "gec-list.pdf"),
+              content_type: file.content_type.presence || "application/pdf",
+              **pdf_import_upload_storage_attributes(file, gec_import.id)
+            )
+          rescue StandardError => e
+            gec_import.update!(
+              status: "failed",
+              metadata: (gec_import.metadata || {}).merge({
+                "stage" => "failed",
+                "progress_percent" => 100,
+                "error" => e.message
+              })
+            )
+            Rails.logger.warn("Could not store GEC PDF import upload #{gec_import.id}: #{e.class}: #{e.message}")
+            return render_api_error(message: "Could not store PDF import upload. Please try again.", status: :unprocessable_entity, code: "pdf_import_storage_failed")
+          end
           job = GecImportJob.perform_later(
             gec_import_id: gec_import.id,
             upload_id: upload_payload.id,
@@ -581,6 +594,20 @@ module Api
           S3Service.upload(s3_key, io, content_type: file.content_type.presence || "application/pdf")
         end
         raise "Could not store PDF preview upload" unless uploaded
+
+        { file_s3_key: s3_key }
+      end
+
+      def pdf_import_upload_storage_attributes(file, import_id)
+        return { file_data: File.binread(file.tempfile.path) } if Rails.env.development? || !S3Service.enabled?
+
+        filename = File.basename(file.original_filename.to_s.presence || "gec-list.pdf")
+        safe_filename = S3Service.safe_filename(filename, fallback: "gec-list.pdf")
+        s3_key = "gec-imports/#{import_id}/raw/#{safe_filename}"
+        uploaded = File.open(file.tempfile.path, "rb") do |io|
+          S3Service.upload(s3_key, io, content_type: file.content_type.presence || "application/pdf")
+        end
+        raise "Could not store PDF import upload" unless uploaded
 
         { file_s3_key: s3_key }
       end

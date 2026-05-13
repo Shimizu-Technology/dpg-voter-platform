@@ -33,7 +33,7 @@ class GecImportJob < ApplicationJob
       upload_is_pdf = pdf_upload?(upload)
       source_tmp = Tempfile.new([ "gec_import_source", upload_is_pdf ? ".pdf" : safe_upload_extension(upload) ])
       source_tmp.binmode
-      source_tmp.write(upload.file_data)
+      write_upload_to_tempfile!(upload, source_tmp)
       source_tmp.flush
       source_tmp.close
       preserve_raw_upload!(gec_import, upload)
@@ -106,6 +106,16 @@ class GecImportJob < ApplicationJob
     %w[.csv .xls .xlsx].include?(ext) ? ext : ".xlsx"
   end
 
+  def write_upload_to_tempfile!(upload, tempfile)
+    if upload.file_data.present?
+      tempfile.write(upload.file_data)
+      return
+    end
+
+    raise "Missing upload payload" if upload.file_s3_key.blank?
+    raise "Could not download upload payload" unless S3Service.download_to_io(upload.file_s3_key, tempfile)
+  end
+
   def merge_metadata!(gec_import, **attrs)
     gec_import.update!(metadata: (gec_import.metadata || {}).merge(attrs.compact.stringify_keys))
   end
@@ -155,10 +165,20 @@ class GecImportJob < ApplicationJob
   end
 
   def preserve_raw_upload!(gec_import, upload)
-    return unless S3Service.enabled?
-
     filename = File.basename(upload.filename.to_s.presence || "gec-import-upload")
     content_type = upload.content_type.presence || "application/octet-stream"
+
+    if upload.file_s3_key.present?
+      gec_import.update_columns(
+        raw_file_s3_key: upload.file_s3_key,
+        raw_filename: filename,
+        raw_content_type: content_type
+      )
+      return
+    end
+
+    return unless S3Service.enabled?
+
     safe_filename = S3Service.safe_filename(filename, fallback: "gec-import-upload")
     s3_key = "gec-imports/#{gec_import.id}/raw/#{safe_filename}"
     uploaded = S3Service.upload(s3_key, StringIO.new(upload.file_data), content_type: content_type)

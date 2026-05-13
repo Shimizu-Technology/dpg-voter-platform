@@ -354,6 +354,7 @@ export default function GecVotersPage() {
   const [voterPage, setVoterPage] = useState(1);
   const [householdSearch, setHouseholdSearch] = useState('');
   const [submittedHouseholdSearch, setSubmittedHouseholdSearch] = useState('');
+  const [expandedHouseholds, setExpandedHouseholds] = useState<Record<string, boolean>>({});
   const [showImportPanel, setShowImportPanel] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [listDate, setListDate] = useState(today);
@@ -588,6 +589,13 @@ export default function GecVotersPage() {
     [voters]
   );
   const households = useMemo<Household[]>(() => householdsQuery.data?.households ?? [], [householdsQuery.data]);
+  const householdAddressSuggestions = useMemo(
+    () => Array.from(new Set([
+      ...voters.map((voter) => voter.address),
+      ...households.map((household) => household.address),
+    ].filter((value): value is string => Boolean(value)))).slice(0, 30),
+    [households, voters]
+  );
   const imports = useMemo<GecImport[]>(() => importsQuery.data?.imports ?? [], [importsQuery.data]);
   const activeImports = imports.filter((row) => row.status === 'processing' || row.status === 'pending');
   const activeImport = activeImports.find((row) => row.status === 'processing') || activeImports[0];
@@ -1346,11 +1354,17 @@ export default function GecVotersPage() {
               }}
             >
               <input
+                list="household-address-suggestions"
                 value={householdSearch}
                 onChange={(event) => setHouseholdSearch(event.target.value)}
                 placeholder="Street address or house number"
                 className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
               />
+              <datalist id="household-address-suggestions">
+                {householdAddressSuggestions.map((address) => (
+                  <option key={address} value={address} />
+                ))}
+              </datalist>
               <button type="submit" className="app-btn-primary min-h-11 justify-center px-3">
                 <Search className="h-4 w-4" />
               </button>
@@ -1358,33 +1372,139 @@ export default function GecVotersPage() {
             <div className="mt-4 space-y-3">
               {householdsQuery.isFetching ? (
                 <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Searching addresses...</div>
-              ) : households.map((household) => (
-                <div key={`${household.village_name}-${household.address}`} className="rounded-xl border border-slate-200 p-3">
-                  <div className="font-semibold text-slate-950">{household.address}</div>
-                  <div className="text-xs text-slate-500">{household.village_name}</div>
-                  <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-1">
-                    <div className="rounded-lg bg-blue-50 p-2 text-blue-900">
-                      <div className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em]">
-                        <Database className="h-3.5 w-3.5" />
-                        GEC voters
+              ) : households.map((household) => {
+                const householdKey = `${household.village_name}-${household.address}`;
+                const isExpanded = Boolean(expandedHouseholds[householdKey]);
+                const visibleVoters = isExpanded ? household.gec_voters : household.gec_voters.slice(0, 8);
+
+                return (
+                  <div key={householdKey} className="rounded-xl border border-slate-200 p-3">
+                    <div className="font-semibold text-slate-950">{household.address}</div>
+                    <div className="text-xs text-slate-500">{household.village_name}</div>
+                    <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-1">
+                      <div className="rounded-lg bg-blue-50 p-2 text-blue-900">
+                        <div className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em]">
+                          <Database className="h-3.5 w-3.5" />
+                          GEC voters
+                        </div>
+                        {household.gec_voters.length || 0} found
                       </div>
-                      {household.gec_voters.length || 0} found
+                      <div className="rounded-lg bg-green-50 p-2 text-green-900">
+                        <div className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em]">
+                          <Users className="h-3.5 w-3.5" />
+                          DPG contacts
+                        </div>
+                        {household.contacts.length || 0} found
+                      </div>
                     </div>
-                    <div className="rounded-lg bg-green-50 p-2 text-green-900">
-                      <div className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em]">
-                        <Users className="h-3.5 w-3.5" />
-                        DPG contacts
+                    {household.contacts.length > 0 && (
+                      <div className="mt-3 rounded-lg bg-green-50/70 p-2">
+                        <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-green-900">DPG contacts at this address</div>
+                        <div className="space-y-1">
+                          {household.contacts.map((contact) => (
+                            <div key={contact.id} className="text-sm text-slate-700">
+                              {contact.print_name || `${contact.first_name} ${contact.last_name}`}
+                              {contact.current_gec_match ? <span className="ml-2 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-green-700">matched</span> : null}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      {household.contacts.length || 0} found
+                    )}
+                    <div className="mt-3 space-y-2">
+                      {visibleVoters.map((voter) => (
+                        <div key={voter.id} className="rounded-lg border border-slate-100 bg-white p-2">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-800">{fullName(voter)}</div>
+                              <div className="text-xs text-slate-500">
+                                {[voter.voter_registration_number, voter.birth_year ? `Born ${voter.birth_year}` : null, voter.precinct_number ? `Pct ${voter.precinct_number}` : null].filter(Boolean).join(' · ')}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => createContactMutation.mutate(voter.id)}
+                                disabled={createContactMutation.isPending || Boolean(voter.linked_contact_count)}
+                                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                              >
+                                <Users className="h-3.5 w-3.5" />
+                                {voter.linked_contact_count ? 'Linked' : 'Create'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextVoterId = linkVoterId === voter.id ? null : voter.id;
+                                  setLinkVoterId(nextVoterId);
+                                  setContactSearch(nextVoterId ? fullName(voter) : '');
+                                  setSubmittedContactSearch('');
+                                }}
+                                disabled={linkContactMutation.isPending || Boolean(voter.linked_contact_count)}
+                                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                              >
+                                <LinkIcon className="h-3.5 w-3.5" />
+                                Link
+                              </button>
+                            </div>
+                          </div>
+                          {linkVoterId === voter.id && (
+                            <div className="mt-3 rounded-lg bg-slate-50 p-2">
+                              <form
+                                className="flex gap-2"
+                                onSubmit={(event) => {
+                                  event.preventDefault();
+                                  setSubmittedContactSearch(contactSearch.trim());
+                                }}
+                              >
+                                <input
+                                  value={contactSearch}
+                                  onChange={(event) => setContactSearch(event.target.value)}
+                                  placeholder="Search DPG contacts"
+                                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                />
+                                <button type="submit" className="rounded-lg bg-primary px-3 text-sm font-semibold text-white">Search</button>
+                              </form>
+                              <div className="mt-2 space-y-2">
+                                {contactResultsQuery.isFetching ? (
+                                  <div className="text-sm text-slate-500">Searching contacts...</div>
+                                ) : submittedContactSearch && contactResults.length === 0 ? (
+                                  <div className="text-sm text-slate-500">No matching DPG contacts found.</div>
+                                ) : contactResults.map((contact) => (
+                                  <div key={contact.id} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-slate-900">{contact.print_name || `${contact.first_name} ${contact.last_name}`}</div>
+                                      <div className="text-xs text-slate-500">
+                                        {[contact.contact_number, contact.email, contact.village_name, contact.street_address].filter(Boolean).join(' · ') || 'No contact details'}
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      disabled={linkContactMutation.isPending}
+                                      onClick={() => linkContactMutation.mutate({ voterId: voter.id, supporterId: contact.id })}
+                                      className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-white disabled:opacity-50"
+                                    >
+                                      <LinkIcon className="h-3.5 w-3.5" />
+                                      Link
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {household.gec_voters.length > 8 && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedHouseholds((current) => ({ ...current, [householdKey]: !isExpanded }))}
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                        >
+                          {isExpanded ? 'Show fewer voters' : `Show all ${household.gec_voters.length} voters`}
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="mt-3 space-y-1">
-                    {household.gec_voters.slice(0, 8).map((voter) => (
-                      <div key={voter.id} className="text-sm text-slate-700">{fullName(voter)}{voter.precinct_number ? ` · Pct ${voter.precinct_number}` : ''}</div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {submittedHouseholdSearch && !householdsQuery.isFetching && households.length === 0 && (
                 <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No households found for that address.</div>
               )}

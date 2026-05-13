@@ -372,6 +372,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
     pdf.rewind
     upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-february.pdf")
+    original_s3_enabled = S3Service.method(:enabled?)
+    S3Service.define_singleton_method(:enabled?) { false }
 
     assert_difference -> { GecImport.count }, 1 do
       assert_difference -> { GecImportUpload.count }, 1 do
@@ -394,6 +396,84 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "pending", payload.dig("import", "status")
     assert_equal "pdf", payload.dig("import", "metadata", "source_type")
   ensure
+    S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
+    pdf&.close!
+  end
+
+  test "confirmed PDF import stores upload payload in S3 when configured" do
+    pdf = Tempfile.new([ "gec-upload-s3", ".pdf" ])
+    pdf.binmode
+    pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+    pdf.rewind
+    upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-s3.pdf")
+    uploaded_keys = []
+
+    original_s3_enabled = S3Service.method(:enabled?)
+    original_s3_upload = S3Service.method(:upload)
+    S3Service.define_singleton_method(:enabled?) { true }
+    S3Service.define_singleton_method(:upload) do |key, io, content_type: nil|
+      uploaded_keys << [ key, io.read, content_type ]
+      true
+    end
+
+    assert_difference -> { GecImportUpload.count }, 1 do
+      assert_enqueued_with(job: GecImportJob) do
+        post "/api/v1/gec_voters/upload",
+          params: {
+            file: upload,
+            gec_list_date: "2026-02-25",
+            import_type: "full_list",
+            confirm_review: "true"
+          },
+          headers: auth_headers(@admin)
+      end
+    end
+
+    assert_response :accepted
+    payload = GecImportUpload.order(:id).last
+    assert_nil payload.file_data
+    assert_match %r{\Agec-imports/\d+/raw/gec-s3\.pdf\z}, payload.file_s3_key
+    assert_equal payload.file_s3_key, uploaded_keys.first.first
+    assert_equal "application/pdf", uploaded_keys.first.third
+  ensure
+    S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
+    S3Service.define_singleton_method(:upload, original_s3_upload) if original_s3_upload
+    pdf&.close!
+  end
+
+  test "failed PDF upload storage marks import failed instead of leaving it pending" do
+    pdf = Tempfile.new([ "gec-upload-s3-fail", ".pdf" ])
+    pdf.binmode
+    pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+    pdf.rewind
+    upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-s3-fail.pdf")
+
+    original_s3_enabled = S3Service.method(:enabled?)
+    original_s3_upload = S3Service.method(:upload)
+    S3Service.define_singleton_method(:enabled?) { true }
+    S3Service.define_singleton_method(:upload) { |_key, _io, content_type: nil| false }
+
+    assert_difference -> { GecImport.count }, 1 do
+      assert_no_difference -> { GecImportUpload.count } do
+        post "/api/v1/gec_voters/upload",
+          params: {
+            file: upload,
+            gec_list_date: "2026-02-25",
+            import_type: "full_list",
+            confirm_review: "true"
+          },
+          headers: auth_headers(@admin)
+      end
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal "pdf_import_storage_failed", JSON.parse(response.body)["code"]
+    failed_import = GecImport.order(:id).last
+    assert_equal "failed", failed_import.status
+    assert_equal "failed", failed_import.metadata["stage"]
+  ensure
+    S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
+    S3Service.define_singleton_method(:upload, original_s3_upload) if original_s3_upload
     pdf&.close!
   end
 
@@ -403,6 +483,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
     pdf.rewind
     upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-changes.pdf")
+    original_s3_enabled = S3Service.method(:enabled?)
+    S3Service.define_singleton_method(:enabled?) { false }
 
     assert_enqueued_with(job: GecImportJob) do
       post "/api/v1/gec_voters/upload",
@@ -420,6 +502,7 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "changes_only", payload.dig("import", "import_type")
     assert_equal "changes_only", GecImport.order(:created_at).last.import_type
   ensure
+    S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
     pdf&.close!
   end
 
