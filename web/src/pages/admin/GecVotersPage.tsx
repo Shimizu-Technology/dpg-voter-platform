@@ -182,7 +182,7 @@ export default function GecVotersPage() {
 
       try {
         const data = await getGecPdfPreviewStatus(previewRequestId);
-        if (data.preview_rows) {
+        if (data.status === 'completed') {
           setPreviewData(data);
           setPdfPreviewStatus('completed');
           setUploadError(null);

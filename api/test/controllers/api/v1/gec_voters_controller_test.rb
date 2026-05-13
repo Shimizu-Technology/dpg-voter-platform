@@ -216,6 +216,54 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     pdf&.close!
   end
 
+  test "admin can read completed PDF preview status" do
+    preview = GecPdfPreview.create!(
+      preview_request_id: "completed-preview-test",
+      uploaded_by_user: @admin,
+      filename: "gec-february.pdf",
+      content_type: "application/pdf",
+      status: "completed",
+      file_data: "%PDF-1.4",
+      result_data: {
+        "qa" => { "status" => "pass" },
+        "warnings" => [],
+        "row_count" => 1,
+        "preview_rows" => [
+          { "first_name" => "Juan", "last_name" => "Cruz", "village_name" => "Barrigada" }
+        ]
+      }
+    )
+
+    get "/api/v1/gec_voters/preview_status",
+      params: { preview_request_id: preview.preview_request_id },
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal true, payload["async"]
+    assert_equal "completed", payload["status"]
+    assert_equal 1, payload["row_count"]
+    assert_equal "Juan", payload["preview_rows"].first["first_name"]
+  end
+
+  test "preview status returns not found for unknown preview request" do
+    get "/api/v1/gec_voters/preview_status",
+      params: { preview_request_id: "missing-preview-test" },
+      headers: auth_headers(@admin)
+
+    assert_response :not_found
+    assert_equal "preview_not_found", JSON.parse(response.body)["code"]
+  end
+
+  test "preview status requires GEC import access" do
+    get "/api/v1/gec_voters/preview_status",
+      params: { preview_request_id: "leader-preview-test" },
+      headers: auth_headers(@leader)
+
+    assert_response :forbidden
+    assert_equal "gec_import_access_required", JSON.parse(response.body)["code"]
+  end
+
   test "PDF upload requires review confirmation before background import" do
     pdf = Tempfile.new([ "gec-upload", ".pdf" ])
     pdf.binmode

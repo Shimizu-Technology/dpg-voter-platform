@@ -3,15 +3,13 @@
 class GecImportJob < ApplicationJob
   queue_as :default
 
-  discard_on StandardError
-
   def perform(gec_import_id:, upload_id:, gec_list_date:, uploaded_by_user_id: nil, sheet_name: nil, import_type: "full_list", confirm_review: false)
     gec_import = GecImport.find_by(id: gec_import_id)
     upload = GecImportUpload.find_by(id: upload_id)
     return unless gec_import
 
     unless upload
-      fail_import!(gec_import, "Missing upload payload")
+      fail_import_safely!(gec_import, "Missing upload payload", gec_import_id)
       return
     end
 
@@ -85,7 +83,7 @@ class GecImportJob < ApplicationJob
       )
       write_audit_log!(result.gec_import, user, result.stats, gec_list_date, import_type)
     rescue StandardError => e
-      fail_import!(gec_import, e.message)
+      fail_import_safely!(gec_import, e.message, gec_import_id)
       Rails.logger.error("GecImportJob failed for import #{gec_import_id}: #{e.class}: #{e.message}")
     ensure
       source_tmp&.close!
@@ -114,6 +112,13 @@ class GecImportJob < ApplicationJob
       status: "failed",
       metadata: (gec_import.metadata || {}).merge({ "stage" => "failed", "progress_percent" => 100, "error" => message })
     )
+  end
+
+  def fail_import_safely!(gec_import, message, import_id)
+    fail_import!(gec_import, message)
+  rescue StandardError => e
+    Rails.logger.error("GecImportJob could not mark import #{import_id} as failed: #{e.class}: #{e.message}")
+    raise
   end
 
   def preserve_import_artifact!(gec_import, file_path:, filename:, content_type:)
