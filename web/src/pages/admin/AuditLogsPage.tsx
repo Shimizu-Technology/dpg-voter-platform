@@ -125,7 +125,7 @@ export default function AuditLogsPage() {
   return (
     <WorkspacePage width="full" className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Activity Log</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Activity Log</h1>
         <p className="text-sm text-[var(--text-secondary)]">
           Master history of who did what across supporters, imports, vetting, duplicates, and configuration.
         </p>

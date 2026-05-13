@@ -44,6 +44,7 @@ Rails.application.routes.draw do
           get :stats
           get :households
           get :imports
+          get :preview_status
           post :preview
           post :upload
           post "imports/:id/activate", action: :activate_import

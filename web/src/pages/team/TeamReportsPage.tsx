@@ -105,7 +105,7 @@ export default function TeamReportsPage() {
   return (
     <WorkspacePage width="full" className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Reports</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Reports</h1>
         <p className="text-sm text-gray-500 mt-0.5">Preview filtered reports in the app, then download the final export</p>
       </div>
 

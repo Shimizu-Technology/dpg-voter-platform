@@ -102,18 +102,22 @@ export const getGecStats = () => api.get('/gec_voters/stats').then(r => r.data);
 export const getGecVoters = (params?: QueryParams) => api.get('/gec_voters', { params }).then(r => r.data);
 export const getGecHouseholds = (params?: QueryParams) => api.get('/gec_voters/households', { params }).then(r => r.data);
 export const getGecImports = () => api.get('/gec_voters/imports').then(r => r.data);
-export const previewGecList = (file: File, gecListDate?: string, limit = 20) => {
+export const previewGecList = (file: File, gecListDate?: string, limit = 20, previewRequestId?: string) => {
   const form = new FormData();
   form.append('file', file);
   form.append('limit', String(limit));
   if (gecListDate) form.append('gec_list_date', gecListDate);
+  if (previewRequestId) form.append('preview_request_id', previewRequestId);
   return api.post('/gec_voters/preview', form).then(r => r.data);
 };
-export const uploadGecList = (file: File, gecListDate: string, importType = 'full_list') => {
+export const getGecPdfPreviewStatus = (previewRequestId: string) =>
+  api.get('/gec_voters/preview_status', { params: { preview_request_id: previewRequestId } }).then(r => r.data);
+export const uploadGecList = (file: File, gecListDate: string, importType = 'full_list', confirmReview = false) => {
   const form = new FormData();
   form.append('file', file);
   form.append('gec_list_date', gecListDate);
   form.append('import_type', importType);
+  if (confirmReview) form.append('confirm_review', 'true');
   return api.post('/gec_voters/upload', form).then(r => r.data);
 };
 export const activateGecImport = (importId: number) =>

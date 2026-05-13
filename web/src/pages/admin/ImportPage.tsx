@@ -260,7 +260,7 @@ export default function ImportPage() {
     <WorkspacePage width="full" className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Import Contacts</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Import Contacts</h1>
         <div className="flex items-center gap-2 mt-3 text-sm text-gray-500">
           {(['upload', 'select-sheet', 'map-columns', 'review', 'complete'] as Step[]).map((s, i) => (
             <span key={s} className={`flex items-center gap-1 ${step === s ? 'text-gray-900 font-medium' : ''}`}>

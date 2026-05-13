@@ -246,7 +246,7 @@ export default function DuplicatesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Duplicate Review</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">Duplicate Review</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
             {groups.length} potential duplicate group{groups.length !== 1 ? 's' : ''} ({totalCount} records flagged)
           </p>

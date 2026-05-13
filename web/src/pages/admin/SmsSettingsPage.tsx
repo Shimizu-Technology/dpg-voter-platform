@@ -134,7 +134,7 @@ export default function SmsSettingsPage() {
   return (
     <WorkspacePage width="full" className="space-y-6">
       <div>
-        <h1 className="text-lg font-bold text-gray-900">SMS, Social &amp; Public Settings</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">SMS, Social &amp; Public Settings</h1>
         <p className="text-sm text-(--text-secondary) mt-1">
           Manage the welcome text template plus the public social links and signup or thank-you reminders shown across the site.
         </p>

@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -16,6 +16,7 @@ import {
   createContactFromGecVoter,
   getGecHouseholds,
   getGecImports,
+  getGecPdfPreviewStatus,
   getGecStats,
   getGecVoters,
   getSupporters,
@@ -24,6 +25,7 @@ import {
   uploadGecList,
 } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
+import WorkspacePage from '../../components/WorkspacePage';
 
 type GecVoter = {
   id: number;
@@ -83,6 +85,19 @@ type ContactResult = {
 
 const today = new Date().toISOString().slice(0, 10);
 
+type PreviewResponse = {
+  async?: boolean;
+  source_type?: 'pdf' | 'spreadsheet';
+  preview_request_id?: string;
+  status?: 'pending' | 'processing' | 'completed' | 'failed';
+  error?: string;
+  qa?: { status?: string; quality_score?: number | null; row_count?: number; preview_mode?: boolean };
+  warnings?: string[];
+  row_count?: number;
+  column_map?: Record<string, number>;
+  preview_rows?: Array<Record<string, unknown>>;
+};
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error && 'response' in error) {
@@ -99,6 +114,14 @@ function fullName(voter: Pick<GecVoter, 'first_name' | 'middle_name' | 'last_nam
 function formatDate(value?: string | null) {
   if (!value) return '—';
   return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'Pacific/Guam' });
+}
+
+function createPreviewRequestId() {
+  return globalThis.crypto?.randomUUID?.() ?? `gec-preview-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 export default function GecVotersPage() {
@@ -119,9 +142,21 @@ export default function GecVotersPage() {
   const [linkVoterId, setLinkVoterId] = useState<number | null>(null);
   const [contactSearch, setContactSearch] = useState('');
   const [submittedContactSearch, setSubmittedContactSearch] = useState('');
+  const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
+  const [confirmReview, setConfirmReview] = useState(false);
+  const [pdfPreviewStatus, setPdfPreviewStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed'>('idle');
+  const activePreviewRequestRef = useRef<string | null>(null);
 
   const statsQuery = useQuery({ queryKey: ['gec-stats'], queryFn: getGecStats });
-  const importsQuery = useQuery({ queryKey: ['gec-imports'], queryFn: getGecImports, enabled: canUploadGec });
+  const importsQuery = useQuery({
+    queryKey: ['gec-imports'],
+    queryFn: getGecImports,
+    enabled: canUploadGec,
+    refetchInterval: (query) => {
+      const rows = (query.state.data?.imports ?? []) as GecImport[];
+      return rows.some((row) => row.status === 'pending' || row.status === 'processing') ? 3000 : false;
+    },
+  });
   const votersQuery = useQuery({
     queryKey: ['gec-voters', submittedSearch],
     queryFn: () => getGecVoters({ q: submittedSearch, per_page: 50 }),
@@ -136,17 +171,72 @@ export default function GecVotersPage() {
     queryFn: () => getSupporters({ search: submittedContactSearch, per_page: 10 }),
     enabled: Boolean(linkVoterId) && submittedContactSearch.trim().length >= 2,
   });
+  const selectedFileIsPdf = Boolean(file && (file.type.includes('pdf') || file.name.toLowerCase().endsWith('.pdf')));
+
+  async function pollPdfPreview(previewRequestId?: string) {
+    if (!previewRequestId) return;
+
+    for (const delayMs of [1000, 1500, 2000, 2500, 3000, 4000, 5000, 5000]) {
+      await sleep(delayMs);
+      if (activePreviewRequestRef.current !== previewRequestId) return;
+
+      try {
+        const data = await getGecPdfPreviewStatus(previewRequestId);
+        if (data.preview_rows) {
+          setPreviewData(data);
+          setPdfPreviewStatus('completed');
+          setUploadError(null);
+          setUploadMessage(`PDF preview found ${data.row_count ?? 0} sample rows. Review the sample before importing.`);
+          return;
+        }
+
+        if (data.status === 'failed') {
+          setPreviewData(null);
+          setPdfPreviewStatus('failed');
+          setUploadMessage(null);
+          setUploadError(`Preview failed: ${data.error || 'PDF preview failed'}`);
+          return;
+        }
+
+        setPdfPreviewStatus(data.status || 'processing');
+      } catch (error) {
+        setPreviewData(null);
+        setPdfPreviewStatus('failed');
+        setUploadMessage(null);
+        setUploadError(getErrorMessage(error));
+        return;
+      }
+    }
+
+    setPdfPreviewStatus('failed');
+    setUploadMessage(null);
+    setUploadError('PDF preview is taking longer than expected. Please try again.');
+  }
 
   const previewMutation = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error('Choose a file first.');
-      return previewGecList(file, listDate);
+      const requestId = selectedFileIsPdf ? createPreviewRequestId() : undefined;
+      if (requestId) activePreviewRequestRef.current = requestId;
+      return previewGecList(file, listDate, 20, requestId);
     },
     onSuccess: (data) => {
       setUploadError(null);
+      if (data.async && data.source_type === 'pdf') {
+        setPdfPreviewStatus(data.status || 'pending');
+        setUploadMessage('PDF preview is running in the background. This usually takes a few seconds.');
+        void pollPdfPreview(data.preview_request_id);
+        return;
+      }
+
+      setPreviewData(data);
+      setPdfPreviewStatus('completed');
       setUploadMessage(`Preview found ${data.row_count ?? 0} rows and mapped ${Object.keys(data.column_map ?? {}).length} columns.`);
     },
     onError: (error: unknown) => {
+      activePreviewRequestRef.current = null;
+      setPreviewData(null);
+      setPdfPreviewStatus('failed');
       setUploadMessage(null);
       setUploadError(getErrorMessage(error));
     },
@@ -155,11 +245,19 @@ export default function GecVotersPage() {
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error('Choose a file first.');
-      return uploadGecList(file, listDate, importType);
+      return uploadGecList(file, listDate, importType, selectedFileIsPdf ? confirmReview : false);
     },
     onSuccess: (data) => {
       setUploadError(null);
-      setUploadMessage(`Imported ${data.stats?.total ?? 0} GEC rows. New: ${data.stats?.new ?? 0}, updated: ${data.stats?.updated ?? 0}, removed: ${data.stats?.removed ?? 0}.`);
+      setPreviewData(null);
+      setConfirmReview(false);
+      setPdfPreviewStatus('idle');
+      activePreviewRequestRef.current = null;
+      if (data.async) {
+        setUploadMessage(`Import queued in background${data.import?.id ? ` (#${data.import.id})` : ''}. Recent Imports will update while it processes.`);
+      } else {
+        setUploadMessage(`Imported ${data.stats?.total ?? 0} GEC rows. New: ${data.stats?.new ?? 0}, updated: ${data.stats?.updated ?? 0}, removed: ${data.stats?.removed ?? 0}.`);
+      }
       void queryClient.invalidateQueries({ queryKey: ['gec-stats'] });
       void queryClient.invalidateQueries({ queryKey: ['gec-imports'] });
       void queryClient.invalidateQueries({ queryKey: ['gec-voters'] });
@@ -221,16 +319,18 @@ export default function GecVotersPage() {
   const households = useMemo<Household[]>(() => householdsQuery.data?.households ?? [], [householdsQuery.data]);
   const imports = useMemo<GecImport[]>(() => importsQuery.data?.imports ?? [], [importsQuery.data]);
   const contactResults = useMemo<ContactResult[]>(() => contactResultsQuery.data?.supporters ?? [], [contactResultsQuery.data]);
+  const isPreviewBusy = previewMutation.isPending || pdfPreviewStatus === 'pending' || pdfPreviewStatus === 'processing';
+  const canImport = Boolean(file && listDate && !uploadMutation.isPending && (!selectedFileIsPdf || (previewData?.source_type === 'pdf' && confirmReview)));
 
   return (
-    <div className="space-y-6">
+    <WorkspacePage width="full" className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
             <Database className="h-3.5 w-3.5" />
             Public voter file
           </div>
-          <h1 className="text-2xl font-bold text-slate-950">GEC Voter List</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">GEC Voter List</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
             Search official voter records by name, address, village, precinct, or registration number, then link voters into DPG contacts for follow-up.
           </p>
@@ -268,8 +368,14 @@ export default function GecVotersPage() {
               <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">File</span>
               <input
                 type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                accept=".csv,.xlsx,.xls,.pdf"
+                onChange={(event) => {
+                  setFile(event.target.files?.[0] ?? null);
+                  setPreviewData(null);
+                  setConfirmReview(false);
+                  setPdfPreviewStatus('idle');
+                  activePreviewRequestRef.current = null;
+                }}
                 className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
               />
             </label>
@@ -295,16 +401,16 @@ export default function GecVotersPage() {
             </label>
             <button
               type="button"
-              disabled={!file || previewMutation.isPending}
+              disabled={!file || isPreviewBusy}
               onClick={() => previewMutation.mutate()}
               className="app-btn-secondary min-h-11 justify-center"
             >
-              {previewMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              {isPreviewBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               Preview
             </button>
             <button
               type="button"
-              disabled={!file || !listDate || uploadMutation.isPending}
+              disabled={!canImport}
               onClick={() => uploadMutation.mutate()}
               className="app-btn-primary min-h-11 justify-center"
             >
@@ -312,6 +418,29 @@ export default function GecVotersPage() {
               Import
             </button>
           </div>
+          {previewData && (
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+              <div className="font-semibold">
+                {previewData.source_type === 'pdf' ? 'PDF preview ready' : 'Spreadsheet preview ready'}
+              </div>
+              <div className="mt-1 text-blue-800">
+                {previewData.source_type === 'pdf'
+                  ? `${previewData.row_count ?? 0} sample rows parsed. QA status: ${previewData.qa?.status || 'preview'}.`
+                  : `${previewData.row_count ?? 0} rows detected and ${Object.keys(previewData.column_map ?? {}).length} columns mapped.`}
+              </div>
+              {selectedFileIsPdf && (
+                <label className="mt-3 flex items-start gap-2 text-sm font-medium text-blue-950">
+                  <input
+                    type="checkbox"
+                    checked={confirmReview}
+                    onChange={(event) => setConfirmReview(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-blue-300"
+                  />
+                  I reviewed the PDF sample and want to queue the full background import.
+                </label>
+              )}
+            </div>
+          )}
           {uploadMessage && (
             <div className="mt-3 flex items-start gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-800">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
@@ -559,7 +688,7 @@ export default function GecVotersPage() {
           )}
         </div>
       </section>
-    </div>
+    </WorkspacePage>
   );
 }
 

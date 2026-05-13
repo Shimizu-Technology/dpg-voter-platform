@@ -190,6 +190,80 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "admin can enqueue a PDF preview job" do
+    pdf = Tempfile.new([ "gec-preview", ".pdf" ])
+    pdf.binmode
+    pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+    pdf.rewind
+    upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-february.pdf")
+
+    original_s3_enabled = S3Service.method(:enabled?)
+    S3Service.define_singleton_method(:enabled?) { false }
+    assert_enqueued_with(job: GecPdfPreviewJob) do
+      post "/api/v1/gec_voters/preview",
+        params: { file: upload, preview_request_id: "preview-pdf-test" },
+        headers: auth_headers(@admin)
+    end
+
+    assert_response :accepted
+    payload = JSON.parse(response.body)
+    assert_equal true, payload["async"]
+    assert_equal "pdf", payload["source_type"]
+    assert_equal "pending", payload["status"]
+    assert_equal "preview-pdf-test", payload["preview_request_id"]
+  ensure
+    S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
+    pdf&.close!
+  end
+
+  test "PDF upload requires review confirmation before background import" do
+    pdf = Tempfile.new([ "gec-upload", ".pdf" ])
+    pdf.binmode
+    pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+    pdf.rewind
+    upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-february.pdf")
+
+    post "/api/v1/gec_voters/upload",
+      params: { file: upload, gec_list_date: "2026-02-25", import_type: "full_list" },
+      headers: auth_headers(@admin)
+
+    assert_response :unprocessable_entity
+    assert_equal "pdf_review_confirmation_required", JSON.parse(response.body)["code"]
+  ensure
+    pdf&.close!
+  end
+
+  test "admin can enqueue a confirmed PDF import job" do
+    pdf = Tempfile.new([ "gec-upload-confirmed", ".pdf" ])
+    pdf.binmode
+    pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+    pdf.rewind
+    upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-february.pdf")
+
+    assert_difference -> { GecImport.count }, 1 do
+      assert_difference -> { GecImportUpload.count }, 1 do
+        assert_enqueued_with(job: GecImportJob) do
+          post "/api/v1/gec_voters/upload",
+            params: {
+              file: upload,
+              gec_list_date: "2026-02-25",
+              import_type: "full_list",
+              confirm_review: "true"
+            },
+            headers: auth_headers(@admin)
+        end
+      end
+    end
+
+    assert_response :accepted
+    payload = JSON.parse(response.body)
+    assert_equal true, payload["async"]
+    assert_equal "pending", payload.dig("import", "status")
+    assert_equal "pdf", payload.dig("import", "metadata", "source_type")
+  ensure
+    pdf&.close!
+  end
+
   test "activate import audit log records actual previous active state" do
     import = GecImport.create!(
       gec_list_date: Date.new(2026, 1, 25),

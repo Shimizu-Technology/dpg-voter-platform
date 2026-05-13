@@ -621,7 +621,7 @@ export default function UsersPage() {
   return (
     <WorkspacePage width="full" className="space-y-5 sm:space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-gray-900">
           <Users className="w-5 h-5 text-primary" /> User Management
         </h1>
         <p className="text-gray-500 text-sm">Authorized managers can invite users and assign allowed party roles.</p>
