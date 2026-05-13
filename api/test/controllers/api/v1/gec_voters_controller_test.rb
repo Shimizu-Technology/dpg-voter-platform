@@ -275,6 +275,34 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     pdf&.close!
   end
 
+  test "PDF preview storage failures return JSON errors" do
+    pdf = Tempfile.new([ "gec-preview-s3-fail", ".pdf" ])
+    pdf.binmode
+    pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+    pdf.rewind
+    upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-preview-fail.pdf")
+
+    original_s3_enabled = S3Service.method(:enabled?)
+    original_s3_upload = S3Service.method(:upload)
+    S3Service.define_singleton_method(:enabled?) { true }
+    S3Service.define_singleton_method(:upload) { |_key, _io, content_type: nil| false }
+
+    assert_no_difference -> { GecPdfPreview.count } do
+      post "/api/v1/gec_voters/preview",
+        params: { file: upload, preview_request_id: "preview-storage-fail-test" },
+        headers: auth_headers(@admin)
+    end
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "pdf_preview_storage_failed", payload["code"]
+    assert_match "Could not store PDF preview upload", payload["error"]
+  ensure
+    S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
+    S3Service.define_singleton_method(:upload, original_s3_upload) if original_s3_upload
+    pdf&.close!
+  end
+
   test "admin can read completed PDF preview status" do
     preview = GecPdfPreview.create!(
       preview_request_id: "completed-preview-test",

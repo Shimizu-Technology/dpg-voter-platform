@@ -115,14 +115,19 @@ module Api
           preview_request_id = params[:preview_request_id].to_s.strip.presence || SecureRandom.uuid
           preview = GecPdfPreview.find_by(preview_request_id: preview_request_id, uploaded_by_user: current_user)
           unless preview
-            preview = GecPdfPreview.create!(
-              preview_request_id: preview_request_id,
-              uploaded_by_user: current_user,
-              filename: File.basename(file.original_filename.to_s.presence || "upload.pdf"),
-              content_type: file.content_type.presence || "application/pdf",
-              status: "pending",
-              **pdf_preview_storage_attributes(file, preview_request_id)
-            )
+            begin
+              preview = GecPdfPreview.create!(
+                preview_request_id: preview_request_id,
+                uploaded_by_user: current_user,
+                filename: File.basename(file.original_filename.to_s.presence || "upload.pdf"),
+                content_type: file.content_type.presence || "application/pdf",
+                status: "pending",
+                **pdf_preview_storage_attributes(file, preview_request_id)
+              )
+            rescue StandardError => e
+              Rails.logger.warn("Could not store GEC PDF preview upload #{preview_request_id}: #{e.class}: #{e.message}")
+              return render_api_error(message: "Could not store PDF preview upload. Please try again.", status: :unprocessable_entity, code: "pdf_preview_storage_failed")
+            end
             GecPdfPreviewJob.perform_later(gec_pdf_preview_id: preview.id)
           end
 

@@ -355,6 +355,7 @@ export default function GecVotersPage() {
   const [householdSearch, setHouseholdSearch] = useState('');
   const [submittedHouseholdSearch, setSubmittedHouseholdSearch] = useState('');
   const [expandedHouseholds, setExpandedHouseholds] = useState<Record<string, boolean>>({});
+  const [showHouseholdSuggestions, setShowHouseholdSuggestions] = useState(false);
   const [showImportPanel, setShowImportPanel] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [listDate, setListDate] = useState(today);
@@ -445,6 +446,7 @@ export default function GecVotersPage() {
 
         setPdfPreviewStatus(data.status || 'processing');
       } catch (error) {
+        if (activePreviewRequestRef.current !== previewRequestId) return;
         setPreviewData(null);
         setPdfPreviewStatus('failed');
         setUploadMessage(null);
@@ -596,6 +598,14 @@ export default function GecVotersPage() {
     ].filter((value): value is string => Boolean(value)))).slice(0, 30),
     [households, voters]
   );
+  const filteredHouseholdSuggestions = useMemo(() => {
+    const query = householdSearch.trim().toLowerCase();
+    if (query.length < 2) return [];
+
+    return householdAddressSuggestions
+      .filter((address) => address.toLowerCase().includes(query))
+      .slice(0, 5);
+  }, [householdAddressSuggestions, householdSearch]);
   const imports = useMemo<GecImport[]>(() => importsQuery.data?.imports ?? [], [importsQuery.data]);
   const activeImports = imports.filter((row) => row.status === 'processing' || row.status === 'pending');
   const activeImport = activeImports.find((row) => row.status === 'processing') || activeImports[0];
@@ -1347,24 +1357,43 @@ export default function GecVotersPage() {
               <h2 className="text-lg font-semibold text-slate-950">Household Lookup</h2>
             </div>
             <form
-              className="flex gap-2"
+              className="relative flex gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
+                setShowHouseholdSuggestions(false);
                 setSubmittedHouseholdSearch(householdSearch.trim());
               }}
             >
               <input
-                list="household-address-suggestions"
                 value={householdSearch}
-                onChange={(event) => setHouseholdSearch(event.target.value)}
+                onChange={(event) => {
+                  setHouseholdSearch(event.target.value);
+                  setShowHouseholdSuggestions(true);
+                }}
+                onFocus={() => setShowHouseholdSuggestions(true)}
+                onBlur={() => window.setTimeout(() => setShowHouseholdSuggestions(false), 120)}
                 placeholder="Street address or house number"
                 className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
               />
-              <datalist id="household-address-suggestions">
-                {householdAddressSuggestions.map((address) => (
-                  <option key={address} value={address} />
-                ))}
-              </datalist>
+              {showHouseholdSuggestions && filteredHouseholdSuggestions.length > 0 && (
+                <div className="absolute left-0 right-14 top-full z-20 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-200/70">
+                  {filteredHouseholdSuggestions.map((address) => (
+                    <button
+                      key={address}
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        setHouseholdSearch(address);
+                        setShowHouseholdSuggestions(false);
+                        setSubmittedHouseholdSearch(address);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+                    >
+                      {address}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button type="submit" className="app-btn-primary min-h-11 justify-center px-3">
                 <Search className="h-4 w-4" />
               </button>
