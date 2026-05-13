@@ -128,10 +128,26 @@ export const getGecImportChanges = (importId: number, params?: QueryParams) =>
   api.get(`/gec_voters/imports/${importId}/changes`, { params }).then(r => r.data);
 export const getGecImportSkippedRows = (importId: number, params?: QueryParams) =>
   api.get(`/gec_voters/imports/${importId}/skipped_rows`, { params }).then(r => r.data);
-export const previewGecImportSkippedRowResolution = (importId: number, skippedRowId: number, data: JsonRecord) =>
-  api.post(`/gec_voters/imports/${importId}/skipped_rows/${skippedRowId}/preview_resolution`, data).then(r => r.data);
-export const resolveGecImportSkippedRow = (importId: number, skippedRowId: number, data: JsonRecord) =>
-  api.post(`/gec_voters/imports/${importId}/skipped_rows/${skippedRowId}/resolve`, data).then(r => r.data);
+export const previewGecImportSkippedRowResolution = (
+  importId: number,
+  skippedRowId: number,
+  data: JsonRecord,
+  selectedGecVoterId?: number | null
+) =>
+  api.post(`/gec_voters/imports/${importId}/skipped_rows/${skippedRowId}/preview_resolution`, {
+    ...data,
+    selected_gec_voter_id: selectedGecVoterId ?? undefined,
+  }).then(r => r.data);
+export const resolveGecImportSkippedRow = (
+  importId: number,
+  skippedRowId: number,
+  data: JsonRecord,
+  selectedGecVoterId?: number | null
+) =>
+  api.post(`/gec_voters/imports/${importId}/skipped_rows/${skippedRowId}/resolve`, {
+    ...data,
+    selected_gec_voter_id: selectedGecVoterId ?? undefined,
+  }).then(r => r.data);
 export const dismissGecImportSkippedRow = (importId: number, skippedRowId: number) =>
   api.post(`/gec_voters/imports/${importId}/skipped_rows/${skippedRowId}/dismiss`).then(r => r.data);
 export const openGecImportOriginal = (importId: number) =>

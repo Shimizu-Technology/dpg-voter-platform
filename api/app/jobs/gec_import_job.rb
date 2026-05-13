@@ -117,9 +117,10 @@ class GecImportJob < ApplicationJob
 
   def fail_import_safely!(gec_import, message, import_id)
     fail_import!(gec_import, message)
+    true
   rescue StandardError => e
     Rails.logger.error("GecImportJob could not mark import #{import_id} as failed: #{e.class}: #{e.message}")
-    raise
+    false
   end
 
   def preserve_import_artifact!(gec_import, file_path:, filename:, content_type:)
