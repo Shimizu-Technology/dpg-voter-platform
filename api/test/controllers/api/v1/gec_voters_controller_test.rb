@@ -362,6 +362,39 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "dismissed", skipped_row.reload.resolution_status
   end
 
+  test "skipped row resolution preview uses nested corrected values" do
+    import = GecImport.create!(
+      gec_list_date: Date.new(2026, 2, 25),
+      filename: "gec-voters.csv",
+      status: "completed",
+      import_type: "full_list"
+    )
+    skipped_row = GecImportSkippedRow.create!(
+      gec_import: import,
+      row_number: 4,
+      message: "Missing parsed name",
+      village_name: @village.name,
+      birth_year: 1979
+    )
+
+    post "/api/v1/gec_voters/imports/#{import.id}/skipped_rows/#{skipped_row.id}/preview_resolution",
+      params: {
+        corrected_values: {
+          first_name: "Maria",
+          last_name: "Santos",
+          village_name: @village.name,
+          birth_year: "1979"
+        }
+      },
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal "ready_to_create", payload.dig("preview", "status")
+    assert_equal "Maria", payload.dig("preview", "corrected_values", "first_name")
+    assert_equal "Santos", payload.dig("preview", "corrected_values", "last_name")
+  end
+
   test "import data endpoint reports unavailable parsed artifact cleanly" do
     import = GecImport.create!(
       gec_list_date: Date.new(2026, 2, 25),

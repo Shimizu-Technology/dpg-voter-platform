@@ -296,6 +296,7 @@ export default function GecVotersPage() {
     enabled: Boolean(linkVoterId) && submittedContactSearch.trim().length >= 2,
   });
   const selectedFileIsPdf = Boolean(file && (file.type.includes('pdf') || file.name.toLowerCase().endsWith('.pdf')));
+  const hasCompletedPreview = Boolean(previewData?.preview_rows && (previewData.row_count ?? previewData.preview_rows.length) > 0);
 
   async function pollPdfPreview(previewRequestId?: string) {
     if (!previewRequestId) return;
@@ -494,7 +495,15 @@ export default function GecVotersPage() {
     enabled: canUploadGec && viewerTab === 'skipped' && Boolean(selectedImportId),
   });
   const isPreviewBusy = previewMutation.isPending || pdfPreviewStatus === 'pending' || pdfPreviewStatus === 'processing';
-  const canImport = Boolean(file && listDate && !uploadMutation.isPending && (!selectedFileIsPdf || (previewData?.source_type === 'pdf' && confirmReview)));
+  const canAnalyze = Boolean(file && listDate && !isPreviewBusy);
+  const canImport = Boolean(
+    file &&
+    listDate &&
+    hasCompletedPreview &&
+    !isPreviewBusy &&
+    !uploadMutation.isPending &&
+    (!selectedFileIsPdf || (previewData?.source_type === 'pdf' && confirmReview))
+  );
   const renderImportHistory = () => (
     <section className="app-card overflow-hidden">
       <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
@@ -720,18 +729,26 @@ export default function GecVotersPage() {
             <div className="mt-5 space-y-4 border-t border-slate-100 pt-5">
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Excel / PDF file</span>
-                <input
-                  type="file"
-                  accept=".csv,.xlsx,.xls,.pdf"
-                  onChange={(event) => {
-                    setFile(event.target.files?.[0] ?? null);
-                    setPreviewData(null);
-                    setConfirmReview(false);
-                    setPdfPreviewStatus('idle');
-                    activePreviewRequestRef.current = null;
-                  }}
-                  className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                />
+                <span className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <span className="inline-flex shrink-0 cursor-pointer items-center rounded-lg bg-blue-50 px-3 py-1.5 font-semibold text-blue-700 hover:bg-blue-100">
+                    Choose File
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls,.pdf"
+                      onChange={(event) => {
+                        setFile(event.target.files?.[0] ?? null);
+                        setPreviewData(null);
+                        setUploadMessage(null);
+                        setUploadError(null);
+                        setConfirmReview(false);
+                        setPdfPreviewStatus('idle');
+                        activePreviewRequestRef.current = null;
+                      }}
+                      className="sr-only"
+                    />
+                  </span>
+                  <span className="min-w-0 truncate text-slate-950">{file?.name || 'No file chosen'}</span>
+                </span>
               </label>
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,320px)]">
@@ -750,7 +767,15 @@ export default function GecVotersPage() {
                   <input
                     type="date"
                     value={listDate}
-                    onChange={(event) => setListDate(event.target.value)}
+                    onChange={(event) => {
+                      setListDate(event.target.value);
+                      setPreviewData(null);
+                      setUploadMessage(null);
+                      setUploadError(null);
+                      setConfirmReview(false);
+                      setPdfPreviewStatus('idle');
+                      activePreviewRequestRef.current = null;
+                    }}
                     className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
                   />
                 </label>
@@ -759,7 +784,7 @@ export default function GecVotersPage() {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
-                  disabled={!file || isPreviewBusy}
+                  disabled={!canAnalyze}
                   onClick={() => previewMutation.mutate()}
                   className="app-btn-secondary min-h-11 justify-center"
                 >
