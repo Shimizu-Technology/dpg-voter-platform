@@ -157,6 +157,21 @@ export const openGecImportOriginal = (importId: number) =>
   });
 export const downloadGecImportFile = (importId: number) =>
   api.get(`/gec_voters/imports/${importId}/download`).then(r => {
+    if (r.data?.download_data_base64) {
+      const binary = atob(r.data.download_data_base64);
+      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+      const blob = new Blob([bytes], { type: r.data?.content_type || 'application/octet-stream' });
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = r.data?.filename || `gec-import-${importId}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+      return r.data;
+    }
+
     const url = r.data?.download_url;
     if (!url) return r.data;
 

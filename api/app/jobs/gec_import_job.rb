@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "fileutils"
+
 class GecImportJob < ApplicationJob
   queue_as :default
 
@@ -124,9 +126,21 @@ class GecImportJob < ApplicationJob
   end
 
   def preserve_import_artifact!(gec_import, file_path:, filename:, content_type:)
-    return unless S3Service.enabled?
-
     safe_filename = S3Service.safe_filename(filename, fallback: "import_artifact")
+
+    unless S3Service.enabled?
+      local_dir = Rails.root.join("tmp", "gec_import_artifacts", gec_import.id.to_s)
+      FileUtils.mkdir_p(local_dir)
+      local_path = local_dir.join(safe_filename)
+      FileUtils.cp(file_path, local_path)
+      gec_import.update_columns(
+        original_file_s3_key: "local://tmp/gec_import_artifacts/#{gec_import.id}/#{safe_filename}",
+        original_filename: filename,
+        original_content_type: content_type
+      )
+      return
+    end
+
     s3_key = "gec-imports/#{gec_import.id}/artifact/#{safe_filename}"
     uploaded = File.open(file_path, "rb") { |io| S3Service.upload(s3_key, io, content_type: content_type) }
     return unless uploaded

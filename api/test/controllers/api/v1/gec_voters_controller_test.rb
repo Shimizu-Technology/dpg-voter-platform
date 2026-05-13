@@ -462,6 +462,37 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "parsed_data_not_available", JSON.parse(response.body)["code"]
   end
 
+  test "import data endpoint falls back to recorded change rows when artifact is missing" do
+    import = GecImport.create!(
+      gec_list_date: Date.new(2026, 2, 25),
+      filename: "gec-voters.csv",
+      status: "completed",
+      import_type: "full_list"
+    )
+    GecImportChange.create!(
+      gec_import: import,
+      change_type: "new",
+      row_number: 1,
+      first_name: "Fallback",
+      last_name: "Voter",
+      village_name: @village.name,
+      voter_registration_number: "FALL-123",
+      birth_year: 1988,
+      details: { "address" => "12 Test Street", "precinct_number" => "15A" }
+    )
+
+    get "/api/v1/gec_voters/imports/#{import.id}/view_data", headers: auth_headers(@admin)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal "change_fallback", payload.dig("preview", "source_type")
+    assert_equal 1, payload.dig("preview", "pagination", "total_rows")
+    row = payload.dig("preview", "preview_rows").first
+    assert_equal "Fallback", row["first_name"]
+    assert_equal "12 Test Street", row["address"]
+    assert_includes payload.dig("preview", "warnings").first, "reconstructed"
+  end
+
   test "activate import audit log records actual previous active state" do
     import = GecImport.create!(
       gec_list_date: Date.new(2026, 1, 25),

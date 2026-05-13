@@ -15,6 +15,7 @@ import {
   Search,
   Upload,
   Users,
+  X,
 } from 'lucide-react';
 import {
   activateGecImport,
@@ -359,6 +360,7 @@ export default function GecVotersPage() {
   const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
   const [confirmReview, setConfirmReview] = useState(false);
   const [pdfPreviewStatus, setPdfPreviewStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed'>('idle');
+  const [expandedImportId, setExpandedImportId] = useState<number | null>(null);
   const [selectedImportId, setSelectedImportId] = useState<number | null>(null);
   const [viewerTab, setViewerTab] = useState<ImportViewerTab>('data');
   const [viewerSearch, setViewerSearch] = useState('');
@@ -405,6 +407,8 @@ export default function GecVotersPage() {
 
       try {
         const data = await getGecPdfPreviewStatus(previewRequestId);
+        if (activePreviewRequestRef.current !== previewRequestId) return;
+
         if (data.status === 'completed') {
           setPreviewData(data);
           setPdfPreviewStatus('completed');
@@ -587,7 +591,7 @@ export default function GecVotersPage() {
       q: submittedViewerSearch,
       village: viewerVillage,
     }),
-    enabled: canUploadGec && viewerTab === 'data' && Boolean(selectedImportId && selectedImport?.has_import_artifact),
+    enabled: canUploadGec && viewerTab === 'data' && Boolean(selectedImportId),
   });
   const importChangesQuery = useQuery({
     queryKey: ['gec-import-changes', selectedImportId, viewerPage, submittedViewerSearch, changeType],
@@ -619,9 +623,30 @@ export default function GecVotersPage() {
     !uploadMutation.isPending &&
     (!selectedFileIsPdf || (previewData?.source_type === 'pdf' && confirmReview))
   );
+  const openImportViewer = (row: GecImport, tab: ImportViewerTab = 'data') => {
+    setSelectedImportId(row.id);
+    setViewerTab(tab);
+    setViewerPage(1);
+    setSubmittedViewerSearch('');
+    setViewerSearch('');
+    setViewerVillage('');
+    setChangeType('all');
+    setSkippedStatus('all');
+  };
+
+  const closeImportViewer = () => {
+    setSelectedImportId(null);
+    setSubmittedViewerSearch('');
+    setViewerSearch('');
+    setViewerVillage('');
+    setChangeType('all');
+    setSkippedStatus('all');
+    setViewerPage(1);
+  };
+
   const renderImportHistory = () => (
-    <section className="app-card overflow-hidden">
-      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-slate-500" />
@@ -642,6 +667,7 @@ export default function GecVotersPage() {
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.08em] text-slate-500">
               <tr>
+                <th className="w-10 px-3 py-3" aria-label="Expand import details" />
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">File</th>
                 <th className="px-4 py-3 text-right">Total</th>
@@ -657,128 +683,113 @@ export default function GecVotersPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {imports.map((row) => (
-                <tr key={row.id} className={selectedImportId === row.id ? 'bg-blue-50/50' : undefined}>
-                  <td className="px-4 py-3 font-medium text-slate-700">{formatDate(row.gec_list_date)}</td>
-                  <td className="max-w-[260px] px-4 py-3">
-                    <div className="truncate font-semibold text-slate-900">{row.filename}</div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {row.import_type ? row.import_type.replace(/_/g, ' ') : 'full list'}
-                      {row.pending_skipped_rows_count ? ` · ${row.pending_skipped_rows_count} skipped pending` : ''}
-                      {row.active_election_day ? ' · Active election list' : ''}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-950">{row.total_records || 0}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-green-700">{row.new_records || 0}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-blue-700">{row.updated_records || 0}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-red-700">{row.removed_records || 0}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-blue-700">{row.transferred_records || 0}</td>
-                  <td className="px-4 py-3 text-slate-600">{formatDateTime(row.created_at)}</td>
-                  <td className="max-w-[180px] truncate px-4 py-3 text-slate-600">{row.uploaded_by_email || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                      row.status === 'completed'
-                        ? 'bg-green-50 text-green-700'
-                        : row.status === 'failed'
-                          ? 'bg-red-50 text-red-700'
-                          : 'bg-amber-50 text-amber-700'
-                    }`}
-                    >
-                      {row.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap justify-end gap-2">
+                <Fragment key={row.id}>
+                  <tr className={expandedImportId === row.id ? 'bg-blue-50/40' : undefined}>
+                    <td className="px-3 py-3">
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedImportId(row.id);
-                          setViewerTab('data');
-                          setViewerPage(1);
-                          setSubmittedViewerSearch('');
-                          setViewerSearch('');
-                        }}
-                        className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        onClick={() => setExpandedImportId((current) => (current === row.id ? null : row.id))}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-900"
+                        aria-label={expandedImportId === row.id ? 'Collapse import details' : 'Expand import details'}
+                      >
+                        <ChevronDown className={`h-4 w-4 transition-transform ${expandedImportId === row.id ? 'rotate-180' : '-rotate-90'}`} />
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-700">{formatDate(row.gec_list_date)}</td>
+                    <td className="max-w-[260px] px-4 py-3">
+                      <div className="truncate font-semibold text-slate-900">{row.filename}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {row.import_type ? row.import_type.replace(/_/g, ' ') : 'full list'}
+                        {row.pending_skipped_rows_count ? ` · ${row.pending_skipped_rows_count} skipped pending` : ''}
+                        {row.active_election_day ? ' · Active election list' : ''}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-950">{row.total_records || 0}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-green-700">{row.new_records || 0}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-blue-700">{row.updated_records || 0}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-red-700">{row.removed_records || 0}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-blue-700">{row.transferred_records || 0}</td>
+                    <td className="px-4 py-3 text-slate-600">{formatDateTime(row.created_at)}</td>
+                    <td className="max-w-[180px] truncate px-4 py-3 text-slate-600">{row.uploaded_by_email || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                        row.status === 'completed'
+                          ? 'bg-green-50 text-green-700'
+                          : row.status === 'failed'
+                            ? 'bg-red-50 text-red-700'
+                            : 'bg-amber-50 text-amber-700'
+                      }`}
+                      >
+                        {row.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openImportViewer(row)}
+                        className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        Review
+                        Open
                       </button>
-                      {row.has_original_file ? (
-                        <button
-                          type="button"
-                          disabled={openOriginalMutation.isPending}
-                          onClick={() => openOriginalMutation.mutate(row.id)}
-                          className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                          <FileText className="h-3.5 w-3.5" />
-                          Original
-                        </button>
-                      ) : null}
-                      {row.has_downloadable_file ? (
-                        <button
-                          type="button"
-                          disabled={downloadImportMutation.isPending}
-                          onClick={() => downloadImportMutation.mutate(row.id)}
-                          className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          Download
-                        </button>
-                      ) : null}
-                      {row.status === 'completed' && !row.active_election_day ? (
-                        <button
-                          type="button"
-                          disabled={activateImportMutation.isPending}
-                          onClick={() => activateImportMutation.mutate(row.id)}
-                          className="inline-flex min-h-8 items-center rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                          Activate
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                  {expandedImportId === row.id && (
+                    <tr className="bg-slate-50/60">
+                      <td colSpan={12} className="px-4 py-4">
+                        <div className="grid gap-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100 lg:grid-cols-3">
+                          <div className="space-y-2">
+                            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Import details</div>
+                            <div className="text-sm text-slate-700">Imported at: <span className="font-semibold text-slate-900">{formatDateTime(row.created_at)}</span></div>
+                            <div className="text-sm text-slate-700">Imported by: <span className="font-semibold text-slate-900">{row.uploaded_by_email || '—'}</span></div>
+                            <div className="text-sm text-slate-700">Filename: <span className="font-semibold text-slate-900">{row.filename}</span></div>
+                            <div className="text-sm text-slate-700">List date: <span className="font-semibold text-slate-900">{formatDate(row.gec_list_date)}</span></div>
+                            <div className="text-sm text-slate-700">Type: <span className="font-semibold text-slate-900">{row.import_type?.replace(/_/g, ' ') || 'full list'}</span></div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Breakdown</div>
+                            <div className="text-sm text-slate-700">Total processed: <span className="font-semibold text-slate-900">{row.total_records || 0}</span></div>
+                            <div className="text-sm text-green-700">New records: <span className="font-semibold">{row.new_records || 0}</span></div>
+                            <div className="text-sm text-blue-700">Updated records: <span className="font-semibold">{row.updated_records || 0}</span></div>
+                            <div className="text-sm text-red-700">Removed / purged: <span className="font-semibold">{row.removed_records || 0}</span></div>
+                            <div className="text-sm text-blue-700">Transferred villages: <span className="font-semibold">{row.transferred_records || 0}</span></div>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Additional</div>
+                            <div className="text-sm text-slate-700">Skipped rows: <span className="font-semibold text-slate-900">{row.skipped_rows_count || 0}</span></div>
+                            <div className="text-sm text-slate-700">Pending fixes: <span className="font-semibold text-slate-900">{row.pending_skipped_rows_count || 0}</span></div>
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <button type="button" onClick={() => openImportViewer(row)} className="app-btn-secondary min-h-10">
+                                <Eye className="h-4 w-4" />
+                                Open Import
+                              </button>
+                              {row.has_original_file ? (
+                                <button type="button" disabled={openOriginalMutation.isPending} onClick={() => openOriginalMutation.mutate(row.id)} className="app-btn-secondary min-h-10">
+                                  <FileText className="h-4 w-4" />
+                                  Original
+                                </button>
+                              ) : null}
+                              {row.has_downloadable_file ? (
+                                <button type="button" disabled={downloadImportMutation.isPending} onClick={() => downloadImportMutation.mutate(row.id)} className="app-btn-secondary min-h-10">
+                                  <Download className="h-4 w-4" />
+                                  Download
+                                </button>
+                              ) : null}
+                              {row.status === 'completed' && !row.active_election_day ? (
+                                <button type="button" disabled={activateImportMutation.isPending} onClick={() => activateImportMutation.mutate(row.id)} className="app-btn-secondary min-h-10">
+                                  Activate
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {selectedImport && (
-        <div className="border-t border-slate-100 p-4 sm:p-5">
-          <ImportReviewPanel
-            selectedImport={selectedImport}
-            viewerTab={viewerTab}
-            setViewerTab={(tab) => {
-              setViewerTab(tab);
-              setViewerPage(1);
-            }}
-            viewerSearch={viewerSearch}
-            setViewerSearch={setViewerSearch}
-            submitSearch={() => {
-              setSubmittedViewerSearch(viewerSearch.trim());
-              setViewerPage(1);
-            }}
-            viewerVillage={viewerVillage}
-            setViewerVillage={(value) => {
-              setViewerVillage(value);
-              setViewerPage(1);
-            }}
-            changeType={changeType}
-            setChangeType={(value) => {
-              setChangeType(value);
-              setViewerPage(1);
-            }}
-            skippedStatus={skippedStatus}
-            setSkippedStatus={(value) => {
-              setSkippedStatus(value);
-              setViewerPage(1);
-            }}
-            viewerPage={viewerPage}
-            setViewerPage={setViewerPage}
-            dataQuery={importDataQuery}
-            changesQuery={importChangesQuery}
-            skippedRowsQuery={importSkippedRowsQuery}
-          />
         </div>
       )}
     </section>
@@ -1040,6 +1051,8 @@ export default function GecVotersPage() {
                   )}
                 </div>
               )}
+
+              {renderImportHistory()}
             </div>
           )}
           {uploadMessage && (
@@ -1200,7 +1213,7 @@ export default function GecVotersPage() {
           <section className="app-card p-4 sm:p-5">
             <div className="mb-4 flex items-center gap-2">
               <Home className="h-5 w-5 text-blue-600" />
-              <h2 className="text-lg font-semibold text-slate-950">Address Lookup</h2>
+              <h2 className="text-lg font-semibold text-slate-950">Household Lookup</h2>
             </div>
             <form
               className="flex gap-2"
@@ -1212,7 +1225,7 @@ export default function GecVotersPage() {
               <input
                 value={householdSearch}
                 onChange={(event) => setHouseholdSearch(event.target.value)}
-                placeholder="Enter street or house number"
+                placeholder="Street address or house number"
                 className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
               />
               <button type="submit" className="app-btn-primary min-h-11 justify-center px-3">
@@ -1257,7 +1270,65 @@ export default function GecVotersPage() {
         </div>
       </section>
 
-      {canUploadGec && renderImportHistory()}
+      {selectedImport && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/55 px-3 py-6 backdrop-blur-sm sm:px-6">
+          <div className="my-auto w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">Import transparency</div>
+                <h2 className="mt-1 truncate text-xl font-semibold text-slate-950">{selectedImport.filename}</h2>
+                <div className="mt-1 text-sm text-slate-500">
+                  Imported at: {formatDateTime(selectedImport.created_at)} · Imported by: {selectedImport.uploaded_by_email || '—'} · Type: {selectedImport.import_type?.replace(/_/g, ' ') || 'full list'} · Status: {selectedImport.status}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeImportViewer}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+                aria-label="Close import transparency"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="max-h-[78vh] overflow-y-auto p-4 sm:p-5">
+              <ImportReviewPanel
+                selectedImport={selectedImport}
+                viewerTab={viewerTab}
+                setViewerTab={(tab) => {
+                  setViewerTab(tab);
+                  setViewerPage(1);
+                }}
+                viewerSearch={viewerSearch}
+                setViewerSearch={setViewerSearch}
+                submitSearch={() => {
+                  setSubmittedViewerSearch(viewerSearch.trim());
+                  setViewerPage(1);
+                }}
+                viewerVillage={viewerVillage}
+                setViewerVillage={(value) => {
+                  setViewerVillage(value);
+                  setViewerPage(1);
+                }}
+                changeType={changeType}
+                setChangeType={(value) => {
+                  setChangeType(value);
+                  setViewerPage(1);
+                }}
+                skippedStatus={skippedStatus}
+                setSkippedStatus={(value) => {
+                  setSkippedStatus(value);
+                  setViewerPage(1);
+                }}
+                viewerPage={viewerPage}
+                setViewerPage={setViewerPage}
+                dataQuery={importDataQuery}
+                changesQuery={importChangesQuery}
+                skippedRowsQuery={importSkippedRowsQuery}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </WorkspacePage>
   );
 }
@@ -1313,7 +1384,7 @@ function ImportReviewPanel({
   const activePagination = viewerTab === 'data' ? dataPagination : viewerTab === 'changes' ? changePagination : skippedPagination;
 
   return (
-    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3">
       <div className="flex flex-col gap-3 border-b border-slate-100 pb-3">
         <div>
           <div className="text-sm font-semibold text-slate-950">Import transparency</div>

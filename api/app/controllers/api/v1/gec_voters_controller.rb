@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "base64"
+
 module Api
   module V1
     class GecVotersController < ApplicationController
@@ -244,7 +246,7 @@ module Api
         gec_import = GecImport.includes(:uploaded_by_user).find_by(id: params[:id])
         return render_api_error(message: "Import not found", status: :not_found, code: "not_found") unless gec_import
 
-        unless gec_import.import_artifact_available?
+        unless gec_import.import_artifact_available? || gec_import.change_records.exists?
           return render_api_error(message: "Parsed import data is not available for this import", status: :not_found, code: "parsed_data_not_available")
         end
 
@@ -440,6 +442,17 @@ module Api
 
         unless gec_import.downloadable_file_available?
           return render_api_error(message: "Download file is not available for this import", status: :not_found, code: "file_not_available")
+        end
+
+        if local_artifact_key?(gec_import.downloadable_file_key)
+          artifact_data = read_local_artifact(gec_import.downloadable_file_key)
+          return render_api_error(message: "Download file is not available for this import", status: :not_found, code: "file_not_available") unless artifact_data
+
+          return render json: {
+            filename: gec_import.downloadable_filename || "gec_import_#{gec_import.id}",
+            content_type: gec_import.downloadable_content_type || "application/octet-stream",
+            download_data_base64: Base64.strict_encode64(artifact_data)
+          }
         end
 
         download_url = S3Service.presigned_url(
@@ -889,7 +902,7 @@ module Api
       end
 
       def build_existing_import_preview(gec_import, page:, per_page:, q:, village:)
-        dataset = fetch_cached_import_viewer_dataset(gec_import)
+        dataset = fetch_cached_import_viewer_dataset(gec_import) || build_import_change_fallback_dataset(gec_import)
         return nil unless dataset
 
         filtered_rows = apply_import_view_filters(
@@ -962,8 +975,42 @@ module Api
         dataset["row_count"].to_i <= import_viewer_cache_row_limit
       end
 
+      def build_import_change_fallback_dataset(gec_import)
+        rows = gec_import.change_records.order(Arel.sql("COALESCE(row_number, 2147483647) ASC"), :id).map do |change|
+          details = change.details || {}
+          {
+            "name" => NameParser.combine(
+              first_name: change.first_name,
+              middle_name: change.middle_name,
+              last_name: change.last_name,
+              format: :last_comma_first
+            ),
+            "first_name" => change.first_name,
+            "middle_name" => change.middle_name,
+            "last_name" => change.last_name,
+            "address" => details["address"] || details["street_address"],
+            "village_name" => change.village_name,
+            "previous_village_name" => change.previous_village_name,
+            "precinct_number" => details["precinct_number"] || details["precinct"],
+            "birth_year" => change.birth_year,
+            "dob" => change.dob,
+            "voter_registration_number" => change.voter_registration_number,
+            "change_type" => change.change_type,
+            "row_number" => change.row_number
+          }
+        end
+
+        {
+          "source_type" => "change_fallback",
+          "row_count" => rows.length,
+          "rows" => rows,
+          "available_villages" => rows.map { |row| row["village_name"] }.compact.uniq.sort,
+          "warnings" => [ "Original import artifact is unavailable, so this view is reconstructed from recorded import changes." ]
+        }
+      end
+
       def build_import_viewer_dataset(gec_import)
-        artifact_data = S3Service.download(gec_import.original_file_s3_key)
+        artifact_data = import_artifact_data(gec_import)
         return nil unless artifact_data
 
         filename = gec_import.original_filename.presence || gec_import.filename
@@ -1049,9 +1096,9 @@ module Api
         if q.present?
           query = q.downcase.strip
           searchable_fields = if source_type == "pdf"
-            %w[name village precinct_number birth_year voter_registration_number]
+            %w[name address village precinct_number birth_year voter_registration_number]
           else
-            %w[first_name middle_name last_name village_name village precinct_number birth_year dob voter_registration_number]
+            %w[name first_name middle_name last_name address village_name village precinct_number birth_year dob voter_registration_number]
           end
           filtered = filtered.select do |row|
             searchable_fields.any? { |field| row[field].to_s.downcase.include?(query) }
@@ -1059,6 +1106,27 @@ module Api
         end
 
         filtered
+      end
+
+      def import_artifact_data(gec_import)
+        key = gec_import.original_file_s3_key.to_s
+        return nil if key.blank?
+
+        local_artifact_key?(key) ? read_local_artifact(key) : S3Service.download(key)
+      end
+
+      def local_artifact_key?(key)
+        key.to_s.start_with?("local://")
+      end
+
+      def read_local_artifact(key)
+        relative_path = key.to_s.delete_prefix("local://")
+        root = Rails.root.join("tmp", "gec_import_artifacts").expand_path
+        path = Rails.root.join(relative_path).expand_path
+        return nil unless path.to_s.start_with?("#{root}/")
+        return nil unless File.file?(path)
+
+        File.binread(path)
       end
 
       def voter_json(voter, linked_contact_count: nil)
