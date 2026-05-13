@@ -73,7 +73,7 @@ export default function HouseholdsPage() {
             <Home className="h-3.5 w-3.5" />
             Address workspace
           </div>
-          <h1 className="text-2xl font-bold text-slate-950">Households</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Households</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
             Search an address to see who appears there in the public GEC voter file and which DPG contacts are already connected to that household.
           </p>

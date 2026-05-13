@@ -44,9 +44,18 @@ Rails.application.routes.draw do
           get :stats
           get :households
           get :imports
+          get :preview_status
           post :preview
           post :upload
           post "imports/:id/activate", action: :activate_import
+          get "imports/:id/view_data", action: :view_import_data
+          get "imports/:id/changes", action: :view_import_changes
+          get "imports/:id/skipped_rows", action: :view_import_skipped_rows
+          post "imports/:id/skipped_rows/:skipped_row_id/preview_resolution", action: :preview_skipped_row_resolution
+          post "imports/:id/skipped_rows/:skipped_row_id/resolve", action: :resolve_skipped_row
+          post "imports/:id/skipped_rows/:skipped_row_id/dismiss", action: :dismiss_skipped_row
+          get "imports/:id/view_original", action: :view_original
+          get "imports/:id/download", action: :download_import
         end
 
         member do

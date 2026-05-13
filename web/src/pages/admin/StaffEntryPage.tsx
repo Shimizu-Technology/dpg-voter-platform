@@ -202,7 +202,7 @@ export default function StaffEntryPage() {
       {/* Header */}
       <div>
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Staff Entry Form</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Staff Entry Form</h1>
           <div className="flex items-center gap-2">
             {successCount > 0 && (
               <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">

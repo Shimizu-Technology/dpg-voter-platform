@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_11_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_13_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -197,10 +197,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_11_100000) do
   create_table "gec_import_uploads", force: :cascade do |t|
     t.string "content_type"
     t.datetime "created_at", null: false
-    t.binary "file_data", null: false
+    t.binary "file_data"
+    t.string "file_s3_key"
     t.string "filename", null: false
     t.bigint "gec_import_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["file_s3_key"], name: "index_gec_import_uploads_on_file_s3_key"
     t.index ["gec_import_id"], name: "index_gec_import_uploads_on_gec_import_id", unique: true
   end
 

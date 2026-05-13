@@ -1,104 +1,171 @@
-# DPG Deployment Checklist
+# DPG Deployment And QA Checklist
 
-**Last updated:** May 11, 2026
-**Current verified commit:** `8c8623a Merge pull request #25 from Shimizu-Technology/hotfix/bootstrap-admin-auth`
+**Last updated:** May 12, 2026  
+**Current verified commit:** `547c4c7` - merged Phase 5 communications governance
 
-## Isolation requirements
+## Current deployment status
+
+The DPG app has been deployed online. This checklist now tracks what must be confirmed on the deployed environment before the app is treated as production-ready for broad DPG staff use.
+
+The main remaining risk is not missing code for the current foundation. It is that most admin-side flows have not yet been thoroughly tested in a real deployed browser session with DPG auth, DPG database, DPG URLs, and DPG provider credentials.
+
+## Environment isolation
 
 - [x] GitHub repository is DPG-specific: `Shimizu-Technology/dpg-voter-platform`.
+- [ ] Deployed backend service is confirmed DPG-specific and does not reuse the Josh/Tina service.
+- [ ] Deployed frontend service is confirmed DPG-specific and does not reuse the Josh/Tina site.
 - [ ] Backend service uses a DPG-specific `DATABASE_URL`.
-- [ ] Backend service uses a DPG-specific `DIRECT_DATABASE_URL` for migration/pre-deploy commands, matching the campaign-tracker production pattern.
-- [ ] Render web service is DPG-specific and does not reuse the Josh/Tina service.
-- [ ] Render worker service is DPG-specific if background jobs are run separately (`bundle exec bin/jobs`).
-- [ ] `CACHE_DATABASE_URL` and `QUEUE_DATABASE_URL` are either DPG-specific Neon URLs or intentionally blank to share the DPG `DATABASE_URL`.
-- [ ] `SECRET_KEY_BASE` is set on the Render web service and worker.
-- [ ] `REDIS_URL` is blank for the simple Monday deploy, or points to DPG-specific Redis if shared realtime is needed.
-- [ ] Frontend service uses a DPG-specific Clerk publishable key.
-- [ ] Backend service uses a DPG-specific Clerk secret key.
-- [ ] Netlify deploy uses a DPG-specific `NETLIFY_SITE_ID`.
+- [ ] Backend service uses a DPG-specific `DIRECT_DATABASE_URL` for migration/pre-deploy commands.
+- [ ] Render worker service is DPG-specific if background jobs run separately.
+- [ ] `CACHE_DATABASE_URL` and `QUEUE_DATABASE_URL` are DPG-specific or intentionally blank to share the DPG `DATABASE_URL`.
+- [ ] `SECRET_KEY_BASE` is set on backend web and worker services.
+- [ ] `REDIS_URL` is blank for simple deploy or points to DPG-specific Redis if realtime is enabled.
+- [ ] Frontend uses a DPG-specific Clerk publishable key.
+- [ ] Backend uses a DPG-specific Clerk secret key.
+- [ ] Netlify deploy uses the DPG-specific `NETLIFY_SITE_ID`.
 - [ ] `FRONTEND_URL` points to the DPG frontend domain/subdomain.
 - [ ] `ALLOWED_ORIGINS` includes only the DPG frontend domain(s).
-- [ ] SMS/email sender settings are DPG-specific or explicitly approved shared infrastructure.
-- [ ] `DPG_LIVE_OUTREACH_ENABLED=true` on the intended DPG environment after confirming DPG sender/email/text credentials are present.
-- [ ] Dry-run/preview is used for normal smoke testing; real sends are limited to controlled DPG-approved recipients/content.
-- [ ] Backups are configured for the DPG database before Monday testing.
+- [ ] SMS sender settings are DPG-specific or explicitly approved shared infrastructure.
+- [ ] Email sender/domain settings are DPG-specific or explicitly approved shared infrastructure.
+- [ ] `DPG_LIVE_OUTREACH_ENABLED=true` is set only on the intended DPG environment after confirming SMS/email credentials.
+- [ ] Database backups are configured before DPG enters real data.
 
-## Pre-deploy verification
+## Domain status
 
-Verified locally after latest cleanup:
+- [ ] Current deployed URL/domain is documented.
+- [ ] Confirm whether DPG wants to use an existing domain or a purchased domain.
+- [ ] Once selected, configure the proper DPG domain and update `FRONTEND_URL`, `ALLOWED_ORIGINS`, Clerk allowed origins/redirects, and email links if needed.
+- [ ] Keep the temporary/free deploy domain only as a staging/fallback URL after the official domain is active.
 
-- [x] `cd web && npm run lint -- --max-warnings=0` passed May 11.
-- [x] `cd web && npm run build` passed May 11. Local Node is 22.0.0, so Vite emitted a version warning; use Node 22.12+ or 20.19+ for clean local/deploy logs.
-- [x] `cd api && eval "$(rbenv init - zsh)" && bundle exec rails test` passed May 11: 173 runs, 636 assertions, 0 failures.
-- [x] Ruby environment confirmed with rbenv Ruby 3.3.7 and Bundler 4.0.5.
-- [x] Render pre-deploy command uses `DATABASE_URL=$DIRECT_DATABASE_URL bundle exec rails db:migrate:primary` only after `DIRECT_DATABASE_URL` is set.
-- [x] Background worker recurring tasks only reference classes that exist in the DPG build.
-- [x] Source scan has no active Josh/Tina/quota/war-room/poll-watcher/yard-sign/motorcade routes or Monday-facing UI.
-- [x] Built `web/dist` was regenerated May 11 after the production build.
-- [x] Rails route scan has no deferred election-day/proprietary modules. Only duplicate-review `scan_duplicates` remains, which is expected.
+## CI and source verification
+
+Latest merged Phase 5 PR passed:
+
+- [x] `api_lint`
+- [x] `api_scan_ruby`
+- [x] `api_test`
+- [x] `web_lint_build`
+- [x] Greptile review
+
+Latest local backend verification during Phase 5 review:
+
+- [x] Rails tests passed: `197 runs, 748 assertions, 0 failures`.
+- [x] RuboCop passed: `194 files inspected, no offenses`.
+- [x] Bundler audit passed: no vulnerabilities.
 
 Local repo note:
 
-- [ ] Resolve untracked root `package-lock.json` before committing/deploy handoff.
+- [ ] Resolve or intentionally ignore the untracked root `package-lock.json` before the next commit/handoff.
 
-## Starter testing scope
+## Deployed public smoke test
 
-Already smoke-tested locally:
+- [ ] Public landing page loads on deployed URL.
+- [ ] DPG branding/logo/copy render correctly.
+- [ ] Public signup page loads.
+- [ ] Public signup submits a test contact.
+- [ ] Thank-you page renders with DPG copy.
+- [ ] Submitted public signup appears in Contacts.
+- [ ] Submitted public signup appears in Intake / `new_intake`.
+- [ ] Submitted public signup does not count as official supporter/member until classified.
 
-- [x] Public signup submits a supporter/contact.
-- [x] Thank-you page renders after signup.
-- [x] Staff/admin sign-in screens render locally after Clerk loads; authenticated admin workflows are covered by integration/API tests unless a real Clerk login is available.
-- [x] Supporter/contact list loads.
-- [x] Supporter/contact detail loads.
-- [x] Supporter search works by name, phone, email, and street address.
-- [x] Manual entry works.
-- [x] Staff-entered supporters appear in search/list.
-- [x] Import confirm works through authenticated API with a small test CSV.
-- [x] Duplicate review API/page loads.
-- [x] Reports API and supporter summary preview load.
-- [x] Users/roles screen/API loads.
-- [x] Audit logs load.
-- [x] SMS/email pages render safely.
-- [x] SMS/email dry-run works.
-- [x] Live SMS/email provider setup is present; dry-run/preview remains available for safe validation.
+## Deployed admin smoke test
 
-Still needs staging verification:
+These are the highest priority because the admin side has not yet been thoroughly browser-tested on the deployed environment.
 
-- [ ] Public landing page loads with DPG branding on deployed frontend.
-- [ ] Public signup submits a supporter/contact on staging.
 - [ ] Admin login works with DPG Clerk app.
-- [ ] Manual entry works on staging.
-- [ ] Browser UI import upload/preview/confirm works on staging.
-- [ ] Duplicate review works on staging.
-- [ ] Reports/export downloads from staging.
-- [ ] Users/roles mutations work with DPG Clerk users.
-- [ ] Audit logs capture staging actions.
-- [ ] SMS/email settings render safely on staging.
-- [ ] Live outreach is enabled only on the intended DPG environment and tested with controlled recipients before any broader blast.
+- [ ] Admin dashboard loads.
+- [ ] Contacts list loads.
+- [ ] Intake filter loads.
+- [ ] Contact detail loads.
+- [ ] Contact classification update saves and persists.
+- [ ] Contact voter-help/support fields save and persist.
+- [ ] Contact History timeline loads.
+- [ ] Manual contact-attempt logging works.
+- [ ] Manual Entry creates a DPG contact.
+- [ ] Search/filter works by name, phone, email, village, precinct, and address text.
+- [ ] Duplicate review page loads.
+- [ ] Duplicate scan works on a small safe test set.
+- [ ] Reports page loads.
+- [ ] Reports preview works.
+- [ ] Reports/export download works.
+- [ ] Users page loads.
+- [ ] User create/update works for a test staff user.
+- [ ] Audit logs record deployed admin actions.
+
+## Deployed import QA
+
+- [ ] Contact import page loads.
+- [ ] Small CSV/Excel contact import preview works.
+- [ ] Import column mapping/parse works.
+- [ ] Import confirm creates DPG contacts.
+- [ ] Imported contacts default to `new_intake`.
+- [ ] Imported contacts are searchable.
+- [ ] Imported contacts appear in Intake until classified.
+
+## Deployed GEC voter workspace QA
+
+- [ ] GEC Voters page loads.
+- [ ] GEC stats load.
+- [ ] GEC import history loads.
+- [ ] GEC import preview works with a small safe file.
+- [ ] GEC upload works with a controlled test file.
+- [ ] GEC import activation works only for intended imports.
+- [ ] GEC search works by name.
+- [ ] GEC search works by address.
+- [ ] GEC search works by village/precinct.
+- [ ] Create DPG contact from GEC voter works.
+- [ ] Link existing DPG contact to GEC voter works.
+- [ ] Linked contact appears correctly from GEC and contact detail views.
+
+## Deployed household/outreach QA
+
+- [ ] Households page loads.
+- [ ] Address search returns GEC voters.
+- [ ] Address search returns DPG contacts.
+- [ ] Household view distinguishes GEC voters and DPG contacts.
+- [ ] Follow-Up Queue loads.
+- [ ] Latest contact attempt appears on queue cards.
+- [ ] Queue-card call/SMS/in-person logging works.
+- [ ] Queue-card logging updates the contact detail timeline.
+
+## Deployed SMS/email QA
+
+- [ ] SMS status page/API loads.
+- [ ] SMS settings page loads.
+- [ ] SMS blast page loads.
+- [ ] SMS starter templates populate the message box.
+- [ ] SMS dry-run returns recipient count and sample recipients.
+- [ ] SMS live send is blocked unless recipient review/count confirmation is present.
+- [ ] Controlled single-recipient SMS live test succeeds only when DPG approves.
+- [ ] Email status page/API loads.
+- [ ] Email blast page loads.
+- [ ] Email starter templates populate subject/body.
+- [ ] Email dry-run returns recipient count and sample recipients.
+- [ ] Email live send is blocked unless recipient review/count confirmation is present.
+- [ ] Controlled single-recipient email live test succeeds only when DPG approves.
+- [ ] SMS/email blast attempts appear in Contact History.
 
 ## Handoff notes
 
 - This is the DPG voter engagement platform, built from Shimizu Technology's reusable foundation.
 - It excludes other campaign branding, data, operating playbooks, and proprietary campaign-specific workflows.
-- The proper next step is the DPG workflow reset in `docs/dpg-product-blueprint.md`.
-- GEC voter-list import/search is core public voter-file infrastructure and should be restored/built as a first-class DPG workspace.
-- Public signups should be visible contacts, but the final workflow should classify them through Intake before counting them as supporters/members.
-- Starter testing should be framed as testing the voter engagement/admin foundation, not as a finished DPG workflow or election-day command center.
-- Auntie Stephanie should be created as `campaign_admin` after she provides the email she wants to use.
+- DPG can begin guided familiarization once admin access is created.
+- Do not describe the app as a finished Election Day command center yet.
+- Live outreach is configured/gated, but real sends should only happen intentionally with approved recipients/content.
+- Auntie Stephanie should be created as `campaign_admin` using her preferred email until DPG role names are polished.
 
 ## Known deferred modules
 
-- Visible DPG Intake queue and classification workflow.
-- One internal DPG workspace replacing the Admin/Data Ops split.
-- GEC voter-list workspace: import, search, address lookup, and contact matching.
-- DPG membership-vs-GEC automation.
-- Household/address canvassing workflow.
-- Structured contact attempts by method/outcome.
+- Explicit DPG list types: DPG members, registered Democrat list, contacts/supporters, other/custom.
+- DPG membership/supporter roster vs GEC cross-reference reports.
+- DPG role-name cleanup and stricter export/delete permission rules.
+- QR download/share/attribution workflow.
 - Support/lean/donation tracking.
-- Precinct/village/district-scoped permissions beyond the current role foundation.
+- DPG-defined district grouping.
+- Advanced canvassing route/assignment tooling.
 - Poll watcher workflow.
 - Real-time voted/not-voted tracking.
-- War-room dashboard.
+- War-room/turnout dashboard.
 - GIS/maps/heatmaps.
 - ID/photo/OCR scanning.
 - Autodialer integration.
