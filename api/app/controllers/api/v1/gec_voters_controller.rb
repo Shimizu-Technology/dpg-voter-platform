@@ -43,10 +43,13 @@ module Api
         per_page = [ [ params.fetch(:per_page, 50).to_i, 1 ].max, 200 ].min
         total = scope.count
         voters = scope.offset((page - 1) * per_page).limit(per_page).to_a
-        linked_contact_counts = Supporter.contacts.where(gec_voter_id: voters.map(&:id)).group(:gec_voter_id).count
+        linked_contacts_by_voter = linked_contacts_by_voter(voters.map(&:id))
 
         render json: {
-          gec_voters: voters.map { |voter| voter_json(voter, linked_contact_count: linked_contact_counts[voter.id].to_i) },
+          gec_voters: voters.map do |voter|
+            linked_contacts = linked_contacts_by_voter[voter.id] || []
+            voter_json(voter, linked_contact_count: linked_contacts.size, linked_contact: linked_contacts.first)
+          end,
           pagination: {
             page: page,
             per_page: per_page,
@@ -89,7 +92,7 @@ module Api
           .order(:village_name, :address, :last_name, :first_name)
           .limit(250)
           .to_a
-        linked_contact_counts = Supporter.contacts.where(gec_voter_id: voters.map(&:id)).group(:gec_voter_id).count
+        linked_contacts_by_voter = linked_contacts_by_voter(voters.map(&:id))
 
         contacts = scope_supporters(Supporter.contacts.includes(:village, :precinct, :gec_voter))
           .where("LOWER(supporters.street_address) LIKE ?", "%#{ActiveRecord::Base.sanitize_sql_like(query.downcase)}%")
@@ -98,7 +101,7 @@ module Api
           .to_a
 
         render json: {
-          households: build_households(voters, contacts, linked_contact_counts: linked_contact_counts),
+          households: build_households(voters, contacts, linked_contacts_by_voter: linked_contacts_by_voter),
           voter_count: voters.length,
           contact_count: contacts.length
         }
@@ -695,15 +698,16 @@ module Api
         end
       end
 
-      def build_households(voters, contacts, linked_contact_counts: {})
+      def build_households(voters, contacts, linked_contacts_by_voter: {})
         grouped = {}
 
         voters.each do |voter|
           key = household_key(voter.address, voter.village_name)
           next if key.blank?
 
+          linked_contacts = linked_contacts_by_voter[voter.id] || []
           grouped[key] ||= household_json(voter.address, voter.village_name)
-          grouped[key][:gec_voters] << voter_json(voter, linked_contact_count: linked_contact_counts[voter.id].to_i)
+          grouped[key][:gec_voters] << voter_json(voter, linked_contact_count: linked_contacts.size, linked_contact: linked_contacts.first)
         end
 
         contacts.each do |contact|
@@ -1202,7 +1206,17 @@ module Api
         File.binread(path)
       end
 
-      def voter_json(voter, linked_contact_count: nil)
+      def linked_contacts_by_voter(voter_ids)
+        ids = Array(voter_ids).compact
+        return {} if ids.empty?
+
+        Supporter.contacts
+          .where(gec_voter_id: ids)
+          .order(:id)
+          .group_by(&:gec_voter_id)
+      end
+
+      def voter_json(voter, linked_contact_count: nil, linked_contact: nil)
         voter.as_json(
           only: [
             :id, :first_name, :middle_name, :last_name, :dob, :birth_year, :address,
@@ -1212,7 +1226,8 @@ module Api
           ]
         ).merge(
           precinct_label: voter.precinct&.number,
-          linked_contact_count: linked_contact_count || Supporter.contacts.where(gec_voter_id: voter.id).count
+          linked_contact_count: linked_contact_count || Supporter.contacts.where(gec_voter_id: voter.id).count,
+          linked_contact: linked_contact && supporter_json(linked_contact)
         )
       end
 

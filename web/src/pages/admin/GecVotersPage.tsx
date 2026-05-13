@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   ChevronDown,
@@ -53,6 +54,7 @@ type GecVoter = {
   voter_registration_number?: string | null;
   gec_list_date: string;
   linked_contact_count?: number;
+  linked_contact?: ContactResult | null;
 };
 
 type Household = {
@@ -226,6 +228,11 @@ function getErrorMessage(error: unknown) {
 
 function fullName(voter: Pick<GecVoter, 'first_name' | 'middle_name' | 'last_name'>) {
   return [voter.first_name, voter.middle_name, voter.last_name].filter(Boolean).join(' ');
+}
+
+function contactClassificationLabel(value?: string | null) {
+  if (!value) return 'DPG contact';
+  return value.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
 }
 
 function formatDate(value?: string | null) {
@@ -1229,9 +1236,13 @@ export default function GecVotersPage() {
                   <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">Loading voters...</td></tr>
                 ) : voters.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">No GEC voters found</td></tr>
-                ) : voters.map((voter) => (
-                  <Fragment key={voter.id}>
-                    <tr className="align-top">
+                ) : voters.map((voter) => {
+                  const linkedContact = voter.linked_contact;
+                  const isLinked = Boolean(voter.linked_contact_count);
+
+                  return (
+                    <Fragment key={voter.id}>
+                    <tr className={`align-top ${isLinked ? 'bg-green-50/45' : ''}`}>
                       <td className="px-4 py-3">
                         <div className="font-semibold text-slate-950">{fullName(voter)}</div>
                         <div className="text-xs text-slate-500">{voter.voter_registration_number || 'No voter number'}{voter.birth_year ? ` · Born ${voter.birth_year}` : ''}</div>
@@ -1239,33 +1250,68 @@ export default function GecVotersPage() {
                       <td className="px-4 py-3 text-slate-600">{voter.address || '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{voter.village_name}</td>
                       <td className="px-4 py-3 text-slate-600">{voter.precinct_number || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {voter.linked_contact_count ? `${voter.linked_contact_count} linked` : 'Not linked'}
+                      <td className="px-4 py-3">
+                        {isLinked ? (
+                          <div className="space-y-1">
+                            <span className="inline-flex w-fit items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                              DPG contact
+                            </span>
+                            {linkedContact && (
+                              <Link
+                                to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                className="block text-xs font-semibold text-primary hover:underline"
+                              >
+                                {linkedContact.print_name || `${linkedContact.first_name} ${linkedContact.last_name}`}
+                              </Link>
+                            )}
+                            <div className="text-xs text-slate-500">
+                              {linkedContact ? contactClassificationLabel(linkedContact.contact_classification) : `${voter.linked_contact_count} linked`}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-500">Not linked</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex flex-col items-end gap-2">
-                          <button
-                            type="button"
-                            disabled={createContactMutation.isPending}
-                            onClick={() => createContactMutation.mutate(voter.id)}
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            <LinkIcon className="h-4 w-4" />
-                            Create Contact
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextId = linkVoterId === voter.id ? null : voter.id;
-                              setLinkVoterId(nextId);
-                              setContactSearch('');
-                              setSubmittedContactSearch('');
-                            }}
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                          >
-                            <Users className="h-4 w-4" />
-                            Link Existing
-                          </button>
+                          {isLinked ? (
+                            linkedContact ? (
+                              <Link
+                                to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-green-200 bg-white px-3 text-xs font-semibold text-green-800 hover:bg-green-50"
+                              >
+                                <Eye className="h-4 w-4" />
+                                Open Contact
+                              </Link>
+                            ) : (
+                              <span className="rounded-xl bg-green-50 px-3 py-2 text-xs font-semibold text-green-800">Already linked</span>
+                            )
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                disabled={createContactMutation.isPending}
+                                onClick={() => createContactMutation.mutate(voter.id)}
+                                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                <LinkIcon className="h-4 w-4" />
+                                Create Contact
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextId = linkVoterId === voter.id ? null : voter.id;
+                                  setLinkVoterId(nextId);
+                                  setContactSearch('');
+                                  setSubmittedContactSearch('');
+                                }}
+                                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              >
+                                <Users className="h-4 w-4" />
+                                Link Existing
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1318,8 +1364,9 @@ export default function GecVotersPage() {
                         </td>
                       </tr>
                     )}
-                  </Fragment>
-                ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1440,39 +1487,64 @@ export default function GecVotersPage() {
                       </div>
                     )}
                     <div className="mt-3 space-y-2">
-                      {visibleVoters.map((voter) => (
-                        <div key={voter.id} className="rounded-lg border border-slate-100 bg-white p-2">
+                      {visibleVoters.map((voter) => {
+                        const linkedContact = voter.linked_contact;
+                        const isLinked = Boolean(voter.linked_contact_count);
+
+                        return (
+                        <div key={voter.id} className={`rounded-lg border p-2 ${isLinked ? 'border-green-100 bg-green-50/50' : 'border-slate-100 bg-white'}`}>
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
-                              <div className="font-semibold text-slate-800">{fullName(voter)}</div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-semibold text-slate-800">{fullName(voter)}</span>
+                                {isLinked && (
+                                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">DPG contact</span>
+                                )}
+                              </div>
                               <div className="text-xs text-slate-500">
                                 {[voter.voter_registration_number, voter.birth_year ? `Born ${voter.birth_year}` : null, voter.precinct_number ? `Pct ${voter.precinct_number}` : null].filter(Boolean).join(' · ')}
                               </div>
                             </div>
                             <div className="flex shrink-0 flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => createContactMutation.mutate(voter.id)}
-                                disabled={createContactMutation.isPending || Boolean(voter.linked_contact_count)}
-                                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
-                              >
-                                <Users className="h-3.5 w-3.5" />
-                                {voter.linked_contact_count ? 'Linked' : 'Create'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const nextVoterId = linkVoterId === voter.id ? null : voter.id;
-                                  setLinkVoterId(nextVoterId);
-                                  setContactSearch(nextVoterId ? fullName(voter) : '');
-                                  setSubmittedContactSearch('');
-                                }}
-                                disabled={linkContactMutation.isPending || Boolean(voter.linked_contact_count)}
-                                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
-                              >
-                                <LinkIcon className="h-3.5 w-3.5" />
-                                Link
-                              </button>
+                              {isLinked ? (
+                                linkedContact ? (
+                                  <Link
+                                    to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-green-200 bg-white px-2.5 text-xs font-semibold text-green-800 hover:bg-green-50"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    Open
+                                  </Link>
+                                ) : (
+                                  <span className="inline-flex min-h-9 items-center rounded-lg bg-green-100 px-2.5 text-xs font-semibold text-green-800">Linked</span>
+                                )
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => createContactMutation.mutate(voter.id)}
+                                    disabled={createContactMutation.isPending}
+                                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                                  >
+                                    <Users className="h-3.5 w-3.5" />
+                                    Create
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextVoterId = linkVoterId === voter.id ? null : voter.id;
+                                      setLinkVoterId(nextVoterId);
+                                      setContactSearch(nextVoterId ? fullName(voter) : '');
+                                      setSubmittedContactSearch('');
+                                    }}
+                                    disabled={linkContactMutation.isPending}
+                                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                                  >
+                                    <LinkIcon className="h-3.5 w-3.5" />
+                                    Link
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                           {linkVoterId === voter.id && (
@@ -1520,7 +1592,8 @@ export default function GecVotersPage() {
                             </div>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                       {household.gec_voters.length > 8 && (
                         <button
                           type="button"

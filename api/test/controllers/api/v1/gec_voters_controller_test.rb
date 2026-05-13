@@ -79,6 +79,9 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     payload = JSON.parse(response.body)
     assert_equal [ @voter.id ], payload["gec_voters"].map { |row| row["id"] }
+    assert_equal 1, payload["gec_voters"].first["linked_contact_count"]
+    assert_equal contact.id, payload["gec_voters"].first.dig("linked_contact", "id")
+    assert_equal "supporter", payload["gec_voters"].first.dig("linked_contact", "contact_classification")
   end
 
   test "households groups GEC voters and DPG contacts at an address" do

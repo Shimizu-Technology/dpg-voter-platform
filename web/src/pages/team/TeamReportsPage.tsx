@@ -5,6 +5,7 @@ import { captureAnalyticsEvent } from '../../lib/analytics';
 import {
   FileSpreadsheet,
   Download,
+  Database,
   Users,
   UserX,
   ArrowRightLeft,
@@ -14,6 +15,8 @@ import {
   CheckCircle,
   Loader2,
   Eye,
+  Link2,
+  SearchCheck,
 } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
 
@@ -24,6 +27,10 @@ const reportIcons: Record<string, React.ComponentType<{ className?: string }>> =
   referral_list: GitBranch,
   mapping_issues_list: AlertTriangle,
   supporter_summary: BarChart3,
+  dpg_contacts_linked_to_gec: Link2,
+  dpg_contacts_unlinked_from_gec: UserX,
+  gec_voters_not_in_dpg: Database,
+  possible_gec_matches: SearchCheck,
 };
 
 const reportDescriptions: Record<string, string> = {
@@ -33,9 +40,19 @@ const reportDescriptions: Record<string, string> = {
   referral_list: 'Official supporters submitted under one village but matched to a different GEC village. Shows submitted village versus actual registration.',
   mapping_issues_list: 'GEC voters whose latest village could not be mapped cleanly to an official village. Shows previous village, current mapping, and latest list date.',
   supporter_summary: 'Per-village supporter summary with approved counts, GEC matches, pending public signups, and review status.',
+  dpg_contacts_linked_to_gec: 'DPG contacts already connected to public GEC voter records. Use this to understand how much of the contact file is voter-file matched.',
+  dpg_contacts_unlinked_from_gec: 'DPG contacts that do not yet have a linked GEC voter record. Use this for registration follow-up and manual matching work.',
+  gec_voters_not_in_dpg: 'Current public GEC voters with no linked DPG contact. Use this to find outreach gaps by village or precinct.',
+  possible_gec_matches: 'Flagged DPG contacts with possible GEC matches that need manual review before they should be treated as linked.',
 };
 
-const SUPPORTER_REPORT_TYPES = new Set(['support_list', 'referral_list']);
+const SUPPORTER_REPORT_TYPES = new Set([
+  'support_list',
+  'referral_list',
+  'dpg_contacts_linked_to_gec',
+  'dpg_contacts_unlinked_from_gec',
+  'possible_gec_matches',
+]);
 
 export default function TeamReportsPage() {
   const [selectedReport, setSelectedReport] = useState<string>('support_list');
@@ -111,9 +128,12 @@ export default function TeamReportsPage() {
 
       {/* Quick Stats */}
       {quickStats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-10 gap-3">
           <MiniStat label="Official Supporters" value={quickStats.official_supporters ?? quickStats.total_active} />
           <MiniStat label="Matched To Voter List" value={quickStats.matched_to_gec ?? quickStats.total_verified} />
+          <MiniStat label="Unlinked Contacts" value={quickStats.dpg_contacts_unlinked_from_gec ?? 0} />
+          <MiniStat label="GEC Outreach Gaps" value={quickStats.gec_voters_not_in_dpg ?? 0} />
+          <MiniStat label="Possible Matches" value={quickStats.possible_gec_matches ?? 0} />
           <MiniStat label="Village Changes" value={quickStats.transfer_list_size ?? quickStats.transfers} />
           <MiniStat label="Referral List Size" value={quickStats.referral_list_size ?? 0} />
           <MiniStat label="Mapping Issues" value={quickStats.mapping_issues_list_size ?? 0} />

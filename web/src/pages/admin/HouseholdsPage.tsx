@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Database, Home, MapPin, Search, Users } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, CheckCircle2, Database, Home, Link as LinkIcon, MapPin, Search, Users } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
-import { getGecHouseholds } from '../../lib/api';
+import { createContactFromGecVoter, getGecHouseholds, getSupporters, linkContactToGecVoter } from '../../lib/api';
 import {
   contactClassificationChipClass,
   contactClassificationLabel,
@@ -43,6 +43,17 @@ type Household = {
   contacts: HouseholdContact[];
 };
 
+type ContactResult = {
+  id: number;
+  print_name?: string | null;
+  first_name: string;
+  last_name: string;
+  contact_number?: string | null;
+  email?: string | null;
+  street_address?: string | null;
+  village_name?: string | null;
+};
+
 function fullName(person: Pick<GecVoter | HouseholdContact, 'first_name' | 'middle_name' | 'last_name'>) {
   return [person.first_name, person.middle_name, person.last_name].filter(Boolean).join(' ');
 }
@@ -51,9 +62,24 @@ function voterLabel(voter: GecVoter) {
   return [voter.precinct_number ? `Pct ${voter.precinct_number}` : null, voter.voter_registration_number].filter(Boolean).join(' · ') || 'GEC voter';
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
+    return response?.data?.message || response?.data?.error || 'The request failed.';
+  }
+  return 'The request failed.';
+}
+
 export default function HouseholdsPage() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState('');
+  const [linkVoterId, setLinkVoterId] = useState<number | null>(null);
+  const [contactSearch, setContactSearch] = useState('');
+  const [submittedContactSearch, setSubmittedContactSearch] = useState('');
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const householdsQuery = useQuery({
     queryKey: ['households-workspace', submittedSearch],
@@ -64,6 +90,51 @@ export default function HouseholdsPage() {
   const households = useMemo<Household[]>(() => householdsQuery.data?.households ?? [], [householdsQuery.data]);
   const voterCount = householdsQuery.data?.voter_count ?? households.reduce((sum, household) => sum + household.gec_voters.length, 0);
   const contactCount = householdsQuery.data?.contact_count ?? households.reduce((sum, household) => sum + household.contacts.length, 0);
+  const contactResultsQuery = useQuery({
+    queryKey: ['household-link-contact-candidates', linkVoterId, submittedContactSearch],
+    queryFn: () => getSupporters({ search: submittedContactSearch, per_page: 10 }),
+    enabled: Boolean(linkVoterId) && submittedContactSearch.trim().length >= 2,
+  });
+  const contactResults = useMemo<ContactResult[]>(() => contactResultsQuery.data?.supporters ?? [], [contactResultsQuery.data]);
+
+  const createContactMutation = useMutation({
+    mutationFn: (voterId: number) => createContactFromGecVoter(voterId),
+    onSuccess: () => {
+      setActionError(null);
+      setActionMessage('Created and linked the DPG contact.');
+      setLinkVoterId(null);
+      setContactSearch('');
+      setSubmittedContactSearch('');
+      void queryClient.invalidateQueries({ queryKey: ['households-workspace'] });
+      void queryClient.invalidateQueries({ queryKey: ['gec-voters'] });
+      void queryClient.invalidateQueries({ queryKey: ['gec-households'] });
+      void queryClient.invalidateQueries({ queryKey: ['session'] });
+    },
+    onError: (error: unknown) => {
+      setActionMessage(null);
+      setActionError(getErrorMessage(error));
+    },
+  });
+
+  const linkContactMutation = useMutation({
+    mutationFn: ({ voterId, supporterId }: { voterId: number; supporterId: number }) => linkContactToGecVoter(voterId, supporterId),
+    onSuccess: () => {
+      setActionError(null);
+      setActionMessage('Linked the existing DPG contact to the GEC voter.');
+      setLinkVoterId(null);
+      setContactSearch('');
+      setSubmittedContactSearch('');
+      void queryClient.invalidateQueries({ queryKey: ['households-workspace'] });
+      void queryClient.invalidateQueries({ queryKey: ['gec-voters'] });
+      void queryClient.invalidateQueries({ queryKey: ['gec-households'] });
+      void queryClient.invalidateQueries({ queryKey: ['session'] });
+      void queryClient.invalidateQueries({ queryKey: ['household-link-contact-candidates'] });
+    },
+    onError: (error: unknown) => {
+      setActionMessage(null);
+      setActionError(getErrorMessage(error));
+    },
+  });
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -85,6 +156,8 @@ export default function HouseholdsPage() {
           className="flex flex-col gap-3 md:flex-row"
           onSubmit={(event) => {
             event.preventDefault();
+            setActionMessage(null);
+            setActionError(null);
             setSubmittedSearch(search.trim());
           }}
         >
@@ -106,6 +179,19 @@ export default function HouseholdsPage() {
           Enter at least 3 characters. Village-scoped users only see households in their assigned village.
         </div>
       </section>
+
+      {actionMessage && (
+        <div className="flex items-start gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-800">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          {actionMessage}
+        </div>
+      )}
+      {actionError && (
+        <div className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          {actionError}
+        </div>
+      )}
 
       {submittedSearch && (
         <div className="grid gap-3 md:grid-cols-3">
@@ -169,11 +255,87 @@ export default function HouseholdsPage() {
                   <div className="space-y-2">
                     {household.gec_voters.map((voter) => (
                       <div key={voter.id} className="rounded-xl border border-slate-200 p-3">
-                        <div className="font-semibold text-slate-950">{fullName(voter)}</div>
-                        <div className="mt-1 text-xs text-slate-500">{voterLabel(voter)}</div>
-                        <div className="mt-2 text-xs font-medium text-slate-600">
-                          {voter.linked_contact_count ? `${voter.linked_contact_count} linked DPG contact${voter.linked_contact_count === 1 ? '' : 's'}` : 'No DPG contact linked'}
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-950">{fullName(voter)}</div>
+                            <div className="mt-1 text-xs text-slate-500">{voterLabel(voter)}</div>
+                            <div className="mt-2 text-xs font-medium text-slate-600">
+                              {voter.linked_contact_count ? `${voter.linked_contact_count} linked DPG contact${voter.linked_contact_count === 1 ? '' : 's'}` : 'No DPG contact linked'}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={createContactMutation.isPending || Boolean(voter.linked_contact_count)}
+                              onClick={() => createContactMutation.mutate(voter.id)}
+                              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                              <Users className="h-3.5 w-3.5" />
+                              {voter.linked_contact_count ? 'Linked' : 'Create Contact'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={linkContactMutation.isPending || Boolean(voter.linked_contact_count)}
+                              onClick={() => {
+                                const nextVoterId = linkVoterId === voter.id ? null : voter.id;
+                                setLinkVoterId(nextVoterId);
+                                setContactSearch(nextVoterId ? fullName(voter) : '');
+                                setSubmittedContactSearch('');
+                              }}
+                              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                              <LinkIcon className="h-3.5 w-3.5" />
+                              Link Existing
+                            </button>
+                          </div>
                         </div>
+                        {linkVoterId === voter.id && (
+                          <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                            <form
+                              className="flex flex-col gap-2 sm:flex-row"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                setSubmittedContactSearch(contactSearch.trim());
+                              }}
+                            >
+                              <input
+                                value={contactSearch}
+                                onChange={(event) => setContactSearch(event.target.value)}
+                                placeholder="Search existing DPG contacts by name, phone, email, or address"
+                                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                              />
+                              <button type="submit" className="app-btn-secondary min-h-10 justify-center">
+                                <Search className="h-4 w-4" />
+                                Find Contact
+                              </button>
+                            </form>
+                            <div className="mt-3 space-y-2">
+                              {contactResultsQuery.isFetching ? (
+                                <div className="text-sm text-slate-500">Searching contacts...</div>
+                              ) : submittedContactSearch && contactResults.length === 0 ? (
+                                <div className="text-sm text-slate-500">No matching contacts found.</div>
+                              ) : contactResults.map((contact) => (
+                                <div key={contact.id} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-2 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-slate-900">{contact.print_name || `${contact.first_name} ${contact.last_name}`}</div>
+                                    <div className="text-xs text-slate-500">
+                                      {[contact.contact_number, contact.email, contact.village_name, contact.street_address].filter(Boolean).join(' · ') || 'No contact details'}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={linkContactMutation.isPending}
+                                    onClick={() => linkContactMutation.mutate({ voterId: voter.id, supporterId: contact.id })}
+                                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-white disabled:opacity-50"
+                                  >
+                                    <LinkIcon className="h-3.5 w-3.5" />
+                                    Link
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
