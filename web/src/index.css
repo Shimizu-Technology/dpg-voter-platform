@@ -167,6 +167,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   opacity: 0.9;
   box-shadow: 0 4px 12px -2px rgba(27, 58, 107, 0.4);
 }
+.app-btn-primary:disabled {
+  cursor: not-allowed;
+  background: #dbe4f0;
+  color: #7a8aa0;
+  opacity: 1;
+  box-shadow: none;
+}
+.app-btn-primary:disabled:hover {
+  opacity: 1;
+  box-shadow: none;
+}
 
 .app-btn-danger {
   background: var(--campaign-red);
@@ -202,6 +213,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .app-btn-secondary:hover {
   background: var(--surface-overlay);
   border-color: var(--border-soft);
+}
+.app-btn-secondary:disabled {
+  cursor: not-allowed;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  opacity: 1;
+}
+.app-btn-secondary:disabled:hover {
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
 
 /* ---- Tables ---- */

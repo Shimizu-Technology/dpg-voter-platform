@@ -190,6 +190,33 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "imports endpoint merges live background progress cache" do
+    import = GecImport.create!(
+      gec_list_date: Date.new(2026, 2, 25),
+      filename: "gec-voters.csv",
+      status: "processing",
+      import_type: "full_list",
+      metadata: { "stage" => "queued", "progress_percent" => 0 }
+    )
+    progress = { "stage" => "importing", "progress_percent" => 67, "pages_processed" => 500, "page_count" => 760 }
+    cache = Rails.cache
+    original_read = cache.method(:read)
+    cache.define_singleton_method(:read) do |key, *args, **kwargs|
+      key == "gec_import_progress:#{import.id}" ? progress : original_read.call(key, *args, **kwargs)
+    end
+
+    get "/api/v1/gec_voters/imports", headers: auth_headers(@admin)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    row = payload["imports"].find { |entry| entry["id"] == import.id }
+    assert_equal "importing", row.dig("metadata", "stage")
+    assert_equal 67, row.dig("metadata", "progress_percent")
+    assert_equal 500, row.dig("metadata", "pages_processed")
+  ensure
+    Rails.cache.define_singleton_method(:read, original_read) if original_read
+  end
+
   test "admin can enqueue a PDF preview job" do
     pdf = Tempfile.new([ "gec-preview", ".pdf" ])
     pdf.binmode

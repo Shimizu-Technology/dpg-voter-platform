@@ -294,6 +294,8 @@ module Api
           changes = rows.map { |row| import_change_json(row) }
         end
 
+        metadata = gec_import.metadata || {}
+
         render json: {
           import: import_json(gec_import),
           changes: changes,
@@ -304,7 +306,7 @@ module Api
             updated: raw_counts["updated"].to_i,
             removed: raw_counts["removed"].to_i,
             transferred: raw_counts["transferred"].to_i,
-            routed_to_unassigned: gec_import.metadata["unassigned"].to_i
+            routed_to_unassigned: metadata["unassigned"].to_i
           },
           filters: { type: type, q: q },
           pagination: {
@@ -653,6 +655,7 @@ module Api
         else
           import.skipped_rows.group(:resolution_status).count
         end
+        metadata = import_metadata_for_json(import)
 
         {
           id: import.id,
@@ -679,8 +682,19 @@ module Api
           original_content_type: import.original_content_type,
           skipped_rows_count: counts_for_import.values.sum,
           pending_skipped_rows_count: counts_for_import["pending"].to_i,
-          metadata: import.metadata || {}
+          metadata: metadata
         }
+      end
+
+      def import_metadata_for_json(import)
+        metadata = import.metadata || {}
+        return metadata unless %w[pending processing].include?(import.status)
+
+        progress = Rails.cache.read("gec_import_progress:#{import.id}")
+        progress.is_a?(Hash) ? metadata.merge(progress) : metadata
+      rescue StandardError => e
+        Rails.logger.warn("GecVotersController import #{import.id}: progress metadata read failed: #{e.class}: #{e.message}")
+        metadata
       end
 
       def import_change_json(change)
@@ -987,10 +1001,12 @@ module Api
             }
           end
 
+          metadata = gec_import.metadata || {}
+
           {
             "source_type" => "pdf",
-            "qa" => gec_import.metadata["pdf_qa"] || {},
-            "warnings" => Array(gec_import.metadata["pdf_warnings"]).first(20),
+            "qa" => metadata["pdf_qa"] || {},
+            "warnings" => Array(metadata["pdf_warnings"]).first(20),
             "row_count" => preview_data[:row_count],
             "rows" => rows,
             "available_villages" => rows.map { |row| row["village"] }.compact.uniq.sort

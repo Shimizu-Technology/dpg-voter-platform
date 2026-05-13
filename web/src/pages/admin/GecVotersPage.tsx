@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -86,7 +86,18 @@ type GecImport = {
   has_import_artifact?: boolean;
   has_original_file?: boolean;
   has_downloadable_file?: boolean;
-  metadata?: Record<string, unknown>;
+  raw_content_type?: string | null;
+  metadata?: {
+    stage?: string;
+    progress_percent?: number;
+    pages_processed?: number;
+    page_count?: number;
+    error?: string;
+    pdf_qa?: Record<string, unknown>;
+    active_job_id?: string;
+    enqueued_at?: string;
+    [key: string]: unknown;
+  };
 };
 
 type ImportViewerTab = 'data' | 'changes' | 'skipped';
@@ -240,6 +251,90 @@ function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function shouldContinueImportPolling(rows: GecImport[]) {
+  const now = Date.now();
+  return rows.some((row) => {
+    if (row.status === 'processing' || row.status === 'pending') return true;
+    if (row.status !== 'completed') return false;
+    if (row.has_import_artifact) return false;
+    const createdAt = Date.parse(String(row.created_at || ''));
+    if (Number.isNaN(createdAt)) return false;
+    return now - createdAt < 5 * 60 * 1000;
+  });
+}
+
+function getImportStageLabel(stage: string, isPdfImport: boolean): string {
+  switch (stage) {
+    case 'queued':
+      return 'Queued';
+    case 'validating_pdf':
+      return 'Validating PDF';
+    case 'normalizing_pdf':
+      return 'Converting PDF';
+    case 'parsing':
+      return isPdfImport ? 'Importing Parsed Data' : 'Reading File';
+    case 'importing':
+      return 'Importing';
+    case 'matching':
+      return 'Matching Existing Voters';
+    case 'detecting_changes':
+      return 'Detecting Changes';
+    case 're_vetting':
+      return 'Re-vetting Contacts';
+    case 'saving':
+      return 'Saving Results';
+    case 'finalizing_artifact':
+      return 'Finalizing Import';
+    case 'completed':
+      return 'Completed';
+    case 'failed':
+      return 'Failed';
+    default:
+      return stage.replace(/_/g, ' ');
+  }
+}
+
+function getImportStageMessage(
+  stage: string,
+  progressPercent: number,
+  isPdfImport: boolean,
+  metadata?: GecImport['metadata']
+) {
+  if (progressPercent === 0 || stage === 'queued') {
+    return isPdfImport
+      ? 'Your PDF is queued. Full validation and import will run in the background.'
+      : 'Waiting to start. You can leave this page while the import stays queued.';
+  }
+
+  switch (stage) {
+    case 'validating_pdf':
+      if (metadata?.page_count && typeof metadata.pages_processed === 'number') {
+        return `Validated ${Number(metadata.pages_processed).toLocaleString()} of ${Number(metadata.page_count).toLocaleString()} pages. Large PDFs can take a few minutes.`;
+      }
+      return 'Checking the full PDF and confirming the parsed voter data before import.';
+    case 'normalizing_pdf':
+      return 'Converting the PDF into import-ready rows for the voter database.';
+    case 'parsing':
+      return isPdfImport
+        ? 'Importing the parsed PDF data. You can safely leave this page.'
+        : 'Reading the uploaded file and preparing rows for import.';
+    case 'importing':
+      return `${Math.max(5, Math.min(100, progressPercent))}% complete. Progress updates automatically.`;
+    case 'matching':
+      return 'Comparing this list against existing voters to find changes.';
+    case 'detecting_changes':
+      return 'Calculating adds, updates, transfers, and removals.';
+    case 're_vetting':
+      return 'Refreshing contact matches against the updated voter file.';
+    case 'saving':
+      return 'Saving import results and finishing up.';
+    case 'finalizing_artifact':
+      return 'Finishing import transparency files so imported data and downloads are ready as soon as the import completes.';
+    default:
+      return `${Math.max(5, Math.min(100, progressPercent))}% complete. Progress updates automatically.`;
+  }
+}
+
 export default function GecVotersPage() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
@@ -278,7 +373,7 @@ export default function GecVotersPage() {
     enabled: canUploadGec,
     refetchInterval: (query) => {
       const rows = (query.state.data?.imports ?? []) as GecImport[];
-      return rows.some((row) => row.status === 'pending' || row.status === 'processing') ? 3000 : false;
+      return shouldContinueImportPolling(rows) ? 3000 : false;
     },
   });
   const votersQuery = useQuery({
@@ -459,11 +554,28 @@ export default function GecVotersPage() {
   const voters = useMemo<GecVoter[]>(() => votersQuery.data?.gec_voters ?? [], [votersQuery.data]);
   const households = useMemo<Household[]>(() => householdsQuery.data?.households ?? [], [householdsQuery.data]);
   const imports = useMemo<GecImport[]>(() => importsQuery.data?.imports ?? [], [importsQuery.data]);
+  const activeImports = imports.filter((row) => row.status === 'processing' || row.status === 'pending');
+  const activeImport = activeImports.find((row) => row.status === 'processing') || activeImports[0];
+  const activeProgress = Number(activeImport?.metadata?.progress_percent || 0);
+  const activeProgressDisplay = Math.max(5, Math.min(100, activeProgress));
+  const activeStage = String(activeImport?.metadata?.stage || 'queued');
+  const activeImportIsPdf = Boolean(activeImport?.metadata?.source_type === 'pdf' || activeImport?.metadata?.pdf_qa || activeImport?.raw_content_type?.includes('pdf'));
+  const activeStageLabel = getImportStageLabel(activeStage, activeImportIsPdf);
+  const activeStageMessage = getImportStageMessage(activeStage, activeProgress, activeImportIsPdf, activeImport?.metadata);
+  const previouslyHadActiveImport = useRef(false);
   const contactResults = useMemo<ContactResult[]>(() => contactResultsQuery.data?.supporters ?? [], [contactResultsQuery.data]);
   const selectedImport = useMemo(
     () => imports.find((row) => row.id === selectedImportId) ?? null,
     [imports, selectedImportId]
   );
+
+  useEffect(() => {
+    if (previouslyHadActiveImport.current && !activeImport) {
+      void queryClient.invalidateQueries({ queryKey: ['gec-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['gec-voters'] });
+    }
+    previouslyHadActiveImport.current = Boolean(activeImport);
+  }, [activeImport, queryClient]);
   const importDataQuery = useQuery({
     queryKey: ['gec-import-data', selectedImportId, viewerPage, submittedViewerSearch, viewerVillage],
     queryFn: () => getGecImportData(selectedImportId!, {
@@ -704,6 +816,24 @@ export default function GecVotersPage() {
         </div>
       )}
 
+      {activeImport && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-blue-900">
+              {activeImports.length > 1 ? `${activeImports.length} imports in progress` : 'Background import in progress'}
+            </div>
+            <div className="text-xs font-semibold text-blue-700">{activeStageLabel}</div>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
+            <div className="h-full bg-blue-600 transition-all" style={{ width: `${activeProgressDisplay}%` }} />
+          </div>
+          <div className="mt-2 text-xs text-blue-700">{activeStageMessage}</div>
+          {activeImport.metadata?.error && (
+            <div className="mt-2 text-xs font-medium text-red-700">{String(activeImport.metadata.error)}</div>
+          )}
+        </div>
+      )}
+
       {canUploadGec && (
         <section className="app-card p-4 sm:p-5">
           <button
@@ -796,6 +926,7 @@ export default function GecVotersPage() {
                   disabled={!canImport}
                   onClick={() => uploadMutation.mutate()}
                   className="app-btn-primary min-h-11 justify-center"
+                  title={!hasCompletedPreview ? 'Analyze file first to review before importing' : undefined}
                 >
                   {uploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                   Confirm & Import
