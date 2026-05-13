@@ -2,6 +2,7 @@ import { Fragment, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  ChevronDown,
   CheckCircle2,
   Database,
   Download,
@@ -216,6 +217,15 @@ function formatDate(value?: string | null) {
   return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'Pacific/Guam' });
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return '—';
+  return new Date(value).toLocaleString('en-US', {
+    timeZone: 'Pacific/Guam',
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
+}
+
 function displayValue(value: unknown) {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'object') return JSON.stringify(value);
@@ -238,9 +248,9 @@ export default function GecVotersPage() {
   const [submittedSearch, setSubmittedSearch] = useState('');
   const [householdSearch, setHouseholdSearch] = useState('');
   const [submittedHouseholdSearch, setSubmittedHouseholdSearch] = useState('');
+  const [showImportPanel, setShowImportPanel] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [listDate, setListDate] = useState(today);
-  const [importType, setImportType] = useState('full_list');
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -359,7 +369,7 @@ export default function GecVotersPage() {
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error('Choose a file first.');
-      return uploadGecList(file, listDate, importType, selectedFileIsPdf ? confirmReview : false);
+      return uploadGecList(file, listDate, 'full_list', selectedFileIsPdf ? confirmReview : false);
     },
     onSuccess: (data) => {
       setUploadError(null);
@@ -368,7 +378,7 @@ export default function GecVotersPage() {
       setPdfPreviewStatus('idle');
       activePreviewRequestRef.current = null;
       if (data.async) {
-        setUploadMessage(`Import queued in background${data.import?.id ? ` (#${data.import.id})` : ''}. Recent Imports will update while it processes.`);
+        setUploadMessage(`Import queued in background${data.import?.id ? ` (#${data.import.id})` : ''}. You can leave this page — progress will continue and update in Import History.`);
       } else {
         setUploadMessage(`Imported ${data.stats?.total ?? 0} GEC rows. New: ${data.stats?.new ?? 0}, updated: ${data.stats?.updated ?? 0}, removed: ${data.stats?.removed ?? 0}.`);
       }
@@ -485,6 +495,170 @@ export default function GecVotersPage() {
   });
   const isPreviewBusy = previewMutation.isPending || pdfPreviewStatus === 'pending' || pdfPreviewStatus === 'processing';
   const canImport = Boolean(file && listDate && !uploadMutation.isPending && (!selectedFileIsPdf || (previewData?.source_type === 'pdf' && confirmReview)));
+  const renderImportHistory = () => (
+    <section className="app-card overflow-hidden">
+      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-slate-500" />
+            <h2 className="text-lg font-semibold text-slate-950">Import History</h2>
+          </div>
+          <p className="mt-1 max-w-3xl text-sm text-slate-500">
+            Review every GEC list upload, inspect what changed from prior lists, and open the original file for transparency.
+          </p>
+        </div>
+      </div>
+
+      {imports.length === 0 ? (
+        <div className="p-4 sm:p-5">
+          <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No GEC imports yet.</div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1100px] text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.08em] text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">File</th>
+                <th className="px-4 py-3 text-right">Total</th>
+                <th className="px-4 py-3 text-right">New</th>
+                <th className="px-4 py-3 text-right">Updated</th>
+                <th className="px-4 py-3 text-right">Removed</th>
+                <th className="px-4 py-3 text-right">Transfers</th>
+                <th className="px-4 py-3">Imported at</th>
+                <th className="px-4 py-3">Imported by</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {imports.map((row) => (
+                <tr key={row.id} className={selectedImportId === row.id ? 'bg-blue-50/50' : undefined}>
+                  <td className="px-4 py-3 font-medium text-slate-700">{formatDate(row.gec_list_date)}</td>
+                  <td className="max-w-[260px] px-4 py-3">
+                    <div className="truncate font-semibold text-slate-900">{row.filename}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {row.import_type ? row.import_type.replace(/_/g, ' ') : 'full list'}
+                      {row.pending_skipped_rows_count ? ` · ${row.pending_skipped_rows_count} skipped pending` : ''}
+                      {row.active_election_day ? ' · Active election list' : ''}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-950">{row.total_records || 0}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-green-700">{row.new_records || 0}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-blue-700">{row.updated_records || 0}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-red-700">{row.removed_records || 0}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-blue-700">{row.transferred_records || 0}</td>
+                  <td className="px-4 py-3 text-slate-600">{formatDateTime(row.created_at)}</td>
+                  <td className="max-w-[180px] truncate px-4 py-3 text-slate-600">{row.uploaded_by_email || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                      row.status === 'completed'
+                        ? 'bg-green-50 text-green-700'
+                        : row.status === 'failed'
+                          ? 'bg-red-50 text-red-700'
+                          : 'bg-amber-50 text-amber-700'
+                    }`}
+                    >
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedImportId(row.id);
+                          setViewerTab('data');
+                          setViewerPage(1);
+                          setSubmittedViewerSearch('');
+                          setViewerSearch('');
+                        }}
+                        className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Review
+                      </button>
+                      {row.has_original_file ? (
+                        <button
+                          type="button"
+                          disabled={openOriginalMutation.isPending}
+                          onClick={() => openOriginalMutation.mutate(row.id)}
+                          className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          Original
+                        </button>
+                      ) : null}
+                      {row.has_downloadable_file ? (
+                        <button
+                          type="button"
+                          disabled={downloadImportMutation.isPending}
+                          onClick={() => downloadImportMutation.mutate(row.id)}
+                          className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Download
+                        </button>
+                      ) : null}
+                      {row.status === 'completed' && !row.active_election_day ? (
+                        <button
+                          type="button"
+                          disabled={activateImportMutation.isPending}
+                          onClick={() => activateImportMutation.mutate(row.id)}
+                          className="inline-flex min-h-8 items-center rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Activate
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {selectedImport && (
+        <div className="border-t border-slate-100 p-4 sm:p-5">
+          <ImportReviewPanel
+            selectedImport={selectedImport}
+            viewerTab={viewerTab}
+            setViewerTab={(tab) => {
+              setViewerTab(tab);
+              setViewerPage(1);
+            }}
+            viewerSearch={viewerSearch}
+            setViewerSearch={setViewerSearch}
+            submitSearch={() => {
+              setSubmittedViewerSearch(viewerSearch.trim());
+              setViewerPage(1);
+            }}
+            viewerVillage={viewerVillage}
+            setViewerVillage={(value) => {
+              setViewerVillage(value);
+              setViewerPage(1);
+            }}
+            changeType={changeType}
+            setChangeType={(value) => {
+              setChangeType(value);
+              setViewerPage(1);
+            }}
+            skippedStatus={skippedStatus}
+            setSkippedStatus={(value) => {
+              setSkippedStatus(value);
+              setViewerPage(1);
+            }}
+            viewerPage={viewerPage}
+            setViewerPage={setViewerPage}
+            dataQuery={importDataQuery}
+            changesQuery={importChangesQuery}
+            skippedRowsQuery={importSkippedRowsQuery}
+          />
+        </div>
+      )}
+    </section>
+  );
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -523,85 +697,136 @@ export default function GecVotersPage() {
 
       {canUploadGec && (
         <section className="app-card p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Upload className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-slate-950">Import GEC List</h2>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px_160px_auto_auto] lg:items-end">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">File</span>
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls,.pdf"
-                onChange={(event) => {
-                  setFile(event.target.files?.[0] ?? null);
-                  setPreviewData(null);
-                  setConfirmReview(false);
-                  setPdfPreviewStatus('idle');
-                  activePreviewRequestRef.current = null;
-                }}
-                className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">List date</span>
-              <input
-                type="date"
-                value={listDate}
-                onChange={(event) => setListDate(event.target.value)}
-                className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Type</span>
-              <select
-                value={importType}
-                onChange={(event) => setImportType(event.target.value)}
-                className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="full_list">Full list</option>
-                <option value="changes_only">Changes only</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              disabled={!file || isPreviewBusy}
-              onClick={() => previewMutation.mutate()}
-              className="app-btn-secondary min-h-11 justify-center"
-            >
-              {isPreviewBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              Preview
-            </button>
-            <button
-              type="button"
-              disabled={!canImport}
-              onClick={() => uploadMutation.mutate()}
-              className="app-btn-primary min-h-11 justify-center"
-            >
-              {uploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Import
-            </button>
-          </div>
-          {previewData && (
-            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-              <div className="font-semibold">
-                {previewData.source_type === 'pdf' ? 'PDF preview ready' : 'Spreadsheet preview ready'}
-              </div>
-              <div className="mt-1 text-blue-800">
-                {previewData.source_type === 'pdf'
-                  ? `${previewData.row_count ?? 0} sample rows parsed. QA status: ${previewData.qa?.status || 'preview'}.`
-                  : `${previewData.row_count ?? 0} rows detected and ${Object.keys(previewData.column_map ?? {}).length} columns mapped.`}
-              </div>
-              {selectedFileIsPdf && (
-                <label className="mt-3 flex items-start gap-2 text-sm font-medium text-blue-950">
+          <button
+            type="button"
+            onClick={() => setShowImportPanel((current) => !current)}
+            className="flex w-full items-center justify-between gap-4 text-left"
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                <Upload className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-lg font-semibold text-slate-950">Upload New GEC List</span>
+                <span className="block text-sm text-slate-500">
+                  Analyze the public voter file, review a sample, then queue the full background import.
+                </span>
+              </span>
+            </span>
+            <ChevronDown className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${showImportPanel ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showImportPanel && (
+            <div className="mt-5 space-y-4 border-t border-slate-100 pt-5">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Excel / PDF file</span>
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls,.pdf"
+                  onChange={(event) => {
+                    setFile(event.target.files?.[0] ?? null);
+                    setPreviewData(null);
+                    setConfirmReview(false);
+                    setPdfPreviewStatus('idle');
+                    activePreviewRequestRef.current = null;
+                  }}
+                  className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,320px)]">
+                <div>
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Import type</span>
+                  <div className="rounded-xl border border-blue-300 bg-blue-50 p-4 text-blue-900">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <Database className="h-4 w-4" />
+                      Full voter list
+                    </div>
+                    <p className="mt-1 text-xs text-blue-700">Detects new voters, updates, purges, transfers, and address changes against the prior GEC list.</p>
+                  </div>
+                </div>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">GEC list date</span>
                   <input
-                    type="checkbox"
-                    checked={confirmReview}
-                    onChange={(event) => setConfirmReview(event.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-blue-300"
+                    type="date"
+                    value={listDate}
+                    onChange={(event) => setListDate(event.target.value)}
+                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
                   />
-                  I reviewed the PDF sample and want to queue the full background import.
                 </label>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  disabled={!file || isPreviewBusy}
+                  onClick={() => previewMutation.mutate()}
+                  className="app-btn-secondary min-h-11 justify-center"
+                >
+                  {isPreviewBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+                  Analyze File
+                </button>
+                <button
+                  type="button"
+                  disabled={!canImport}
+                  onClick={() => uploadMutation.mutate()}
+                  className="app-btn-primary min-h-11 justify-center"
+                >
+                  {uploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  Confirm & Import
+                </button>
+              </div>
+
+              {previewData && (
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+                  <div className="font-semibold">
+                    {previewData.source_type === 'pdf' ? 'PDF Preview Summary' : 'Spreadsheet Preview Summary'}
+                  </div>
+                  <div className="mt-2 grid gap-1 text-blue-800 sm:grid-cols-3">
+                    <div>Rows sampled: <span className="font-semibold">{previewData.row_count ?? 0}</span></div>
+                    <div>Quality: <span className="font-semibold">{previewData.qa?.status || 'preview'}</span></div>
+                    <div>Status: <span className="font-semibold uppercase">{previewData.status || 'preview'}</span></div>
+                  </div>
+                  {previewData.preview_rows?.length ? (
+                    <div className="mt-3 max-h-80 overflow-auto rounded-xl border border-blue-100 bg-white">
+                      <table className="w-full min-w-[720px] text-left text-xs">
+                        <thead className="bg-slate-50 uppercase tracking-[0.08em] text-slate-500">
+                          <tr>
+                            <th className="px-3 py-2">Reg No.</th>
+                            <th className="px-3 py-2">Name</th>
+                            <th className="px-3 py-2">Address</th>
+                            <th className="px-3 py-2">Village</th>
+                            <th className="px-3 py-2">Precinct</th>
+                            <th className="px-3 py-2">Birth Year</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {previewData.preview_rows.slice(0, 20).map((row, index) => (
+                            <tr key={index}>
+                              <td className="px-3 py-2">{displayValue(row.voter_registration_number || row.registration_number || row.reg_no)}</td>
+                              <td className="px-3 py-2 font-medium text-slate-900">{displayValue(row.name) !== '—' ? displayValue(row.name) : [row.first_name, row.middle_name, row.last_name].map(displayValue).filter((value) => value !== '—').join(' ')}</td>
+                              <td className="px-3 py-2">{displayValue(row.address)}</td>
+                              <td className="px-3 py-2">{displayValue(row.village_name || row.village)}</td>
+                              <td className="px-3 py-2">{displayValue(row.precinct_number || row.precinct)}</td>
+                              <td className="px-3 py-2">{displayValue(row.birth_year || row.year_of_birth)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                  {selectedFileIsPdf && (
+                    <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+                      <input
+                        type="checkbox"
+                        checked={confirmReview}
+                        onChange={(event) => setConfirmReview(event.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-amber-300"
+                      />
+                      I reviewed the sample and want to proceed with the background import.
+                    </label>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -817,117 +1042,10 @@ export default function GecVotersPage() {
               )}
             </div>
           </section>
-
-          {canUploadGec && (
-            <section className="app-card p-4 sm:p-5">
-              <h2 className="mb-3 text-lg font-semibold text-slate-950">Recent Imports</h2>
-              <div className="space-y-2">
-                {imports.length === 0 ? (
-                  <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No GEC imports yet.</div>
-                ) : imports.slice(0, 6).map((row) => (
-                  <div key={row.id} className={`rounded-xl border p-3 ${selectedImportId === row.id ? 'border-blue-300 bg-blue-50/40' : 'border-slate-200'}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold text-slate-900">{row.filename}</div>
-                        <div className="text-xs text-slate-500">
-                          {formatDate(row.gec_list_date)} · {row.status}{row.active_election_day ? ' · Active' : ''}{row.pending_skipped_rows_count ? ` · ${row.pending_skipped_rows_count} skipped pending` : ''}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-2">
-                        <div className="text-right text-xs font-semibold text-slate-500">{row.total_records || 0} rows</div>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedImportId(row.id);
-                              setViewerTab('data');
-                              setViewerPage(1);
-                              setSubmittedViewerSearch('');
-                              setViewerSearch('');
-                            }}
-                            className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            Review
-                          </button>
-                          {row.has_original_file ? (
-                            <button
-                              type="button"
-                              disabled={openOriginalMutation.isPending}
-                              onClick={() => openOriginalMutation.mutate(row.id)}
-                              className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              Original
-                            </button>
-                          ) : null}
-                          {row.has_downloadable_file ? (
-                            <button
-                              type="button"
-                              disabled={downloadImportMutation.isPending}
-                              onClick={() => downloadImportMutation.mutate(row.id)}
-                              className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              Download
-                            </button>
-                          ) : null}
-                        </div>
-                        {row.status === 'completed' && !row.active_election_day ? (
-                          <button
-                            type="button"
-                            disabled={activateImportMutation.isPending}
-                            onClick={() => activateImportMutation.mutate(row.id)}
-                            className="inline-flex min-h-8 items-center rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            Activate
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {selectedImport && (
-                <ImportReviewPanel
-                  selectedImport={selectedImport}
-                  viewerTab={viewerTab}
-                  setViewerTab={(tab) => {
-                    setViewerTab(tab);
-                    setViewerPage(1);
-                  }}
-                  viewerSearch={viewerSearch}
-                  setViewerSearch={setViewerSearch}
-                  submitSearch={() => {
-                    setSubmittedViewerSearch(viewerSearch.trim());
-                    setViewerPage(1);
-                  }}
-                  viewerVillage={viewerVillage}
-                  setViewerVillage={(value) => {
-                    setViewerVillage(value);
-                    setViewerPage(1);
-                  }}
-                  changeType={changeType}
-                  setChangeType={(value) => {
-                    setChangeType(value);
-                    setViewerPage(1);
-                  }}
-                  skippedStatus={skippedStatus}
-                  setSkippedStatus={(value) => {
-                    setSkippedStatus(value);
-                    setViewerPage(1);
-                  }}
-                  viewerPage={viewerPage}
-                  setViewerPage={setViewerPage}
-                  dataQuery={importDataQuery}
-                  changesQuery={importChangesQuery}
-                  skippedRowsQuery={importSkippedRowsQuery}
-                />
-              )}
-            </section>
-          )}
         </div>
       </section>
+
+      {canUploadGec && renderImportHistory()}
     </WorkspacePage>
   );
 }
@@ -986,7 +1104,7 @@ function ImportReviewPanel({
     <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
       <div className="flex flex-col gap-3 border-b border-slate-100 pb-3">
         <div>
-          <div className="text-sm font-semibold text-slate-950">Review import</div>
+          <div className="text-sm font-semibold text-slate-950">Import transparency</div>
           <div className="mt-1 text-xs text-slate-500">
             {selectedImport.filename} · {formatDate(selectedImport.gec_list_date)} · {selectedImport.status}
           </div>
@@ -999,7 +1117,7 @@ function ImportReviewPanel({
               onClick={() => setViewerTab(tab)}
               className={`rounded-lg px-2 py-2 capitalize ${viewerTab === tab ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}
             >
-              {tab === 'data' ? 'Data' : tab === 'changes' ? 'Changes' : 'Skipped'}
+              {tab === 'data' ? 'Imported data' : tab === 'changes' ? 'All changes' : 'Skipped'}
             </button>
           ))}
         </div>
@@ -1115,7 +1233,7 @@ function ImportDataRows({ rows }: { rows: ImportPreviewRow[] }) {
 
   return (
     <div className="space-y-2">
-      {rows.slice(0, 20).map((row, index) => (
+      {rows.map((row, index) => (
         <div key={index} className="rounded-xl border border-slate-200 p-3 text-sm">
           <div className="font-semibold text-slate-900">
             {displayValue(row.name) !== '—'

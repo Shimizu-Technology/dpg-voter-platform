@@ -12,7 +12,18 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+const formApi = axios.create({
+  baseURL: API_BASE_URL,
+});
+
 api.interceptors.response.use(
+  response => response,
+  error => {
+    return Promise.reject(error);
+  }
+);
+
+formApi.interceptors.response.use(
   response => response,
   error => {
     return Promise.reject(error);
@@ -90,7 +101,7 @@ export const sendEmailBlast = (data: { subject: string; body: string; village_id
 export const uploadImportPreview = (file: File) => {
   const form = new FormData();
   form.append('file', file);
-  return api.post('/imports/preview', form).then(r => r.data);
+  return formApi.post('/imports/preview', form).then(r => r.data);
 };
 export const parseImportRows = (data: { import_key: string; sheet_index: number; column_mapping: Record<string, unknown> }) =>
   api.post('/imports/parse', data).then(r => r.data);
@@ -108,7 +119,7 @@ export const previewGecList = (file: File, gecListDate?: string, limit = 20, pre
   form.append('limit', String(limit));
   if (gecListDate) form.append('gec_list_date', gecListDate);
   if (previewRequestId) form.append('preview_request_id', previewRequestId);
-  return api.post('/gec_voters/preview', form).then(r => r.data);
+  return formApi.post('/gec_voters/preview', form).then(r => r.data);
 };
 export const getGecPdfPreviewStatus = (previewRequestId: string) =>
   api.get('/gec_voters/preview_status', { params: { preview_request_id: previewRequestId } }).then(r => r.data);
@@ -118,7 +129,7 @@ export const uploadGecList = (file: File, gecListDate: string, importType = 'ful
   form.append('gec_list_date', gecListDate);
   form.append('import_type', importType);
   if (confirmReview) form.append('confirm_review', 'true');
-  return api.post('/gec_voters/upload', form).then(r => r.data);
+  return formApi.post('/gec_voters/upload', form).then(r => r.data);
 };
 export const activateGecImport = (importId: number) =>
   api.post(`/gec_voters/imports/${importId}/activate`).then(r => r.data);
