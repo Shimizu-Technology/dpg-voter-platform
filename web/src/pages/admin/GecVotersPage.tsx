@@ -11,6 +11,7 @@ import {
   Home,
   Link as LinkIcon,
   Loader2,
+  RefreshCw,
   Search,
   Upload,
   Users,
@@ -101,6 +102,7 @@ type GecImport = {
 };
 
 type ImportViewerTab = 'data' | 'changes' | 'skipped';
+type GecImportType = 'full_list' | 'changes_only';
 
 type ImportPreviewRow = Record<string, unknown>;
 
@@ -346,6 +348,7 @@ export default function GecVotersPage() {
   const [showImportPanel, setShowImportPanel] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [listDate, setListDate] = useState(today);
+  const [importType, setImportType] = useState<GecImportType>('full_list');
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -465,7 +468,7 @@ export default function GecVotersPage() {
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error('Choose a file first.');
-      return uploadGecList(file, listDate, 'full_list', selectedFileIsPdf ? confirmReview : false);
+      return uploadGecList(file, listDate, importType, selectedFileIsPdf ? confirmReview : false);
     },
     onSuccess: (data) => {
       setUploadError(null);
@@ -884,12 +887,65 @@ export default function GecVotersPage() {
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,320px)]">
                 <div>
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Import type</span>
-                  <div className="rounded-xl border border-blue-300 bg-blue-50 p-4 text-blue-900">
-                    <div className="flex items-center gap-2 font-semibold">
-                      <Database className="h-4 w-4" />
-                      Full voter list
-                    </div>
-                    <p className="mt-1 text-xs text-blue-700">Detects new voters, updates, purges, transfers, and address changes against the prior GEC list.</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-colors ${
+                      importType === 'full_list'
+                        ? 'border-blue-300 bg-blue-50 text-blue-900'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="gecImportType"
+                        value="full_list"
+                        checked={importType === 'full_list'}
+                        onChange={() => {
+                          setImportType('full_list');
+                          setPreviewData(null);
+                          setUploadMessage(null);
+                          setUploadError(null);
+                          setConfirmReview(false);
+                          setPdfPreviewStatus('idle');
+                          activePreviewRequestRef.current = null;
+                        }}
+                        className="sr-only"
+                      />
+                      <Database className="h-4 w-4 shrink-0" />
+                      <span>
+                        <span className="block font-semibold">Full voter list</span>
+                        <span className={`mt-1 block text-xs ${importType === 'full_list' ? 'text-blue-700' : 'text-slate-500'}`}>
+                          Detects new voters, updates, purges, transfers, and address changes.
+                        </span>
+                      </span>
+                    </label>
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-colors ${
+                      importType === 'changes_only'
+                        ? 'border-blue-300 bg-blue-50 text-blue-900'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="gecImportType"
+                        value="changes_only"
+                        checked={importType === 'changes_only'}
+                        onChange={() => {
+                          setImportType('changes_only');
+                          setPreviewData(null);
+                          setUploadMessage(null);
+                          setUploadError(null);
+                          setConfirmReview(false);
+                          setPdfPreviewStatus('idle');
+                          activePreviewRequestRef.current = null;
+                        }}
+                        className="sr-only"
+                      />
+                      <RefreshCw className="h-4 w-4 shrink-0" />
+                      <span>
+                        <span className="block font-semibold">Changes only</span>
+                        <span className={`mt-1 block text-xs ${importType === 'changes_only' ? 'text-blue-700' : 'text-slate-500'}`}>
+                          Adds and updates only, with no purge detection.
+                        </span>
+                      </span>
+                    </label>
                   </div>
                 </div>
                 <label className="block">
