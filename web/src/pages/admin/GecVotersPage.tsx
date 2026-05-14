@@ -41,6 +41,7 @@ import {
 } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
 import WorkspacePage from '../../components/WorkspacePage';
+import { contactClassificationChipClass } from '../../lib/contactClassification';
 
 type GecVoter = {
   id: number;
@@ -1521,19 +1522,27 @@ export default function GecVotersPage() {
                       <div className="rounded-lg bg-green-50 p-2 text-green-900">
                         <div className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em]">
                           <Users className="h-3.5 w-3.5" />
-                          DPG contacts
+                          DPG records
                         </div>
                         {household.contacts.length || 0} found
                       </div>
                     </div>
                     {household.contacts.length > 0 && (
                       <div className="mt-3 rounded-lg bg-green-50/70 p-2">
-                        <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-green-900">DPG contacts at this address</div>
-                        <div className="space-y-1">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-green-900">DPG records at this address</div>
+                        <div className="space-y-2">
                           {household.contacts.map((contact) => (
-                            <div key={contact.id} className="text-sm text-slate-700">
-                              {contact.print_name || `${contact.first_name} ${contact.last_name}`}
-                              {contact.current_gec_match ? <span className="ml-2 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-green-700">matched</span> : null}
+                            <div key={contact.id} className="rounded-lg bg-white/70 p-2 text-sm text-slate-700">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-semibold text-slate-800">{contact.print_name || `${contact.first_name} ${contact.last_name}`}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${contactClassificationChipClass(contact.contact_classification || 'new_intake')}`}>
+                                  {contactClassificationLabel(contact.contact_classification || 'new_intake')}
+                                </span>
+                                {contact.current_gec_match ? <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">matched</span> : null}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                {contact.current_gec_match ? 'Linked to current GEC voter' : 'No current GEC link'}
+                              </div>
                             </div>
                           ))}
                         </div>

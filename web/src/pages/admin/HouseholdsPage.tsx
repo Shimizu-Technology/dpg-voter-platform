@@ -248,7 +248,7 @@ export default function HouseholdsPage() {
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
                     <Users className="h-3.5 w-3.5" />
-                    {household.contacts.length} DPG
+                    {household.contacts.length} DPG records
                   </span>
                 </div>
               </div>
@@ -409,10 +409,10 @@ export default function HouseholdsPage() {
               <div className="p-4 sm:p-5">
                 <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.08em] text-slate-500">
                   <Users className="h-4 w-4" />
-                  DPG contacts at this address
+                  DPG records at this address
                 </h3>
                 {household.contacts.length === 0 ? (
-                  <p className="text-sm text-slate-500">No DPG contacts found at this address yet.</p>
+                  <p className="text-sm text-slate-500">No DPG records found at this address yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {household.contacts.map((contact) => (

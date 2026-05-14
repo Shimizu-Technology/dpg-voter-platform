@@ -1617,7 +1617,10 @@ module Api
           gec_voter = best_match&.dig(:gec_voter)
           attrs.merge!(
             gec_voter_id: gec_voter&.id,
+            village_id: gec_voter&.village_id || supporter.village_id,
             precinct_id: gec_voter&.precinct_id || supporter.precinct_id,
+            registered_voter: true,
+            registered_voter_status: "yes",
             verified_by_user_id: current_user.id,
             verified_at: Time.current,
             verification_reason: "manual_staff_verified",
