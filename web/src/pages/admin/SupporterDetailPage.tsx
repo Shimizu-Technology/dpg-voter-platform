@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ChevronLeft, Loader2, Mail, MapPin, MessageSquare, Pencil, Phone, Plus, Save, StickyNote, UserRound, X } from 'lucide-react';
 import { createSupporterContactAttempt, getSupporter, getSupporterContactAttempts, getVillages, updateSupporter, verifySupporter, updateOutreachStatus } from '../../lib/api';
+import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, CONTACT_ATTEMPT_OUTCOME_OPTIONS } from '../../lib/contactAttempt';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
 import { assignPrecinctIdByLastName } from '../../lib/precinctAssignment';
@@ -263,20 +264,19 @@ const PRIMARY_AUDIT_FIELD_ORDER = [
   'dob',
 ];
 
-const CONTACT_ATTEMPT_CHANNELS = [
-  { value: 'in_person', label: 'In person', icon: MapPin },
-  { value: 'call', label: 'Call', icon: Phone },
-  { value: 'sms', label: 'SMS', icon: MessageSquare },
-  { value: 'email', label: 'Email', icon: Mail },
-];
+const CONTACT_ATTEMPT_ICONS = {
+  in_person: MapPin,
+  call: Phone,
+  sms: MessageSquare,
+  email: Mail,
+} as const;
 
-const CONTACT_ATTEMPT_OUTCOMES = [
-  { value: 'reached', label: 'Reached' },
-  { value: 'attempted', label: 'Attempted' },
-  { value: 'unavailable', label: 'Unavailable' },
-  { value: 'wrong_number', label: 'Wrong number' },
-  { value: 'refused', label: 'Refused' },
-];
+const CONTACT_ATTEMPT_CHANNELS = CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) => ({
+  ...option,
+  icon: CONTACT_ATTEMPT_ICONS[option.value],
+}));
+
+const CONTACT_ATTEMPT_OUTCOMES = CONTACT_ATTEMPT_OUTCOME_OPTIONS;
 
 function localDateTimeInputValue(date = new Date()) {
   const localTime = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);

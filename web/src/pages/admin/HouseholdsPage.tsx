@@ -3,27 +3,14 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Database, Home, Link as LinkIcon, MapPin, MessageSquare, Search, Users } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
-import { createContactFromGecVoter, createSupporterContactAttempt, getGecHouseholds, getSupporters, linkContactToGecVoter, updateSupporter } from '../../lib/api';
+import { createContactFromGecVoter, getGecHouseholds, getSupporters, linkContactToGecVoter, updateSupporterCanvass } from '../../lib/api';
+import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, CONTACT_ATTEMPT_OUTCOME_OPTIONS } from '../../lib/contactAttempt';
 import { formatDateTime } from '../../lib/datetime';
 import {
   ACTIVE_RELATIONSHIP_OPTIONS,
   contactClassificationChipClass,
   contactClassificationLabel,
 } from '../../lib/contactClassification';
-
-const CONTACT_ATTEMPT_CHANNELS = [
-  { value: 'in_person', label: 'In person' },
-  { value: 'call', label: 'Call' },
-  { value: 'sms', label: 'SMS' },
-  { value: 'email', label: 'Email' },
-] as const;
-const CONTACT_ATTEMPT_OUTCOMES = [
-  { value: 'reached', label: 'Reached' },
-  { value: 'attempted', label: 'Attempted' },
-  { value: 'unavailable', label: 'Unavailable' },
-  { value: 'wrong_number', label: 'Wrong number' },
-  { value: 'refused', label: 'Refused' },
-] as const;
 
 type GecVoter = {
   id: number;
@@ -179,18 +166,15 @@ export default function HouseholdsPage() {
   });
 
   const canvassMutation = useMutation({
-    mutationFn: async ({ contact, draft }: { contact: HouseholdContact; draft: CanvassDraft }) => {
-      const requests: Promise<unknown>[] = [];
-      if (draft.contact_classification && draft.contact_classification !== (contact.contact_classification || 'new_intake')) {
-        requests.push(updateSupporter(contact.id, { contact_classification: draft.contact_classification }));
-      }
-      requests.push(createSupporterContactAttempt(contact.id, {
-        channel: draft.channel,
-        outcome: draft.outcome,
-        note: draft.note.trim() || undefined,
-      }));
-      return Promise.all(requests);
-    },
+    mutationFn: ({ contact, draft }: { contact: HouseholdContact; draft: CanvassDraft }) =>
+      updateSupporterCanvass(contact.id, {
+        contact_classification: draft.contact_classification,
+        contact_attempt: {
+          channel: draft.channel,
+          outcome: draft.outcome,
+          note: draft.note.trim() || undefined,
+        },
+      }),
     onSuccess: () => {
       setActionError(null);
       setActionMessage('Saved the household canvassing update.');
@@ -555,7 +539,7 @@ export default function HouseholdsPage() {
 	                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
 	                                  aria-label="Contact method"
 	                                >
-	                                  {CONTACT_ATTEMPT_CHANNELS.map((option) => (
+	                                  {CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) => (
 	                                    <option key={option.value} value={option.value}>{option.label}</option>
 	                                  ))}
 	                                </select>
@@ -565,7 +549,7 @@ export default function HouseholdsPage() {
 	                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
 	                                  aria-label="Contact outcome"
 	                                >
-	                                  {CONTACT_ATTEMPT_OUTCOMES.map((option) => (
+	                                  {CONTACT_ATTEMPT_OUTCOME_OPTIONS.map((option) => (
 	                                    <option key={option.value} value={option.value}>{option.label}</option>
 	                                  ))}
 	                                </select>

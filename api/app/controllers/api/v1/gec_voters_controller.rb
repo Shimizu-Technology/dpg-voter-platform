@@ -108,7 +108,7 @@ module Api
           .limit(250)
           .to_a
 
-        latest_contact_attempts = latest_contact_attempts_for(contacts)
+        latest_contact_attempts = LatestSupporterContactAttempts.call(contacts, include_recorded_by: true)
 
         render json: {
           households: build_households(
@@ -1315,26 +1315,6 @@ module Api
           gec_voter_id: contact.gec_voter_id,
           latest_contact_attempt: latest_contact_attempt && contact_attempt_summary_json(latest_contact_attempt)
         }
-      end
-
-      def latest_contact_attempts_for(contacts)
-        contact_ids = Array(contacts).map(&:id)
-        return {} if contact_ids.empty?
-
-        ranked_attempts = SupporterContactAttempt
-          .select(
-            "supporter_contact_attempts.*, " \
-            "ROW_NUMBER() OVER (PARTITION BY supporter_id ORDER BY recorded_at DESC, id DESC) AS attempt_rank"
-          )
-          .where(supporter_id: contact_ids)
-
-        SupporterContactAttempt
-          .from(ranked_attempts, :supporter_contact_attempts)
-          .includes(:recorded_by_user)
-          .where("attempt_rank = 1")
-          .each_with_object({}) do |attempt, latest_by_contact|
-            latest_by_contact[attempt.supporter_id] = attempt
-          end
       end
 
       def contact_attempt_summary_json(attempt)

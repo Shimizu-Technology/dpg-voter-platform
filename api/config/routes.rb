@@ -21,6 +21,7 @@ Rails.application.routes.draw do
         member do
           patch :verify
           patch :review_intake
+          patch :canvass_update
           patch :resolve_duplicate
           patch :outreach_status
         end

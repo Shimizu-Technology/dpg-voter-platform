@@ -729,7 +729,7 @@ class ReportGenerator
     wb = package.workbook
     headers = supporter_cross_reference_headers(include_gec_columns: include_gec_columns, include_match_note: include_match_note)
     supporters = scope.to_a
-    latest_contact_attempts = latest_contact_attempts_for(supporters.map(&:id))
+    latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
 
     wb.add_worksheet(name: sheet_name.to_s[0..30]) do |sheet|
       sheet.add_row headers, style: header_style(wb)
@@ -751,7 +751,7 @@ class ReportGenerator
   def preview_supporter_cross_reference(scope:, include_gec_columns:, status_label:, include_match_note: false)
     total_count = scope.count
     supporters = scope.limit(@preview_limit).to_a
-    latest_contact_attempts = latest_contact_attempts_for(supporters.map(&:id))
+    latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
     {
       columns: supporter_cross_reference_headers(include_gec_columns: include_gec_columns, include_match_note: include_match_note),
       rows: supporters.map do |supporter|
@@ -821,25 +821,6 @@ class ReportGenerator
 
     values << possible_match_note(supporter) if include_match_note
     values
-  end
-
-  def latest_contact_attempts_for(supporter_ids)
-    supporter_ids = Array(supporter_ids).compact
-    return {} if supporter_ids.empty?
-
-    ranked_attempts = SupporterContactAttempt
-      .select(
-        "supporter_contact_attempts.*, " \
-        "ROW_NUMBER() OVER (PARTITION BY supporter_id ORDER BY recorded_at DESC, id DESC) AS attempt_rank"
-      )
-      .where(supporter_id: supporter_ids)
-
-    SupporterContactAttempt
-      .from(ranked_attempts, :supporter_contact_attempts)
-      .where("attempt_rank = 1")
-      .each_with_object({}) do |attempt, latest_by_supporter|
-        latest_by_supporter[attempt.supporter_id] = attempt
-      end
   end
 
   def possible_match_note(supporter)

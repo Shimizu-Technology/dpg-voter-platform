@@ -175,4 +175,105 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_equal "new_intake", supporter.reload.contact_classification
   end
+
+  test "review intake only accepts pending new intake records" do
+    village = Village.find_or_create_by!(name: "Tamuning")
+    supporter = Supporter.create!(
+      first_name: "Reviewed",
+      last_name: "Contact",
+      contact_number: "+16715554444",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "supporter",
+      review_status: "approved",
+      status: "active"
+    )
+
+    patch "/api/v1/supporters/#{supporter.id}/review_intake",
+      params: {
+        intake_review: {
+          decision: "reject",
+          contact_classification: "archived"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :conflict
+    supporter.reload
+    assert_equal "supporter", supporter.contact_classification
+    assert_equal "active", supporter.status
+  end
+
+  test "canvass update atomically classifies contact and logs attempt" do
+    village = Village.find_or_create_by!(name: "Inalåhan")
+    supporter = Supporter.create!(
+      first_name: "Door",
+      last_name: "Knock",
+      contact_number: "+16715556666",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "active"
+    )
+
+    assert_difference -> { SupporterContactAttempt.count }, 1 do
+      patch "/api/v1/supporters/#{supporter.id}/canvass_update",
+        params: {
+          canvass_update: {
+            contact_classification: "volunteer",
+            contact_attempt: {
+              channel: "in_person",
+              outcome: "reached",
+              note: "Wants to help next weekend."
+            }
+          }
+        },
+        headers: auth_headers(@admin),
+        as: :json
+    end
+
+    assert_response :success
+    supporter.reload
+    assert_equal "volunteer", supporter.contact_classification
+    assert_equal @admin.id, supporter.classified_by_user_id
+    assert_equal "in_person", supporter.supporter_contact_attempts.last.channel
+    assert_equal "household_canvass_logged", AuditLog.where(auditable: supporter).last.action
+  end
+
+  test "canvass update rolls back classification if contact attempt is invalid" do
+    village = Village.find_or_create_by!(name: "Malesso")
+    supporter = Supporter.create!(
+      first_name: "Rollback",
+      last_name: "Check",
+      contact_number: "+16715557777",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "active"
+    )
+
+    assert_no_difference -> { SupporterContactAttempt.count } do
+      patch "/api/v1/supporters/#{supporter.id}/canvass_update",
+        params: {
+          canvass_update: {
+            contact_classification: "supporter",
+            contact_attempt: {
+              channel: "in_person",
+              outcome: "maybe"
+            }
+          }
+        },
+        headers: auth_headers(@admin),
+        as: :json
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal "active_contact", supporter.reload.contact_classification
+  end
 end

@@ -12,8 +12,8 @@ module Api
 
       include Authenticatable
       include AuditLoggable
-      before_action :authenticate_request, only: [ :index, :check_duplicate, :export, :show, :update, :verify, :review_intake, :bulk_verify, :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :outreach, :outreach_status, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
-      before_action :require_supporter_access!, only: [ :index, :check_duplicate, :export, :show, :review_intake, :outreach, :outreach_status ]
+      before_action :authenticate_request, only: [ :index, :check_duplicate, :export, :show, :update, :verify, :review_intake, :canvass_update, :bulk_verify, :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :outreach, :outreach_status, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
+      before_action :require_supporter_access!, only: [ :index, :check_duplicate, :export, :show, :review_intake, :canvass_update, :outreach, :outreach_status ]
       before_action :require_data_ops_access!, only: [ :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
       before_action :require_chief_or_above!, only: [ :verify, :bulk_verify ]
 
@@ -165,6 +165,14 @@ module Api
         end
 
         supporter = scope_supporters(Supporter).find(params[:id])
+        unless intake_reviewable?(supporter)
+          return render_api_error(
+            message: "Only pending new-intake records can be reviewed from the intake queue",
+            status: :conflict,
+            code: "not_pending_intake"
+          )
+        end
+
         review = intake_review_params
         decision = review[:decision].presence || "approve"
         unless %w[approve reject].include?(decision)
@@ -219,6 +227,62 @@ module Api
         render json: {
           supporter: supporter_json(supporter.reload),
           contact_attempt: attempt && contact_attempt_summary_json(attempt)
+        }
+      end
+
+      # PATCH /api/v1/supporters/:id/canvass_update
+      def canvass_update
+        unless supporter_edit_allowed?
+          return render_api_error(
+            message: "You do not have permission to update household canvassing records",
+            status: :forbidden,
+            code: "supporter_edit_access_required"
+          )
+        end
+
+        supporter = scope_supporters(Supporter.contacts).find(params[:id])
+        canvass = canvass_update_params
+        classification = canvass[:contact_classification].presence
+        if classification.present? && !household_canvass_classification_allowed?(classification)
+          return render_api_error(
+            message: "Invalid household canvassing classification",
+            status: :unprocessable_entity,
+            code: "invalid_contact_classification"
+          )
+        end
+
+        old_classification = supporter.contact_classification
+        attempt = nil
+
+        begin
+          ApplicationRecord.transaction do
+            if classification.present? && classification != supporter.contact_classification
+              updates = { contact_classification: classification }
+              apply_contact_classification_metadata!(supporter, updates)
+              supporter.update!(updates)
+            end
+
+            attempt = create_required_canvass_contact_attempt!(supporter, canvass[:contact_attempt])
+            log_audit!(supporter, action: "household_canvass_logged", changed_data: {
+              "contact_classification" => old_classification == supporter.contact_classification ? nil : [ old_classification, supporter.contact_classification ],
+              "contact_attempt_id" => attempt.id,
+              "channel" => attempt.channel,
+              "outcome" => attempt.outcome,
+              "recorded_at" => attempt.recorded_at&.iso8601
+            }.compact)
+          end
+        rescue ActiveRecord::RecordInvalid => e
+          return render_api_error(
+            message: e.record.errors.full_messages.to_sentence,
+            status: :unprocessable_entity,
+            code: "canvass_update_failed"
+          )
+        end
+
+        CampaignBroadcast.supporter_updated(supporter, action: "household_canvass_logged")
+        render json: {
+          supporter: supporter_json(supporter.reload),
+          contact_attempt: contact_attempt_summary_json(attempt)
         }
       end
 
@@ -635,7 +699,7 @@ module Api
         }
 
         supporters = supporters.offset((page - 1) * per_page).limit(per_page).to_a
-        latest_contact_attempts = latest_contact_attempts_for(supporters)
+        latest_contact_attempts = LatestSupporterContactAttempts.call(supporters, include_recorded_by: true)
 
         render json: {
           supporters: supporters.map { |s| outreach_json(s, latest_contact_attempt: latest_contact_attempts[s.id]) },
@@ -1043,6 +1107,13 @@ module Api
         )
       end
 
+      def canvass_update_params
+        params.require(:canvass_update).permit(
+          :contact_classification,
+          contact_attempt: [ :channel, :outcome, :note, :recorded_at ]
+        )
+      end
+
       def normalized_public_supporter_params
         normalize_registered_voter_fields(public_supporter_params.to_h.except("household_members"))
       end
@@ -1074,6 +1145,16 @@ module Api
         decision == "reject" ? "invalid" : "active_contact"
       end
 
+      def intake_reviewable?(supporter)
+        supporter.status == "active" &&
+          supporter.contact_classification == "new_intake" &&
+          supporter.review_status == "pending"
+      end
+
+      def household_canvass_classification_allowed?(classification)
+        %w[active_contact supporter member volunteer undecided not_supporting].include?(classification)
+      end
+
       def intake_review_status_updates(classification, decision, supporter)
         rejected = decision == "reject" || %w[duplicate invalid archived].include?(classification)
         updates = {
@@ -1091,6 +1172,13 @@ module Api
         attrs = attempt_params.to_h.symbolize_keys
         return nil if attrs[:channel].blank? && attrs[:outcome].blank? && attrs[:note].blank?
 
+        attrs[:recorded_at] = parsed_contact_attempt_recorded_at(attrs[:recorded_at]) if attrs.key?(:recorded_at)
+        attrs[:recorded_at] ||= Time.current
+        supporter.supporter_contact_attempts.create!(attrs.merge(recorded_by_user: current_user))
+      end
+
+      def create_required_canvass_contact_attempt!(supporter, attempt_params)
+        attrs = attempt_params.present? ? attempt_params.to_h.symbolize_keys : {}
         attrs[:recorded_at] = parsed_contact_attempt_recorded_at(attrs[:recorded_at]) if attrs.key?(:recorded_at)
         attrs[:recorded_at] ||= Time.current
         supporter.supporter_contact_attempts.create!(attrs.merge(recorded_by_user: current_user))
@@ -1405,26 +1493,6 @@ module Api
           contact_classification: supporter.contact_classification,
           created_at: supporter.created_at&.iso8601
         }
-      end
-
-      def latest_contact_attempts_for(supporters)
-        supporter_ids = supporters.map(&:id)
-        return {} if supporter_ids.empty?
-
-        ranked_attempts = SupporterContactAttempt
-          .select(
-            "supporter_contact_attempts.*, " \
-            "ROW_NUMBER() OVER (PARTITION BY supporter_id ORDER BY recorded_at DESC, id DESC) AS attempt_rank"
-          )
-          .where(supporter_id: supporter_ids)
-
-        SupporterContactAttempt
-          .from(ranked_attempts, :supporter_contact_attempts)
-          .includes(:recorded_by_user)
-          .where("attempt_rank = 1")
-          .each_with_object({}) do |attempt, latest_by_supporter|
-            latest_by_supporter[attempt.supporter_id] = attempt
-          end
       end
 
       def contact_attempt_summary_json(attempt)

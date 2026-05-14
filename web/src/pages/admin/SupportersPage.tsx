@@ -6,6 +6,7 @@ import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle,
 import { motion, useReducedMotion } from 'framer-motion';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
+import { OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS } from '../../lib/contactAttempt';
 import { useSession } from '../../hooks/useSession';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import WorkspacePage from '../../components/WorkspacePage';
@@ -85,22 +86,6 @@ const PER_PAGE_OPTIONS = [25, 50, 100, 200] as const;
 type PerPage = (typeof PER_PAGE_OPTIONS)[number];
 const REVIEWED_CLASSIFICATION_FILTER = 'reviewed_contacts';
 const ALL_CLASSIFICATIONS_FILTER = 'all_classifications';
-const CONTACT_ATTEMPT_CHANNELS = [
-  { value: '', label: 'No initial outreach logged' },
-  { value: 'call', label: 'Call' },
-  { value: 'sms', label: 'SMS' },
-  { value: 'email', label: 'Email' },
-  { value: 'in_person', label: 'In person' },
-] as const;
-const CONTACT_ATTEMPT_OUTCOMES = [
-  { value: '', label: 'Select outcome' },
-  { value: 'attempted', label: 'Attempted' },
-  { value: 'reached', label: 'Reached' },
-  { value: 'wrong_number', label: 'Wrong number' },
-  { value: 'unavailable', label: 'Unavailable' },
-  { value: 'refused', label: 'Refused' },
-] as const;
-
 type IntakeReviewDraft = {
   decision: 'approve' | 'reject';
   contact_classification: string;
@@ -1188,7 +1173,7 @@ export default function SupportersPage() {
 	                    onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_channel: event.target.value }))}
 	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
 	                  >
-	                    {CONTACT_ATTEMPT_CHANNELS.map((option) => (
+	                    {OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) => (
 	                      <option key={option.value} value={option.value}>{option.label}</option>
 	                    ))}
 	                  </select>
@@ -1198,7 +1183,7 @@ export default function SupportersPage() {
 	                    disabled={!reviewDraft.contact_attempt_channel}
 	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
 	                  >
-	                    {CONTACT_ATTEMPT_OUTCOMES.map((option) => (
+	                    {OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS.map((option) => (
 	                      <option key={option.value} value={option.value}>{option.label}</option>
 	                    ))}
 	                  </select>
