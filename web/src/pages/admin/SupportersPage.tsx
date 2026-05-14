@@ -249,6 +249,10 @@ function hasCompleteIntakeContactAttempt(draft: IntakeReviewDraft) {
   return Boolean(draft.contact_attempt_channel && draft.contact_attempt_outcome);
 }
 
+function isTerminalIntakeClassification(classification: string) {
+  return ['duplicate', 'invalid', 'archived'].includes(classification);
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error && 'response' in error) {
@@ -482,7 +486,7 @@ export default function SupportersPage() {
   const openIntakeReview = (supporter: SupporterItem, classification = 'active_contact') => {
     setReviewingSupporter(supporter);
     setReviewDraft({
-      decision: ['duplicate', 'invalid', 'archived'].includes(classification) ? 'reject' : 'approve',
+      decision: isTerminalIntakeClassification(classification) ? 'reject' : 'approve',
       contact_classification: classification,
       support_status: supporter.support_status || 'unknown',
       membership_status: supporter.membership_status || 'not_member',
@@ -1197,7 +1201,7 @@ export default function SupportersPage() {
                         setReviewDraft((draft) => ({
                           ...draft,
                           contact_classification: classification,
-                          decision: ['duplicate', 'invalid', 'archived'].includes(classification) ? 'reject' : 'approve',
+                          decision: isTerminalIntakeClassification(classification) ? 'reject' : 'approve',
                         }));
                       }}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
@@ -1211,7 +1215,16 @@ export default function SupportersPage() {
                     <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Review decision</span>
                     <select
                       value={reviewDraft.decision}
-                      onChange={(event) => setReviewDraft((draft) => ({ ...draft, decision: event.target.value as 'approve' | 'reject' }))}
+                      onChange={(event) => {
+                        const decision = event.target.value as 'approve' | 'reject';
+                        setReviewDraft((draft) => ({
+                          ...draft,
+                          decision,
+                          contact_classification: decision === 'reject'
+                            ? (isTerminalIntakeClassification(draft.contact_classification) ? draft.contact_classification : 'invalid')
+                            : (isTerminalIntakeClassification(draft.contact_classification) ? 'active_contact' : draft.contact_classification),
+                        }));
+                      }}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
                     >
                       <option value="approve">Approve into DPG records</option>
