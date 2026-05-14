@@ -82,6 +82,12 @@ type SortField = 'created_at' | 'print_name' | 'village_name' | 'source' | 'regi
 const SORT_FIELDS: SortField[] = ['created_at', 'print_name', 'village_name', 'source', 'registered_voter'];
 const PER_PAGE_OPTIONS = [25, 50, 100, 200] as const;
 type PerPage = (typeof PER_PAGE_OPTIONS)[number];
+const REVIEWED_CLASSIFICATION_FILTER = 'reviewed_contacts';
+const ALL_CLASSIFICATIONS_FILTER = 'all_classifications';
+
+function defaultClassificationFilter(isIntakeView: boolean) {
+  return isIntakeView ? 'new_intake' : REVIEWED_CLASSIFICATION_FILTER;
+}
 
 function parseSortField(value: string | null): SortField {
   return SORT_FIELDS.includes(value as SortField) ? (value as SortField) : 'created_at';
@@ -210,6 +216,7 @@ export default function SupportersPage() {
   const { data: sessionData } = useSession();
   const location = useLocation();
   const isIntakeView = location.pathname === '/admin/intake';
+  const viewKey = isIntakeView ? 'intake' : 'contacts';
   const [returnTo] = useState(searchParams.get('return_to') || '');
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [villageFilter, setVillageFilter] = useState(searchParams.get('village_id') || '');
@@ -217,7 +224,7 @@ export default function SupportersPage() {
   const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '');
   const [optInFilter, setOptInFilter] = useState(searchParams.get('opt_in') || '');
   const [verificationFilter, setVerificationFilter] = useState(searchParams.get('verification_status') || '');
-  const [classificationFilter, setClassificationFilter] = useState(searchParams.get('contact_classification') || (isIntakeView ? 'new_intake' : ''));
+  const [classificationFilter, setClassificationFilter] = useState(searchParams.get('contact_classification') || defaultClassificationFilter(isIntakeView));
   const [registeredStatusFilter, setRegisteredStatusFilter] = useState(searchParams.get('registered_voter_status') || '');
   const [supportNeedFilter, setSupportNeedFilter] = useState(searchParams.get('support_need') || '');
   const [lifecycleFilter, setLifecycleFilter] = useState(searchParams.get('status') || 'active');
@@ -230,6 +237,8 @@ export default function SupportersPage() {
   const [pendingPrecinctBySupporter, setPendingPrecinctBySupporter] = useState<Record<number, string>>({});
   const prefersReducedMotion = useReducedMotion();
   const debouncedSearch = useDebouncedValue(search, 250);
+  const contactClassificationParam = [REVIEWED_CLASSIFICATION_FILTER, ALL_CLASSIFICATIONS_FILTER].includes(classificationFilter) ? undefined : classificationFilter || undefined;
+  const excludeContactClassificationParam = classificationFilter === REVIEWED_CLASSIFICATION_FILTER ? 'new_intake' : undefined;
 
   const { data: villageData } = useQuery({ queryKey: ['villages'], queryFn: getVillages });
   const villages: VillageOption[] = useMemo(() => villageData?.villages || [], [villageData]);
@@ -269,7 +278,7 @@ export default function SupportersPage() {
     if (sourceFilter) params.set('source', sourceFilter);
     if (optInFilter) params.set('opt_in', optInFilter);
     if (verificationFilter) params.set('verification_status', verificationFilter);
-    if (classificationFilter) params.set('contact_classification', classificationFilter);
+    if (classificationFilter && classificationFilter !== defaultClassificationFilter(isIntakeView)) params.set('contact_classification', classificationFilter);
     if (registeredStatusFilter) params.set('registered_voter_status', registeredStatusFilter);
     if (supportNeedFilter) params.set('support_need', supportNeedFilter);
     if (lifecycleFilter) params.set('status', lifecycleFilter);
@@ -279,10 +288,10 @@ export default function SupportersPage() {
     params.set('per_page', String(perPage));
     if (returnTo) params.set('return_to', returnTo);
     setSearchParams(params, { replace: true });
-  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, setSearchParams]);
+  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, isIntakeView, setSearchParams]);
 
   const { data, isFetching } = useQuery<SupportersResponse>({
-    queryKey: ['supporters', debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
+    queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
     queryFn: () => getSupporters({
       search: debouncedSearch,
       village_id: effectiveVillageFilter || undefined,
@@ -291,7 +300,8 @@ export default function SupportersPage() {
       opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
       opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
       verification_status: verificationFilter || undefined,
-      contact_classification: classificationFilter || undefined,
+      contact_classification: contactClassificationParam,
+      exclude_contact_classification: excludeContactClassificationParam,
       registered_voter_status: registeredStatusFilter || undefined,
       support_need: supportNeedFilter || undefined,
       status: lifecycleFilter || undefined,
@@ -301,7 +311,6 @@ export default function SupportersPage() {
       page,
       per_page: perPage,
     }),
-    placeholderData: (previous) => previous,
   });
   const highVolumeMode = (data?.pagination.total || 0) >= 5000;
   const shouldAnimateRows = !prefersReducedMotion && !highVolumeMode;
@@ -332,7 +341,7 @@ export default function SupportersPage() {
     const totalPages = data.pagination.pages;
     if (page < totalPages) {
       void queryClient.prefetchQuery({
-        queryKey: ['supporters', debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
+        queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
         queryFn: () => getSupporters({
           search: debouncedSearch,
           village_id: effectiveVillageFilter || undefined,
@@ -341,7 +350,8 @@ export default function SupportersPage() {
           opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
           opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
           verification_status: verificationFilter || undefined,
-          contact_classification: classificationFilter || undefined,
+          contact_classification: contactClassificationParam,
+          exclude_contact_classification: excludeContactClassificationParam,
           registered_voter_status: registeredStatusFilter || undefined,
           support_need: supportNeedFilter || undefined,
           status: lifecycleFilter || undefined,
@@ -353,7 +363,7 @@ export default function SupportersPage() {
         }),
       });
     }
-  }, [data, page, perPage, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
+  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
 
   const assignPrecinctMutation = useMutation({
     mutationFn: ({ supporterId, precinctId }: { supporterId: number; precinctId: number }) =>
@@ -444,7 +454,7 @@ export default function SupportersPage() {
           </Link>
         )}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{isIntakeView ? 'New Intake' : 'All Contacts'}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{isIntakeView ? 'Pending Intake' : 'All Contacts'}</h1>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => exportSupporters({
@@ -453,7 +463,8 @@ export default function SupportersPage() {
                 source: sourceFilter || undefined,
                 opt_in: optInFilter || undefined,
                 verification_status: verificationFilter || undefined,
-                contact_classification: classificationFilter || undefined,
+                contact_classification: contactClassificationParam,
+                exclude_contact_classification: excludeContactClassificationParam,
                 registered_voter_status: registeredStatusFilter || undefined,
                 support_need: supportNeedFilter || undefined,
                 status: lifecycleFilter || undefined,
@@ -549,7 +560,14 @@ export default function SupportersPage() {
             }}
             className="md:col-span-2 px-3 py-3 border border-[var(--border-soft)] rounded-xl bg-[var(--surface-raised)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary focus:border-transparent min-w-0"
           >
-            <option value="">{isIntakeView ? 'All intake records' : 'All classifications'}</option>
+            {isIntakeView ? (
+              <option value={ALL_CLASSIFICATIONS_FILTER}>All intake records</option>
+            ) : (
+              <>
+                <option value={REVIEWED_CLASSIFICATION_FILTER}>Reviewed contacts</option>
+                <option value={ALL_CLASSIFICATIONS_FILTER}>All classifications</option>
+              </>
+            )}
             {CONTACT_CLASSIFICATION_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}

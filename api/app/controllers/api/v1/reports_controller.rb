@@ -177,7 +177,7 @@ module Api
             dpg_contacts_unlinked_from_gec: scoped_cross_reference_contacts.where(gec_voter_id: nil).count,
             possible_gec_matches: scoped_cross_reference_contacts.where(gec_voter_id: nil, verification_status: "flagged").count,
             gec_voters_not_in_dpg: scoped_cross_reference_gec_voters
-              .where.not(id: Supporter.contacts.where.not(gec_voter_id: nil).select(:gec_voter_id))
+              .where.not(id: scoped_cross_reference_contacts.where.not(gec_voter_id: nil).select(:gec_voter_id))
               .count
           )
         end

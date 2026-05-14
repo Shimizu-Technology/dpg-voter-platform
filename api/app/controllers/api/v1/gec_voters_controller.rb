@@ -513,11 +513,12 @@ module Api
             dob: voter.dob,
             source: "staff_entry",
             attribution_method: "staff_manual",
-            contact_classification: params[:contact_classification].presence_in(Supporter::CONTACT_CLASSIFICATIONS) || "active_contact",
+            contact_classification: params[:contact_classification].presence_in(Supporter::CONTACT_CLASSIFICATIONS) || "new_intake",
             entered_by: current_user,
             registered_voter: true,
             self_reported_registered_voter: true,
             registered_voter_status: "yes",
+            review_status: "pending",
             status: "active"
           )
           contact.update!(
@@ -672,11 +673,13 @@ module Api
       end
 
       def apply_linked_filter(scope, linked_status)
+        linked_voter_ids = scope_supporters(Supporter.contacts).where.not(gec_voter_id: nil).select(:gec_voter_id)
+
         case linked_status.to_s
         when "linked"
-          scope.where(id: Supporter.contacts.where.not(gec_voter_id: nil).select(:gec_voter_id))
+          scope.where(id: linked_voter_ids)
         when "unlinked"
-          scope.where.not(id: Supporter.contacts.where.not(gec_voter_id: nil).select(:gec_voter_id))
+          scope.where.not(id: linked_voter_ids)
         else
           scope
         end
@@ -1210,7 +1213,7 @@ module Api
         ids = Array(voter_ids).compact
         return {} if ids.empty?
 
-        Supporter.contacts
+        scope_supporters(Supporter.contacts)
           .where(gec_voter_id: ids)
           .order(:id)
           .group_by(&:gec_voter_id)
@@ -1226,7 +1229,7 @@ module Api
           ]
         ).merge(
           precinct_label: voter.precinct&.number,
-          linked_contact_count: linked_contact_count || Supporter.contacts.where(gec_voter_id: voter.id).count,
+          linked_contact_count: linked_contact_count || scope_supporters(Supporter.contacts).where(gec_voter_id: voter.id).count,
           linked_contact: linked_contact && supporter_json(linked_contact)
         )
       end

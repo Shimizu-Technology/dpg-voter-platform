@@ -115,7 +115,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_response :created
     contact = Supporter.find(JSON.parse(response.body).dig("supporter", "id"))
     assert_equal @voter.id, contact.gec_voter_id
-    assert_equal "active_contact", contact.contact_classification
+    assert_equal "new_intake", contact.contact_classification
+    assert_equal "pending", contact.review_status
     assert_equal "verified", contact.verification_status
     assert_equal "yes", contact.registered_voter_status
   end

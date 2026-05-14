@@ -526,7 +526,7 @@ export default function GecVotersPage() {
     mutationFn: (voterId: number) => createContactFromGecVoter(voterId),
     onSuccess: () => {
       setActionError(null);
-      setActionMessage('Created and linked the DPG contact.');
+      setActionMessage('Created a pending intake contact and linked it to this GEC voter.');
       void queryClient.invalidateQueries({ queryKey: ['gec-voters'] });
       void queryClient.invalidateQueries({ queryKey: ['gec-households'] });
       void queryClient.invalidateQueries({ queryKey: ['session'] });

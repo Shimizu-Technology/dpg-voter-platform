@@ -39,7 +39,7 @@ class DpgReadinessSmokeTest < ActionDispatch::IntegrationTest
     public_payload = JSON.parse(response.body)
     assert_equal 1, public_payload["household_supporters_created"]
     assert_equal "accepted", public_payload.dig("supporter", "intake_status")
-    assert_equal "approved", public_payload.dig("supporter", "review_status")
+    assert_equal "pending", public_payload.dig("supporter", "review_status")
     assert_equal "not_applicable", public_payload.dig("supporter", "public_review_status")
     assert_enqueued_jobs 0
 
@@ -70,6 +70,21 @@ class DpgReadinessSmokeTest < ActionDispatch::IntegrationTest
 
     get "/api/v1/supporters",
       params: { search: "public-signup@example.com" },
+      headers: auth_headers(@admin)
+    assert_response :success
+    public_rows = JSON.parse(response.body)["supporters"]
+    assert_operator public_rows.size, :>=, 1
+    assert_equal "new_intake", public_rows.first.fetch("contact_classification")
+    assert_equal "pending", public_rows.first.fetch("review_status")
+
+    get "/api/v1/supporters",
+      params: { search: "public-signup@example.com", exclude_contact_classification: "new_intake" },
+      headers: auth_headers(@admin)
+    assert_response :success
+    assert_empty JSON.parse(response.body)["supporters"]
+
+    get "/api/v1/supporters",
+      params: { search: "public-signup@example.com", contact_classification: "new_intake" },
       headers: auth_headers(@admin)
     assert_response :success
     assert_operator JSON.parse(response.body)["supporters"].size, :>=, 1
