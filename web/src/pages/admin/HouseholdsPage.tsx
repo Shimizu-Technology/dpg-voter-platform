@@ -497,7 +497,7 @@ export default function HouseholdsPage() {
 	                            <span>{contact.current_gec_match ? 'Linked to current GEC voter' : 'No current GEC link'}</span>
 	                            {contact.latest_contact_attempt ? (
 	                              <span>
-	                                Last: {contact.latest_contact_attempt.channel.replace('_', ' ')} / {contact.latest_contact_attempt.outcome.replace('_', ' ')}
+	                                Last: {contact.latest_contact_attempt.channel.replaceAll('_', ' ')} / {contact.latest_contact_attempt.outcome.replaceAll('_', ' ')}
 	                                {contact.latest_contact_attempt.recorded_at ? ` on ${formatDateTime(contact.latest_contact_attempt.recorded_at)}` : ''}
 	                              </span>
 	                            ) : (
