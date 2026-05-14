@@ -155,6 +155,10 @@ module Api
           public_signups: scope_supporters(Supporter.active.public_signups).count,
           unregistered: supporter_scope.where(registered_voter: false).count,
           referral_list_size: scope_supporters(Supporter.working_supporters.submitted_village_referrals).count,
+          dpg_contacts_linked_to_gec: 0,
+          dpg_contacts_unlinked_from_gec: 0,
+          gec_voters_not_in_dpg: 0,
+          possible_gec_matches: 0,
           transfer_list_size: 0,
           mapping_issues_list_size: 0,
           transfers: 0,
@@ -168,7 +172,13 @@ module Api
             mapping_issues_list_size: mapping_issues.count,
             transfers: village_changes.count,
             purge_list_size: GecVoter.where(status: "removed").count,
-            latest_import_removed_voters: latest_import&.removed_records.to_i
+            latest_import_removed_voters: latest_import&.removed_records.to_i,
+            dpg_contacts_linked_to_gec: scoped_cross_reference_contacts.where.not(gec_voter_id: nil).count,
+            dpg_contacts_unlinked_from_gec: scoped_cross_reference_contacts.where(gec_voter_id: nil).count,
+            possible_gec_matches: scoped_cross_reference_contacts.where(gec_voter_id: nil, verification_status: "flagged").count,
+            gec_voters_not_in_dpg: scoped_cross_reference_gec_voters
+              .where.not(id: scoped_cross_reference_contacts.where.not(gec_voter_id: nil).select(:gec_voter_id))
+              .count
           )
         end
 
@@ -197,6 +207,14 @@ module Api
           "Village Change List"
         when "mapping_issues_list"
           "Village Mapping Issues"
+        when "dpg_contacts_linked_to_gec"
+          "DPG Contacts Linked To GEC"
+        when "dpg_contacts_unlinked_from_gec"
+          "DPG Contacts Not Linked To GEC"
+        when "gec_voters_not_in_dpg"
+          "GEC Voters Not In DPG Contacts"
+        when "possible_gec_matches"
+          "Possible GEC Matches"
         else
           type.humanize.titleize
         end
@@ -216,6 +234,14 @@ module Api
           "GEC voters whose latest village could not be mapped cleanly to an official village"
         when "supporter_summary"
           "Per-village supporter summary with official totals and review status"
+        when "dpg_contacts_linked_to_gec"
+          "DPG contacts already linked to an official GEC voter record"
+        when "dpg_contacts_unlinked_from_gec"
+          "DPG contacts that still need a GEC voter link or registration follow-up"
+        when "gec_voters_not_in_dpg"
+          "Current public GEC voters without any linked DPG contact"
+        when "possible_gec_matches"
+          "Flagged DPG contacts with possible GEC matches for manual review"
         end
       end
 
@@ -236,6 +262,14 @@ module Api
           scope = scope.joins(:village).where(villages: { district_id: current_user.assigned_district_id })
         end
         scope
+      end
+
+      def scoped_cross_reference_contacts
+        scope_supporters(Supporter.contacts)
+      end
+
+      def scoped_cross_reference_gec_voters
+        GecVoter.active
       end
 
       def resolved_report_filters

@@ -183,7 +183,7 @@ export const downloadGecImportFile = (importId: number) =>
     link.remove();
     return r.data;
   });
-export const createContactFromGecVoter = (gecVoterId: number, contactClassification = 'active_contact') =>
+export const createContactFromGecVoter = (gecVoterId: number, contactClassification = 'new_intake') =>
   api.post(`/gec_voters/${gecVoterId}/create_contact`, { contact_classification: contactClassification }).then(r => r.data);
 export const linkContactToGecVoter = (gecVoterId: number, supporterId: number) =>
   api.post(`/gec_voters/${gecVoterId}/link_contact`, { supporter_id: supporterId }).then(r => r.data);

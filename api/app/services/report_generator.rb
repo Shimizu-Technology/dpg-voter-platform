@@ -10,8 +10,23 @@
 #   - referral_list: Supporters submitted under the wrong village
 #   - mapping_issues_list: GEC voters whose village became unmapped / unassigned
 #   - supporter_summary: Totals by village with supporter review status
+#   - dpg_contacts_linked_to_gec: DPG contacts already tied to public GEC voters
+#   - dpg_contacts_unlinked_from_gec: DPG contacts not tied to public GEC voters
+#   - gec_voters_not_in_dpg: Public GEC voters with no linked DPG contact
+#   - possible_gec_matches: DPG contacts with a possible/manual GEC match
 class ReportGenerator
-  REPORT_TYPES = %w[support_list purge_list transfer_list referral_list mapping_issues_list supporter_summary].freeze
+  REPORT_TYPES = %w[
+    support_list
+    purge_list
+    transfer_list
+    referral_list
+    mapping_issues_list
+    supporter_summary
+    dpg_contacts_linked_to_gec
+    dpg_contacts_unlinked_from_gec
+    gec_voters_not_in_dpg
+    possible_gec_matches
+  ].freeze
 
   def initialize(
     report_type:,
@@ -81,6 +96,7 @@ class ReportGenerator
 
   def apply_gec_geography_filters(scope)
     scope = scope.where(village_id: @village_id) if @village_id.present?
+    scope = scope.where(precinct_id: @precinct_id) if @precinct_id.present?
     scope = scope.joins(:village).where(villages: { district_id: @district_id }) if @district_id.present?
     scope
   end
@@ -212,6 +228,30 @@ class ReportGenerator
 
   def purge_scope
     scope = GecVoter.where(status: "removed")
+    apply_gec_geography_filters(scope)
+  end
+
+  def dpg_contact_scope
+    scope = Supporter.contacts.includes(:village, :precinct, :gec_voter, :entered_by)
+    scope = apply_supporter_geography_filters(scope)
+    apply_supporter_report_filters(scope)
+  end
+
+  def dpg_contacts_linked_to_gec_scope
+    dpg_contact_scope.where.not(gec_voter_id: nil)
+  end
+
+  def dpg_contacts_unlinked_from_gec_scope
+    dpg_contact_scope.where(gec_voter_id: nil)
+  end
+
+  def possible_gec_matches_scope
+    dpg_contacts_unlinked_from_gec_scope.where(verification_status: "flagged")
+  end
+
+  def gec_voters_not_in_dpg_scope
+    linked_voter_ids = Supporter.contacts.where.not(gec_voter_id: nil).select(:gec_voter_id)
+    scope = GecVoter.active.where.not(id: linked_voter_ids).includes(:village, :precinct)
     apply_gec_geography_filters(scope)
   end
 
@@ -464,6 +504,57 @@ class ReportGenerator
     { package: package, filename: "supporter-summary-#{date_today}.xlsx" }
   end
 
+  # ── DPG / GEC Cross-Reference Reports ─────────────────────────
+
+  def generate_dpg_contacts_linked_to_gec
+    generate_supporter_cross_reference_report(
+      scope: dpg_contacts_linked_to_gec_scope.order(:last_name, :first_name),
+      sheet_name: "Linked DPG Contacts",
+      filename: "dpg-contacts-linked-to-gec-#{date_today}.xlsx",
+      include_gec_columns: true,
+      status_label: "Linked to GEC"
+    )
+  end
+
+  def generate_dpg_contacts_unlinked_from_gec
+    generate_supporter_cross_reference_report(
+      scope: dpg_contacts_unlinked_from_gec_scope.order(:last_name, :first_name),
+      sheet_name: "Unlinked DPG Contacts",
+      filename: "dpg-contacts-unlinked-from-gec-#{date_today}.xlsx",
+      include_gec_columns: false,
+      status_label: "No linked GEC voter"
+    )
+  end
+
+  def generate_possible_gec_matches
+    generate_supporter_cross_reference_report(
+      scope: possible_gec_matches_scope.order(:last_name, :first_name),
+      sheet_name: "Possible GEC Matches",
+      filename: "possible-gec-matches-#{date_today}.xlsx",
+      include_gec_columns: false,
+      status_label: "Needs manual GEC review",
+      include_match_note: true
+    )
+  end
+
+  def generate_gec_voters_not_in_dpg
+    scope = gec_voters_not_in_dpg_scope.order(:village_name, :last_name, :first_name)
+
+    package = Axlsx::Package.new
+    wb = package.workbook
+    headers = [ "Last Name", "First Name", "DOB", "Birth Year", "Address", "Village", "Precinct", "Voter Reg #", "GEC List Date", "Status" ]
+
+    wb.add_worksheet(name: "GEC Not In DPG") do |sheet|
+      sheet.add_row headers, style: header_style(wb)
+      scope.each do |voter|
+        sheet.add_row gec_voter_cross_reference_values(voter)
+      end
+      sheet.column_widths 16, 16, 12, 10, 30, 18, 10, 16, 14, 20
+    end
+
+    { package: package, filename: "gec-voters-not-in-dpg-#{date_today}.xlsx" }
+  end
+
   # ── Preview Helpers ───────────────────────────────────────────
 
   def preview_support_list
@@ -595,7 +686,154 @@ class ReportGenerator
     }
   end
 
+  def preview_dpg_contacts_linked_to_gec
+    preview_supporter_cross_reference(
+      scope: dpg_contacts_linked_to_gec_scope.order(:last_name, :first_name),
+      include_gec_columns: true,
+      status_label: "Linked to GEC"
+    )
+  end
+
+  def preview_dpg_contacts_unlinked_from_gec
+    preview_supporter_cross_reference(
+      scope: dpg_contacts_unlinked_from_gec_scope.order(:last_name, :first_name),
+      include_gec_columns: false,
+      status_label: "No linked GEC voter"
+    )
+  end
+
+  def preview_possible_gec_matches
+    preview_supporter_cross_reference(
+      scope: possible_gec_matches_scope.order(:last_name, :first_name),
+      include_gec_columns: false,
+      status_label: "Needs manual GEC review",
+      include_match_note: true
+    )
+  end
+
+  def preview_gec_voters_not_in_dpg
+    scope = gec_voters_not_in_dpg_scope.order(:village_name, :last_name, :first_name)
+    total_count = scope.count
+
+    {
+      columns: [ "Last Name", "First Name", "DOB", "Birth Year", "Address", "Village", "Precinct", "Voter Reg #", "GEC List Date", "Status" ],
+      rows: scope.limit(@preview_limit).map { |voter| gec_voter_cross_reference_values(voter) },
+      total_count: total_count
+    }
+  end
+
   # ── Helpers ───────────────────────────────────────────────────
+
+  def generate_supporter_cross_reference_report(scope:, sheet_name:, filename:, include_gec_columns:, status_label:, include_match_note: false)
+    package = Axlsx::Package.new
+    wb = package.workbook
+    headers = supporter_cross_reference_headers(include_gec_columns: include_gec_columns, include_match_note: include_match_note)
+
+    wb.add_worksheet(name: sheet_name.to_s[0..30]) do |sheet|
+      sheet.add_row headers, style: header_style(wb)
+      scope.each do |supporter|
+        sheet.add_row supporter_cross_reference_values(
+          supporter,
+          include_gec_columns: include_gec_columns,
+          status_label: status_label,
+          include_match_note: include_match_note
+        )
+      end
+      sheet.column_widths(*Array.new(headers.length, 18))
+    end
+
+    { package: package, filename: filename }
+  end
+
+  def preview_supporter_cross_reference(scope:, include_gec_columns:, status_label:, include_match_note: false)
+    total_count = scope.count
+    {
+      columns: supporter_cross_reference_headers(include_gec_columns: include_gec_columns, include_match_note: include_match_note),
+      rows: scope.limit(@preview_limit).map do |supporter|
+        supporter_cross_reference_values(
+          supporter,
+          include_gec_columns: include_gec_columns,
+          status_label: status_label,
+          include_match_note: include_match_note
+        )
+      end,
+      total_count: total_count
+    }
+  end
+
+  def supporter_cross_reference_headers(include_gec_columns:, include_match_note:)
+    headers = [
+      "Last Name",
+      "First Name",
+      "DOB",
+      "Phone",
+      "Email",
+      "Street Address",
+      "Village",
+      "Precinct",
+      "Classification",
+      "Verification",
+      "Cross-Reference Status"
+    ]
+    headers += [ "GEC Reg #", "GEC Village", "GEC Precinct", "GEC Birth Year" ] if include_gec_columns
+    headers << "Match Review Note" if include_match_note
+    headers
+  end
+
+  def supporter_cross_reference_values(supporter, include_gec_columns:, status_label:, include_match_note:)
+    values = [
+      supporter.last_name,
+      supporter.first_name,
+      format_date(supporter.dob),
+      supporter.contact_number,
+      supporter.email,
+      supporter.street_address,
+      supporter.village&.name,
+      supporter.precinct&.number,
+      supporter.contact_classification&.humanize,
+      supporter.verification_status&.humanize,
+      status_label
+    ]
+
+    if include_gec_columns
+      voter = supporter.gec_voter
+      values += [
+        voter&.voter_registration_number,
+        voter&.village_name,
+        voter&.precinct_number,
+        voter&.birth_year
+      ]
+    end
+
+    values << possible_match_note(supporter) if include_match_note
+    values
+  end
+
+  def possible_match_note(supporter)
+    metadata = supporter.verification_reason_metadata || {}
+    [
+      supporter.verification_reason&.humanize,
+      metadata["confidence"].presence && "Confidence: #{metadata['confidence']}",
+      metadata["match_type"].presence && "Match: #{metadata['match_type'].to_s.humanize}",
+      metadata["match_count"].presence && "Candidates: #{metadata['match_count']}",
+      metadata["gec_village_name"].presence && "GEC village: #{metadata['gec_village_name']}"
+    ].compact.join(" · ")
+  end
+
+  def gec_voter_cross_reference_values(voter)
+    [
+      voter.last_name,
+      voter.first_name,
+      format_date(voter.dob),
+      voter.birth_year,
+      voter.address,
+      voter.village_name,
+      voter.precinct_number,
+      voter.voter_registration_number,
+      format_date(voter.gec_list_date),
+      "No linked DPG contact"
+    ]
+  end
 
   def empty_report(name, message)
     package = Axlsx::Package.new

@@ -297,6 +297,7 @@ module Api
         supporters = supporters.where(opt_in_text: true) if params[:opt_in_text] == "true"
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
         supporters = supporters.where(contact_classification: params[:contact_classification]) if params[:contact_classification].present?
+        supporters = supporters.where.not(contact_classification: params[:exclude_contact_classification]) if params[:exclude_contact_classification].present?
 
         supporters = apply_supporter_search(supporters, params[:search]) if params[:search].present?
         supporters = apply_index_sort(supporters)
@@ -929,6 +930,7 @@ module Api
         supporters = supporters.where(opt_in_text: true) if params[:opt_in_text] == "true"
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
         supporters = supporters.where(contact_classification: params[:contact_classification]) if params[:contact_classification].present?
+        supporters = supporters.where.not(contact_classification: params[:exclude_contact_classification]) if params[:exclude_contact_classification].present?
 
         supporters = apply_supporter_search(supporters, params[:search]) if params[:search].present?
 
@@ -985,6 +987,7 @@ module Api
 
         updates[:classified_at] = Time.current
         updates[:classified_by_user_id] = current_user.id
+        updates[:review_status] = new_classification == "new_intake" ? "pending" : "approved"
       end
 
       def normalize_registered_voter_fields(attributes)
@@ -1388,9 +1391,9 @@ module Api
         supporter.source = source
         supporter.attribution_method = attribution_method
         supporter.intake_status = intake_status
-        supporter.review_status = "approved"
         supporter.public_review_status = public_review_status
         supporter.status = "active"
+        supporter.review_status = supporter.contact_classification == "new_intake" ? "pending" : "approved"
         supporter.leader_code = leader_code
         supporter.referral_code = referral_code if referral_code
         supporter.household_group = household_group if household_group
@@ -1614,7 +1617,10 @@ module Api
           gec_voter = best_match&.dig(:gec_voter)
           attrs.merge!(
             gec_voter_id: gec_voter&.id,
+            village_id: gec_voter&.village_id || supporter.village_id,
             precinct_id: gec_voter&.precinct_id || supporter.precinct_id,
+            registered_voter: true,
+            registered_voter_status: "yes",
             verified_by_user_id: current_user.id,
             verified_at: Time.current,
             verification_reason: "manual_staff_verified",

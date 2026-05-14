@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getSupporters, exportSupporters, getVillages, updateSupporter } from '../../lib/api';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft } from 'lucide-react';
+import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
@@ -82,6 +82,12 @@ type SortField = 'created_at' | 'print_name' | 'village_name' | 'source' | 'regi
 const SORT_FIELDS: SortField[] = ['created_at', 'print_name', 'village_name', 'source', 'registered_voter'];
 const PER_PAGE_OPTIONS = [25, 50, 100, 200] as const;
 type PerPage = (typeof PER_PAGE_OPTIONS)[number];
+const REVIEWED_CLASSIFICATION_FILTER = 'reviewed_contacts';
+const ALL_CLASSIFICATIONS_FILTER = 'all_classifications';
+
+function defaultClassificationFilter(isIntakeView: boolean) {
+  return isIntakeView ? 'new_intake' : REVIEWED_CLASSIFICATION_FILTER;
+}
 
 function parseSortField(value: string | null): SortField {
   return SORT_FIELDS.includes(value as SortField) ? (value as SortField) : 'created_at';
@@ -210,6 +216,7 @@ export default function SupportersPage() {
   const { data: sessionData } = useSession();
   const location = useLocation();
   const isIntakeView = location.pathname === '/admin/intake';
+  const viewKey = isIntakeView ? 'intake' : 'contacts';
   const [returnTo] = useState(searchParams.get('return_to') || '');
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [villageFilter, setVillageFilter] = useState(searchParams.get('village_id') || '');
@@ -217,7 +224,7 @@ export default function SupportersPage() {
   const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '');
   const [optInFilter, setOptInFilter] = useState(searchParams.get('opt_in') || '');
   const [verificationFilter, setVerificationFilter] = useState(searchParams.get('verification_status') || '');
-  const [classificationFilter, setClassificationFilter] = useState(searchParams.get('contact_classification') || (isIntakeView ? 'new_intake' : ''));
+  const [classificationFilter, setClassificationFilter] = useState(searchParams.get('contact_classification') || defaultClassificationFilter(isIntakeView));
   const [registeredStatusFilter, setRegisteredStatusFilter] = useState(searchParams.get('registered_voter_status') || '');
   const [supportNeedFilter, setSupportNeedFilter] = useState(searchParams.get('support_need') || '');
   const [lifecycleFilter, setLifecycleFilter] = useState(searchParams.get('status') || 'active');
@@ -228,8 +235,12 @@ export default function SupportersPage() {
   const [page, setPage] = useState(1);
   const [visibleRows, setVisibleRows] = useState(80);
   const [pendingPrecinctBySupporter, setPendingPrecinctBySupporter] = useState<Record<number, string>>({});
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const debouncedSearch = useDebouncedValue(search, 250);
+  const contactClassificationParam = [REVIEWED_CLASSIFICATION_FILTER, ALL_CLASSIFICATIONS_FILTER].includes(classificationFilter) ? undefined : classificationFilter || undefined;
+  const excludeContactClassificationParam = classificationFilter === REVIEWED_CLASSIFICATION_FILTER ? 'new_intake' : undefined;
 
   const { data: villageData } = useQuery({ queryKey: ['villages'], queryFn: getVillages });
   const villages: VillageOption[] = useMemo(() => villageData?.villages || [], [villageData]);
@@ -269,7 +280,7 @@ export default function SupportersPage() {
     if (sourceFilter) params.set('source', sourceFilter);
     if (optInFilter) params.set('opt_in', optInFilter);
     if (verificationFilter) params.set('verification_status', verificationFilter);
-    if (classificationFilter) params.set('contact_classification', classificationFilter);
+    if (classificationFilter && classificationFilter !== defaultClassificationFilter(isIntakeView)) params.set('contact_classification', classificationFilter);
     if (registeredStatusFilter) params.set('registered_voter_status', registeredStatusFilter);
     if (supportNeedFilter) params.set('support_need', supportNeedFilter);
     if (lifecycleFilter) params.set('status', lifecycleFilter);
@@ -279,10 +290,10 @@ export default function SupportersPage() {
     params.set('per_page', String(perPage));
     if (returnTo) params.set('return_to', returnTo);
     setSearchParams(params, { replace: true });
-  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, setSearchParams]);
+  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, isIntakeView, setSearchParams]);
 
   const { data, isFetching } = useQuery<SupportersResponse>({
-    queryKey: ['supporters', debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
+    queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
     queryFn: () => getSupporters({
       search: debouncedSearch,
       village_id: effectiveVillageFilter || undefined,
@@ -291,7 +302,8 @@ export default function SupportersPage() {
       opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
       opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
       verification_status: verificationFilter || undefined,
-      contact_classification: classificationFilter || undefined,
+      contact_classification: contactClassificationParam,
+      exclude_contact_classification: excludeContactClassificationParam,
       registered_voter_status: registeredStatusFilter || undefined,
       support_need: supportNeedFilter || undefined,
       status: lifecycleFilter || undefined,
@@ -301,7 +313,6 @@ export default function SupportersPage() {
       page,
       per_page: perPage,
     }),
-    placeholderData: (previous) => previous,
   });
   const highVolumeMode = (data?.pagination.total || 0) >= 5000;
   const shouldAnimateRows = !prefersReducedMotion && !highVolumeMode;
@@ -332,7 +343,7 @@ export default function SupportersPage() {
     const totalPages = data.pagination.pages;
     if (page < totalPages) {
       void queryClient.prefetchQuery({
-        queryKey: ['supporters', debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
+        queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
         queryFn: () => getSupporters({
           search: debouncedSearch,
           village_id: effectiveVillageFilter || undefined,
@@ -341,7 +352,8 @@ export default function SupportersPage() {
           opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
           opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
           verification_status: verificationFilter || undefined,
-          contact_classification: classificationFilter || undefined,
+          contact_classification: contactClassificationParam,
+          exclude_contact_classification: excludeContactClassificationParam,
           registered_voter_status: registeredStatusFilter || undefined,
           support_need: supportNeedFilter || undefined,
           status: lifecycleFilter || undefined,
@@ -353,7 +365,7 @@ export default function SupportersPage() {
         }),
       });
     }
-  }, [data, page, perPage, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
+  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
 
   const assignPrecinctMutation = useMutation({
     mutationFn: ({ supporterId, precinctId }: { supporterId: number; precinctId: number }) =>
@@ -367,6 +379,22 @@ export default function SupportersPage() {
       queryClient.invalidateQueries({ queryKey: ['supporters'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['village'] });
+    },
+  });
+
+  const approveIntakeMutation = useMutation({
+    mutationFn: (supporterId: number) =>
+      updateSupporter(supporterId, { contact_classification: 'active_contact' }),
+    onSuccess: () => {
+      setActionError(null);
+      setActionMessage('Approved into Contacts as an active contact.');
+      void queryClient.invalidateQueries({ queryKey: ['supporters'] });
+      void queryClient.invalidateQueries({ queryKey: ['session'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (error: unknown) => {
+      setActionMessage(null);
+      setActionError(error instanceof Error ? error.message : 'Could not approve this intake record.');
     },
   });
 
@@ -444,7 +472,7 @@ export default function SupportersPage() {
           </Link>
         )}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{isIntakeView ? 'New Intake' : 'All Contacts'}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{isIntakeView ? 'Pending Intake' : 'All Contacts'}</h1>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => exportSupporters({
@@ -453,7 +481,8 @@ export default function SupportersPage() {
                 source: sourceFilter || undefined,
                 opt_in: optInFilter || undefined,
                 verification_status: verificationFilter || undefined,
-                contact_classification: classificationFilter || undefined,
+                contact_classification: contactClassificationParam,
+                exclude_contact_classification: excludeContactClassificationParam,
                 registered_voter_status: registeredStatusFilter || undefined,
                 support_need: supportNeedFilter || undefined,
                 status: lifecycleFilter || undefined,
@@ -477,6 +506,16 @@ export default function SupportersPage() {
           </div>
         </div>
       </div>
+
+      {(actionMessage || actionError) && (
+        <div
+          className={`rounded-xl px-4 py-3 text-sm ${
+            actionError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+          }`}
+        >
+          {actionError || actionMessage}
+        </div>
+      )}
 
       <div>
         {/* Filters */}
@@ -549,7 +588,14 @@ export default function SupportersPage() {
             }}
             className="md:col-span-2 px-3 py-3 border border-[var(--border-soft)] rounded-xl bg-[var(--surface-raised)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary focus:border-transparent min-w-0"
           >
-            <option value="">{isIntakeView ? 'All intake records' : 'All classifications'}</option>
+            {isIntakeView ? (
+              <option value={ALL_CLASSIFICATIONS_FILTER}>All intake records</option>
+            ) : (
+              <>
+                <option value={REVIEWED_CLASSIFICATION_FILTER}>Reviewed contacts</option>
+                <option value={ALL_CLASSIFICATIONS_FILTER}>All classifications</option>
+              </>
+            )}
             {CONTACT_CLASSIFICATION_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -753,6 +799,21 @@ export default function SupportersPage() {
                   <span className={gecMatchClass(s)}>{gecMatchLabel(s)}</span>
                   <span>{formatDateTime(s.created_at)}</span>
                 </div>
+                {isIntakeView && sessionData?.permissions?.can_edit_supporters && s.contact_classification === 'new_intake' && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => approveIntakeMutation.mutate(s.id)}
+                      disabled={approveIntakeMutation.isPending}
+                      className="app-btn-primary text-xs"
+                    >
+                      <CheckCircle className="w-4 h-4" /> Approve as contact
+                    </button>
+                    <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
+                      Review details
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -802,6 +863,9 @@ export default function SupportersPage() {
                     Date <ArrowUpDown className="w-3.5 h-3.5" /> {sortLabel('created_at')}
                   </button>
                 </th>
+                {isIntakeView && (
+                  <th className="text-right px-4 py-3 font-medium text-[var(--text-secondary)]">Review</th>
+                )}
               </tr>
             </thead>
             <motion.tbody layout={shouldAnimateRows}>
@@ -891,11 +955,34 @@ export default function SupportersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">{formatDateTime(s.created_at)}</td>
+                  {isIntakeView && (
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {sessionData?.permissions?.can_edit_supporters && s.contact_classification === 'new_intake' ? (
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => approveIntakeMutation.mutate(s.id)}
+                            disabled={approveIntakeMutation.isPending}
+                            className="app-btn-primary text-xs"
+                          >
+                            <CheckCircle className="w-4 h-4" /> Approve
+                          </button>
+                          <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
+                            Review
+                          </Link>
+                        </div>
+                      ) : (
+                        <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
+                          Open
+                        </Link>
+                      )}
+                    </td>
+                  )}
                 </motion.tr>
               ))}
               {supportersRows.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                  <td colSpan={isIntakeView ? 12 : 11} className="px-4 py-8 text-center text-[var(--text-muted)]">
                     {isIntakeView ? 'No intake records found' : 'No contacts found'}
                   </td>
                 </tr>

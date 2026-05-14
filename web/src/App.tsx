@@ -132,8 +132,8 @@ export default function App() {
 
             {/* Admin — requires Clerk auth */}
             <Route path="/admin" element={<AdminRoute><DashboardPage /></AdminRoute>} />
-            <Route path="/admin/supporters" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupportersPage /></PermissionRoute></AdminRoute>} />
-            <Route path="/admin/intake" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupportersPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/supporters" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupportersPage key="contacts" /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/intake" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupportersPage key="intake" /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/supporters/:id" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupporterDetailPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/supporters/new" element={<AdminRoute><PermissionRoute permission="can_create_staff_supporters"><StaffEntryPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/import" element={<AdminRoute><PermissionRoute permission="can_import_supporters"><ImportPage /></PermissionRoute></AdminRoute>} />
