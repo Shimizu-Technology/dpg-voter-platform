@@ -150,6 +150,41 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     refute_includes Supporter.contacts.pluck(:id), supporter.id
   end
 
+  test "review intake rejects active contact classification for reject decision" do
+    village = Village.find_or_create_by!(name: "Sinajana")
+    supporter = Supporter.create!(
+      first_name: "Reject",
+      last_name: "Mismatch",
+      contact_number: "+16715552222",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      public_review_status: "pending",
+      status: "active"
+    )
+
+    assert_no_difference -> { AuditLog.count } do
+      patch "/api/v1/supporters/#{supporter.id}/review_intake",
+        params: {
+          intake_review: {
+            decision: "reject",
+            contact_classification: "active_contact"
+          }
+        },
+        headers: auth_headers(@admin),
+        as: :json
+    end
+
+    assert_response :unprocessable_entity
+    supporter.reload
+    assert_equal "new_intake", supporter.contact_classification
+    assert_equal "pending", supporter.review_status
+    assert_equal "unknown", supporter.support_status
+    assert_equal "invalid_intake_review_decision_classification", response.parsed_body["code"]
+  end
+
   test "review intake rejects invalid classification" do
     village = Village.find_or_create_by!(name: "Mangilao")
     supporter = Supporter.create!(

@@ -191,6 +191,13 @@ module Api
             code: "invalid_contact_classification"
           )
         end
+        if decision == "reject" && !intake_rejection_classification?(classification)
+          return render_api_error(
+            message: "A rejected intake review must use duplicate, invalid, or archived",
+            status: :unprocessable_entity,
+            code: "invalid_intake_review_decision_classification"
+          )
+        end
 
         attempt = nil
         old_review_state = supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status")
@@ -1187,13 +1194,17 @@ module Api
       end
 
       def normalized_intake_record_classification(classification)
-        %w[duplicate invalid archived].include?(classification) ? classification : "active_contact"
+        intake_rejection_classification?(classification) ? classification : "active_contact"
       end
 
       def intake_review_classification_allowed?(classification)
         classification.present? &&
           Supporter::CONTACT_CLASSIFICATIONS.include?(classification) &&
           classification != "new_intake"
+      end
+
+      def intake_rejection_classification?(classification)
+        %w[duplicate invalid archived].include?(classification)
       end
 
       def intake_reviewable?(supporter)
@@ -1211,7 +1222,7 @@ module Api
       end
 
       def intake_review_status_updates(classification, decision, supporter)
-        rejected = decision == "reject" || %w[duplicate invalid archived].include?(classification)
+        rejected = decision == "reject" || intake_rejection_classification?(classification)
         updates = {
           review_status: rejected ? "rejected" : "approved"
         }
