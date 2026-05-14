@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getSupporters, exportSupporters, getVillages, updateSupporter } from '../../lib/api';
+import { getSupporters, exportSupporters, getVillages, reviewIntakeSupporter, updateSupporter } from '../../lib/api';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle } from 'lucide-react';
+import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle, MessageSquare, X } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
@@ -11,6 +11,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import WorkspacePage from '../../components/WorkspacePage';
 import {
   CONTACT_CLASSIFICATION_OPTIONS,
+  INTAKE_REVIEW_CLASSIFICATION_OPTIONS,
   contactClassificationChipClass,
   contactClassificationLabel,
 } from '../../lib/contactClassification';
@@ -84,6 +85,30 @@ const PER_PAGE_OPTIONS = [25, 50, 100, 200] as const;
 type PerPage = (typeof PER_PAGE_OPTIONS)[number];
 const REVIEWED_CLASSIFICATION_FILTER = 'reviewed_contacts';
 const ALL_CLASSIFICATIONS_FILTER = 'all_classifications';
+const CONTACT_ATTEMPT_CHANNELS = [
+  { value: '', label: 'No initial outreach logged' },
+  { value: 'call', label: 'Call' },
+  { value: 'sms', label: 'SMS' },
+  { value: 'email', label: 'Email' },
+  { value: 'in_person', label: 'In person' },
+] as const;
+const CONTACT_ATTEMPT_OUTCOMES = [
+  { value: '', label: 'Select outcome' },
+  { value: 'attempted', label: 'Attempted' },
+  { value: 'reached', label: 'Reached' },
+  { value: 'wrong_number', label: 'Wrong number' },
+  { value: 'unavailable', label: 'Unavailable' },
+  { value: 'refused', label: 'Refused' },
+] as const;
+
+type IntakeReviewDraft = {
+  decision: 'approve' | 'reject';
+  contact_classification: string;
+  note: string;
+  contact_attempt_channel: string;
+  contact_attempt_outcome: string;
+  contact_attempt_note: string;
+};
 
 function defaultClassificationFilter(isIntakeView: boolean) {
   return isIntakeView ? 'new_intake' : REVIEWED_CLASSIFICATION_FILTER;
@@ -210,6 +235,15 @@ function supportFollowUpResultClass(supporter: Pick<SupporterItem, 'support_foll
   return 'bg-gray-100 text-gray-700';
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
+    return response?.data?.message || response?.data?.error || fallback;
+  }
+  return fallback;
+}
+
 export default function SupportersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -235,6 +269,15 @@ export default function SupportersPage() {
   const [page, setPage] = useState(1);
   const [visibleRows, setVisibleRows] = useState(80);
   const [pendingPrecinctBySupporter, setPendingPrecinctBySupporter] = useState<Record<number, string>>({});
+  const [reviewingSupporter, setReviewingSupporter] = useState<SupporterItem | null>(null);
+  const [reviewDraft, setReviewDraft] = useState<IntakeReviewDraft>({
+    decision: 'approve',
+    contact_classification: 'active_contact',
+    note: '',
+    contact_attempt_channel: '',
+    contact_attempt_outcome: '',
+    contact_attempt_note: '',
+  });
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
@@ -382,21 +425,57 @@ export default function SupportersPage() {
     },
   });
 
-  const approveIntakeMutation = useMutation({
-    mutationFn: (supporterId: number) =>
-      updateSupporter(supporterId, { contact_classification: 'active_contact' }),
+  const reviewIntakeMutation = useMutation({
+    mutationFn: ({ supporterId, draft }: { supporterId: number; draft: IntakeReviewDraft }) => {
+      const hasContactAttempt = draft.contact_attempt_channel && draft.contact_attempt_outcome;
+      return reviewIntakeSupporter(supporterId, {
+        decision: draft.decision,
+        contact_classification: draft.contact_classification,
+        note: draft.note.trim() || undefined,
+        contact_attempt: hasContactAttempt ? {
+          channel: draft.contact_attempt_channel,
+          outcome: draft.contact_attempt_outcome,
+          note: draft.contact_attempt_note.trim() || undefined,
+        } : undefined,
+      });
+    },
     onSuccess: () => {
       setActionError(null);
-      setActionMessage('Approved into Contacts as an active contact.');
+      setActionMessage('Intake review saved.');
+      setReviewingSupporter(null);
       void queryClient.invalidateQueries({ queryKey: ['supporters'] });
       void queryClient.invalidateQueries({ queryKey: ['session'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['outreach-supporters'] });
+      void queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
     onError: (error: unknown) => {
       setActionMessage(null);
-      setActionError(error instanceof Error ? error.message : 'Could not approve this intake record.');
+      setActionError(getErrorMessage(error, 'Could not save this intake review.'));
     },
   });
+
+  const openIntakeReview = (supporter: SupporterItem, classification = 'active_contact') => {
+    setReviewingSupporter(supporter);
+    setReviewDraft({
+      decision: ['duplicate', 'invalid', 'archived'].includes(classification) ? 'reject' : 'approve',
+      contact_classification: classification,
+      note: '',
+      contact_attempt_channel: '',
+      contact_attempt_outcome: '',
+      contact_attempt_note: '',
+    });
+  };
+
+  const submitIntakeReview = () => {
+    if (!reviewingSupporter) return;
+    if (reviewDraft.contact_attempt_channel && !reviewDraft.contact_attempt_outcome) {
+      setActionMessage(null);
+      setActionError('Choose an outcome for the outreach note, or leave outreach blank.');
+      return;
+    }
+    reviewIntakeMutation.mutate({ supporterId: reviewingSupporter.id, draft: reviewDraft });
+  };
 
   const renderPrecinctAssignControl = (supporter: SupporterItem) => {
     if (supporter.precinct_number) {
@@ -801,14 +880,14 @@ export default function SupportersPage() {
                 </div>
                 {isIntakeView && sessionData?.permissions?.can_edit_supporters && s.contact_classification === 'new_intake' && (
                   <div className="flex flex-wrap gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => approveIntakeMutation.mutate(s.id)}
-                      disabled={approveIntakeMutation.isPending}
-                      className="app-btn-primary text-xs"
-                    >
-                      <CheckCircle className="w-4 h-4" /> Approve as contact
-                    </button>
+	                    <button
+	                      type="button"
+	                      onClick={() => openIntakeReview(s)}
+	                      disabled={reviewIntakeMutation.isPending}
+	                      className="app-btn-primary text-xs"
+	                    >
+	                      <CheckCircle className="w-4 h-4" /> Review intake
+	                    </button>
                     <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
                       Review details
                     </Link>
@@ -959,14 +1038,14 @@ export default function SupportersPage() {
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {sessionData?.permissions?.can_edit_supporters && s.contact_classification === 'new_intake' ? (
                         <div className="inline-flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => approveIntakeMutation.mutate(s.id)}
-                            disabled={approveIntakeMutation.isPending}
-                            className="app-btn-primary text-xs"
-                          >
-                            <CheckCircle className="w-4 h-4" /> Approve
-                          </button>
+	                          <button
+	                            type="button"
+	                            onClick={() => openIntakeReview(s)}
+	                            disabled={reviewIntakeMutation.isPending}
+	                            className="app-btn-primary text-xs"
+	                          >
+	                            <CheckCircle className="w-4 h-4" /> Review
+	                          </button>
                           <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
                             Review
                           </Link>
@@ -1015,8 +1094,142 @@ export default function SupportersPage() {
               Next
             </button>
           </div>
-        )}
-      </div>
-    </WorkspacePage>
-  );
-}
+	        )}
+	      </div>
+
+	      {reviewingSupporter && (
+	        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/55 px-3 py-6 backdrop-blur-sm sm:px-6">
+	          <div className="my-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+	            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+	              <div className="min-w-0">
+	                <div className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">Intake review</div>
+	                <h2 className="mt-1 truncate text-xl font-semibold text-slate-950">{supporterSortName(reviewingSupporter)}</h2>
+	                <div className="mt-1 text-sm text-slate-500">
+	                  {[reviewingSupporter.contact_number, reviewingSupporter.village_name, verificationStatusLabel(reviewingSupporter)].filter(Boolean).join(' · ')}
+	                </div>
+	              </div>
+	              <button
+	                type="button"
+	                onClick={() => setReviewingSupporter(null)}
+	                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+	                aria-label="Close intake review"
+	              >
+	                <X className="h-5 w-5" />
+	              </button>
+	            </div>
+	            <div className="space-y-4 px-5 py-4">
+	              <div className="grid gap-3 sm:grid-cols-2">
+	                <label className="space-y-1.5">
+	                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Relationship</span>
+	                  <select
+	                    value={reviewDraft.contact_classification}
+	                    onChange={(event) => {
+	                      const classification = event.target.value;
+	                      setReviewDraft((draft) => ({
+	                        ...draft,
+	                        contact_classification: classification,
+	                        decision: ['duplicate', 'invalid', 'archived'].includes(classification) ? 'reject' : 'approve',
+	                      }));
+	                    }}
+	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+	                  >
+	                    {INTAKE_REVIEW_CLASSIFICATION_OPTIONS.map((option) => (
+	                      <option key={option.value} value={option.value}>{option.label}</option>
+	                    ))}
+	                  </select>
+	                </label>
+	                <label className="space-y-1.5">
+	                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Review decision</span>
+	                  <select
+	                    value={reviewDraft.decision}
+	                    onChange={(event) => setReviewDraft((draft) => ({ ...draft, decision: event.target.value as 'approve' | 'reject' }))}
+	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+	                  >
+	                    <option value="approve">Approve into DPG records</option>
+	                    <option value="reject">Reject / remove from active queue</option>
+	                  </select>
+	                </label>
+	              </div>
+
+	              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+	                <div className="flex flex-wrap items-center gap-2">
+	                  <span className={`app-chip ${contactClassificationChipClass(reviewDraft.contact_classification)}`}>
+	                    {contactClassificationLabel(reviewDraft.contact_classification)}
+	                  </span>
+	                  <span className={gecMatchClass(reviewingSupporter)}>{gecMatchLabel(reviewingSupporter)}</span>
+	                </div>
+	                {verificationStatusDetail(reviewingSupporter) && (
+	                  <p className="mt-2 text-xs leading-5 text-slate-600">{verificationStatusDetail(reviewingSupporter)}</p>
+	                )}
+	                <Link to={supporterDetailLink(reviewingSupporter.id)} className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">
+	                  Open full record to confirm or link GEC match
+	                </Link>
+	              </div>
+
+	              <label className="space-y-1.5">
+	                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Reviewer note</span>
+	                <textarea
+	                  value={reviewDraft.note}
+	                  onChange={(event) => setReviewDraft((draft) => ({ ...draft, note: event.target.value }))}
+	                  rows={3}
+	                  placeholder="Optional note for why this was approved, rejected, or classified this way"
+	                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+	                />
+	              </label>
+
+	              <div className="rounded-xl border border-slate-200 p-3">
+	                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+	                  <MessageSquare className="h-4 w-4 text-slate-500" />
+	                  Initial outreach outcome
+	                </div>
+	                <div className="grid gap-3 sm:grid-cols-2">
+	                  <select
+	                    value={reviewDraft.contact_attempt_channel}
+	                    onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_channel: event.target.value }))}
+	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+	                  >
+	                    {CONTACT_ATTEMPT_CHANNELS.map((option) => (
+	                      <option key={option.value} value={option.value}>{option.label}</option>
+	                    ))}
+	                  </select>
+	                  <select
+	                    value={reviewDraft.contact_attempt_outcome}
+	                    onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_outcome: event.target.value }))}
+	                    disabled={!reviewDraft.contact_attempt_channel}
+	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+	                  >
+	                    {CONTACT_ATTEMPT_OUTCOMES.map((option) => (
+	                      <option key={option.value} value={option.value}>{option.label}</option>
+	                    ))}
+	                  </select>
+	                </div>
+	                <textarea
+	                  value={reviewDraft.contact_attempt_note}
+	                  onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_note: event.target.value }))}
+	                  disabled={!reviewDraft.contact_attempt_channel}
+	                  rows={2}
+	                  placeholder="Optional outreach note"
+	                  className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+	                />
+	              </div>
+	            </div>
+	            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
+	              <button type="button" onClick={() => setReviewingSupporter(null)} className="app-btn-secondary justify-center">
+	                Cancel
+	              </button>
+	              <button
+	                type="button"
+	                onClick={submitIntakeReview}
+	                disabled={reviewIntakeMutation.isPending}
+	                className="app-btn-primary justify-center disabled:opacity-50"
+	              >
+	                <CheckCircle className="h-4 w-4" />
+	                Save review
+	              </button>
+	            </div>
+	          </div>
+	        </div>
+	      )}
+	    </WorkspacePage>
+	  );
+	}

@@ -1,14 +1,14 @@
 # DPG Voter Platform - Current Project Status
 
-**Last updated:** May 12, 2026  
-**Current branch:** `main`  
-**Current commit:** `547c4c7` - merged Phase 5 communications governance
+**Last updated:** May 14, 2026
+**Current branch:** `feature/intake-relationship-household-polish`
+**Base commit:** `f8f3d97` - merged PR #32, DPG list intelligence reports + household actions
 
 ## One-line status
 
-The Democratic Party of Guam app is now deployed and has the core voter-engagement foundation in place: public signup, a unified admin workspace, Contacts/Intake, GEC voter-list search/import, household/address lookup, contact history, follow-up queue logging, reports, users/roles, and governed SMS/email outreach.
+The Democratic Party of Guam app is now deployed and has the core voter-engagement foundation in place: public signup, a unified admin workspace, Contacts/Intake, GEC voter-list search/import, household/address lookup, create/link contact actions from GEC and household results, contact history, follow-up queue logging, DPG/GEC cross-reference reports, users/roles, and governed SMS/email outreach.
 
-The important caveat is that most admin-side workflows have been verified through automated tests and code review, not through a full real-user browser smoke test on the deployed environment. Treat the deployed app as ready for guided internal QA/familiarization, not as fully production-validated for broad DPG operations yet.
+The important caveat is that most admin-side workflows have been verified through automated tests, code review, and limited live endpoint checks, not through a full real-user browser smoke test with a DPG admin account. Treat the deployed app as ready for guided internal QA/familiarization, not as fully production-validated for broad DPG operations yet.
 
 ## Product frame
 
@@ -61,6 +61,8 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - DPG docs and clean-room guardrails exist.
 - Active Josh/Tina branding/data/workflow surfaces have been removed or disabled.
 - The app is deployed online, but deployment isolation details and full staging QA should still be checked against `docs/deployment-checklist.md`.
+- Live public URL currently used for review: `https://dpg-voter-platform.netlify.app/`.
+- Live backend health and public API checks have been reported as passing, including Netlify-to-Render CORS and protected endpoint auth blocking.
 
 ### Public signup and Intake
 
@@ -85,11 +87,19 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - User management exists.
 - Current highest-level role is still `campaign_admin`.
 - Recommendation: create Auntie Stephanie as `campaign_admin` for now, then rename/reshape roles into DPG language in the next permissions polish phase.
+- Auntie Stephanie provided the preferred admin email on May 11: `Sgflores@gmail.com`.
 - Users/roles, scoped permissions, and audit logs exist, but DPG role labels and export/delete restrictions still need product polish.
+- Clerk sign-in reportedly still shows a development-mode label; acceptable for guided testing, but should be cleaned up before broad staff rollout.
 
 ### Contacts and Intake CRM
 
 - Contact list and contact detail exist.
+- Pending Intake now has a structured reviewer workflow on this branch:
+  - approve or reject intake
+  - classify relationship as active contact, supporter, member, volunteer, undecided, not supporting, duplicate, invalid, or archived
+  - add reviewer note
+  - optionally log the first outreach/contact outcome during review
+  - audit the review decision
 - Contacts can be classified as:
   - new intake
   - active contact
@@ -129,9 +139,11 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Staff can inspect GEC household/address groupings.
 - Staff can create DPG contacts from GEC voter records.
 - Staff can link existing DPG contacts to GEC voter records from the GEC workspace.
+- GEC voter and household results now surface linked contacts and likely DPG matches.
+- Household lookup is now actionable: staff can create/link contacts from household search results.
 - GEC import history/list-date handling exists.
-- Richer GEC import QA screens for skipped rows, source artifacts, and import diffs are still deferred.
-- After PR #31, run a parity hardening pass against the Josh/Tina campaign-tracker GEC importer: confirm large PDF progress/recovery, stale processing cleanup, skipped-row review, source-artifact access, and re-vetting status visibility before DPG relies on monthly production imports.
+- Async PDF preview/import support exists from PR #31.
+- Richer GEC import QA screens now exist for several import-review paths, but monthly production import confidence still needs live QA with real/safe files before DPG relies on it operationally.
 
 ### Contact, household, and outreach operations
 
@@ -139,8 +151,12 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Staff can log in-person, call, and SMS attempts with outcome, timestamp, note, and staff attribution.
 - Contact-attempt logging is village-scoped through existing DPG contact permissions.
 - `/admin/households` searches addresses across GEC voters and DPG contacts.
+- Household lookup can now create/link contacts from household results.
+- Household DPG records can now show the latest contact attempt and log a canvassing update directly from the household view.
+- Household canvassing updates can change the person's relationship classification and log method/outcome/note in one action.
 - `/admin/outreach` Follow-Up Queue shows latest contact attempt per card.
 - Staff can log call/SMS/in-person attempts from queue cards without leaving the queue.
+- Contact detail pages now include GEC check, follow-up workflow, contact history, audit history, and classification.
 
 ### SMS/email outreach
 
@@ -161,23 +177,38 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Reports API exists.
 - Supporter/contact summary preview exists.
 - Export basics exist.
-- Existing reports are still inherited/generic in places; DPG-specific cross-reference reports are a next priority.
+- DPG/GEC list-intelligence and cross-reference reports now exist, including:
+  - DPG contacts linked to GEC
+  - DPG contacts not linked to GEC
+  - GEC voters not in DPG contacts
+  - possible GEC matches
+  - supporter list
+  - referral list
+  - village changes
+  - mapping issues
+  - purge list
+- DPG/GEC contact cross-reference exports now include latest contact method, outcome, date, and note.
+- Explicit list-type imports are still needed so these reports can distinguish DPG members, registered Democrats, supporters/contacts, and custom lists cleanly.
 
 ### Tests/checks
 
-Latest merged PRs passed GitHub checks:
+Latest branch validation:
+
+- Rails full test suite: `230 runs, 931 assertions, 0 failures, 0 errors`
+- Web lint: passing
+- Web build: passing, with existing local Node version warning from Vite (`Node.js 22.0.0`; Vite prefers `20.19+` or `22.12+`)
+
+Earlier reported validation:
 
 - `api_lint`
 - `api_scan_ruby`
 - `api_test`
 - `web_lint_build`
 - Greptile review
+- Rails test suite reported passing after local test DB reset: `227 runs, 906 assertions, 0 failures, 0 errors`.
+- Live checks reported passing for Netlify public routes, Render `/up`, public campaign info API, protected endpoint auth, and CORS.
 
-Latest local backend verification during Phase 5 review passed:
-
-- Rails tests: `197 runs, 748 assertions, 0 failures`
-- RuboCop: `194 files inspected, no offenses`
-- Bundler audit: no vulnerabilities
+Previous local backend verification during Phase 5 review also passed RuboCop and Bundler audit.
 
 ## Still needs real deployed QA
 
@@ -203,6 +234,8 @@ We have not yet thoroughly browser-tested the deployed admin side. Before handin
 - audit logs
 - SMS/email dry-run recipient preview
 - controlled single-recipient live SMS/email tests only when intentionally approved
+- confirm Clerk production/development-mode configuration
+- confirm database backup schedule before real operational data entry
 
 ## Intentionally deferred
 
@@ -216,10 +249,7 @@ These are important, but should be implemented deliberately:
   - other/custom
 - DPG membership roster vs GEC automation
 - registered Democrat list import/cross-reference
-- DPG contacts not matched to GEC report
-- GEC voters marked supporter/member report
-- members/supporters needing registration help report
-- address/village mismatch reports
+- richer list-lineage-aware report filtering after explicit list types exist
 - support/lean/donation tracking
 - DPG-specific district grouping
 - role rename and permissions polish
@@ -235,22 +265,28 @@ These are important, but should be implemented deliberately:
 
 ## Recommended next work
 
-Because the app is already deployed, the next move should not be another feature sprint immediately. The best next sequence is:
+Because the app is already deployed, the next move should be guided QA plus one workflow-polish sprint. The best next sequence is:
 
 1. **Deployed admin QA pass**
    Confirm the admin side actually works end-to-end in the live environment, especially auth, mutations, imports, GEC workflows, reports, and outreach dry-runs.
 
 2. **Create Auntie Stephanie's admin account**
-   Use her preferred email and assign the current highest role, `campaign_admin`.
+   Use `Sgflores@gmail.com` and assign the current highest role, `campaign_admin`.
 
 3. **Prepare a short DPG tester handoff**
    Tell DPG what to click first, what is safe to test, what not to live-send yet, and what feedback to send.
 
-4. **Next product phase: list types + GEC/DPG cross-reference**
-   Build explicit DPG member/supporter/registered-Democrat list imports and the reports that compare those lists against GEC voters.
+4. **Next product PR: Intake Review + Relationship Classification polish**
+   Make Intake a true reviewer workflow: approve, reject, mark duplicate/invalid, classify as active contact/supporter/member/volunteer/undecided/not supporting, confirm/link GEC match, and optionally log an initial note/outreach outcome.
 
-5. **Permissions polish**
+5. **Next product phase: list types + list-lineage reporting**
+   Build explicit DPG member/supporter/registered-Democrat/custom list imports and refine reports so list origin and relationship type are clear.
+
+6. **Permissions polish**
    Rename roles into DPG language and tighten export/delete/scope behavior for non-admin staff.
+
+7. **Field workflow phase**
+   Evolve household lookup into canvassing workflow, add QR/signup attribution, and scope election-day tools with DPG.
 
 ## Related docs
 

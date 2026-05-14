@@ -20,6 +20,7 @@ Rails.application.routes.draw do
         resources :contact_attempts, only: [ :index, :create ], controller: "supporter_contact_attempts"
         member do
           patch :verify
+          patch :review_intake
           patch :resolve_duplicate
           patch :outreach_status
         end

@@ -728,15 +728,18 @@ class ReportGenerator
     package = Axlsx::Package.new
     wb = package.workbook
     headers = supporter_cross_reference_headers(include_gec_columns: include_gec_columns, include_match_note: include_match_note)
+    supporters = scope.to_a
+    latest_contact_attempts = latest_contact_attempts_for(supporters.map(&:id))
 
     wb.add_worksheet(name: sheet_name.to_s[0..30]) do |sheet|
       sheet.add_row headers, style: header_style(wb)
-      scope.each do |supporter|
+      supporters.each do |supporter|
         sheet.add_row supporter_cross_reference_values(
           supporter,
           include_gec_columns: include_gec_columns,
           status_label: status_label,
-          include_match_note: include_match_note
+          include_match_note: include_match_note,
+          latest_contact_attempt: latest_contact_attempts[supporter.id]
         )
       end
       sheet.column_widths(*Array.new(headers.length, 18))
@@ -747,14 +750,17 @@ class ReportGenerator
 
   def preview_supporter_cross_reference(scope:, include_gec_columns:, status_label:, include_match_note: false)
     total_count = scope.count
+    supporters = scope.limit(@preview_limit).to_a
+    latest_contact_attempts = latest_contact_attempts_for(supporters.map(&:id))
     {
       columns: supporter_cross_reference_headers(include_gec_columns: include_gec_columns, include_match_note: include_match_note),
-      rows: scope.limit(@preview_limit).map do |supporter|
+      rows: supporters.map do |supporter|
         supporter_cross_reference_values(
           supporter,
           include_gec_columns: include_gec_columns,
           status_label: status_label,
-          include_match_note: include_match_note
+          include_match_note: include_match_note,
+          latest_contact_attempt: latest_contact_attempts[supporter.id]
         )
       end,
       total_count: total_count
@@ -773,14 +779,18 @@ class ReportGenerator
       "Precinct",
       "Classification",
       "Verification",
-      "Cross-Reference Status"
+      "Cross-Reference Status",
+      "Last Contact Method",
+      "Last Contact Outcome",
+      "Last Contact Date",
+      "Last Contact Note"
     ]
     headers += [ "GEC Reg #", "GEC Village", "GEC Precinct", "GEC Birth Year" ] if include_gec_columns
     headers << "Match Review Note" if include_match_note
     headers
   end
 
-  def supporter_cross_reference_values(supporter, include_gec_columns:, status_label:, include_match_note:)
+  def supporter_cross_reference_values(supporter, include_gec_columns:, status_label:, include_match_note:, latest_contact_attempt: nil)
     values = [
       supporter.last_name,
       supporter.first_name,
@@ -792,7 +802,11 @@ class ReportGenerator
       supporter.precinct&.number,
       supporter.contact_classification&.humanize,
       supporter.verification_status&.humanize,
-      status_label
+      status_label,
+      latest_contact_attempt&.channel&.humanize,
+      latest_contact_attempt&.outcome&.humanize,
+      format_date(latest_contact_attempt&.recorded_at),
+      latest_contact_attempt&.note
     ]
 
     if include_gec_columns
@@ -807,6 +821,25 @@ class ReportGenerator
 
     values << possible_match_note(supporter) if include_match_note
     values
+  end
+
+  def latest_contact_attempts_for(supporter_ids)
+    supporter_ids = Array(supporter_ids).compact
+    return {} if supporter_ids.empty?
+
+    ranked_attempts = SupporterContactAttempt
+      .select(
+        "supporter_contact_attempts.*, " \
+        "ROW_NUMBER() OVER (PARTITION BY supporter_id ORDER BY recorded_at DESC, id DESC) AS attempt_rank"
+      )
+      .where(supporter_id: supporter_ids)
+
+    SupporterContactAttempt
+      .from(ranked_attempts, :supporter_contact_attempts)
+      .where("attempt_rank = 1")
+      .each_with_object({}) do |attempt, latest_by_supporter|
+        latest_by_supporter[attempt.supporter_id] = attempt
+      end
   end
 
   def possible_match_note(supporter)

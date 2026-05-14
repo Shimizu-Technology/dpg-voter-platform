@@ -12,8 +12,8 @@ module Api
 
       include Authenticatable
       include AuditLoggable
-      before_action :authenticate_request, only: [ :index, :check_duplicate, :export, :show, :update, :verify, :bulk_verify, :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :outreach, :outreach_status, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
-      before_action :require_supporter_access!, only: [ :index, :check_duplicate, :export, :show, :outreach, :outreach_status ]
+      before_action :authenticate_request, only: [ :index, :check_duplicate, :export, :show, :update, :verify, :review_intake, :bulk_verify, :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :outreach, :outreach_status, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
+      before_action :require_supporter_access!, only: [ :index, :check_duplicate, :export, :show, :review_intake, :outreach, :outreach_status ]
       before_action :require_data_ops_access!, only: [ :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
       before_action :require_chief_or_above!, only: [ :verify, :bulk_verify ]
 
@@ -152,6 +152,74 @@ module Api
             code: "supporter_update_failed"
           )
         end
+      end
+
+      # PATCH /api/v1/supporters/:id/review_intake
+      def review_intake
+        unless supporter_edit_allowed?
+          return render_api_error(
+            message: "You do not have permission to review intake records",
+            status: :forbidden,
+            code: "supporter_edit_access_required"
+          )
+        end
+
+        supporter = scope_supporters(Supporter).find(params[:id])
+        review = intake_review_params
+        decision = review[:decision].presence || "approve"
+        unless %w[approve reject].include?(decision)
+          return render_api_error(
+            message: "Decision must be approve or reject",
+            status: :unprocessable_entity,
+            code: "invalid_intake_review_decision"
+          )
+        end
+
+        classification = normalized_intake_review_classification(review, decision)
+        unless Supporter::CONTACT_CLASSIFICATIONS.include?(classification)
+          return render_api_error(
+            message: "Invalid contact classification",
+            status: :unprocessable_entity,
+            code: "invalid_contact_classification"
+          )
+        end
+
+        attempt = nil
+        old_review_state = supporter.slice("contact_classification", "review_status", "public_review_status", "status")
+
+        begin
+          ApplicationRecord.transaction do
+            updates = {
+              contact_classification: classification,
+              reviewed_at: Time.current,
+              reviewed_by_user_id: current_user.id
+            }.merge(intake_review_status_updates(classification, decision, supporter))
+
+            apply_contact_classification_metadata!(supporter, updates)
+            supporter.update!(updates)
+            attempt = create_intake_review_contact_attempt!(supporter, review[:contact_attempt])
+
+            log_audit!(supporter, action: "intake_reviewed", changed_data: {
+              "before" => old_review_state,
+              "after" => supporter.slice("contact_classification", "review_status", "public_review_status", "status"),
+              "decision" => decision,
+              "note" => review[:note].presence,
+              "contact_attempt_id" => attempt&.id
+            }.compact)
+          end
+        rescue ActiveRecord::RecordInvalid => e
+          return render_api_error(
+            message: e.record.errors.full_messages.to_sentence,
+            status: :unprocessable_entity,
+            code: "intake_review_failed"
+          )
+        end
+
+        CampaignBroadcast.supporter_updated(supporter, action: "intake_reviewed")
+        render json: {
+          supporter: supporter_json(supporter.reload),
+          contact_attempt: attempt && contact_attempt_summary_json(attempt)
+        }
       end
 
       # PATCH /api/v1/supporters/:id/verify
@@ -966,6 +1034,15 @@ module Api
         )
       end
 
+      def intake_review_params
+        params.require(:intake_review).permit(
+          :decision,
+          :contact_classification,
+          :note,
+          contact_attempt: [ :channel, :outcome, :note, :recorded_at ]
+        )
+      end
+
       def normalized_public_supporter_params
         normalize_registered_voter_fields(public_supporter_params.to_h.except("household_members"))
       end
@@ -987,7 +1064,44 @@ module Api
 
         updates[:classified_at] = Time.current
         updates[:classified_by_user_id] = current_user.id
-        updates[:review_status] = new_classification == "new_intake" ? "pending" : "approved"
+        updates[:review_status] ||= new_classification == "new_intake" ? "pending" : "approved"
+      end
+
+      def normalized_intake_review_classification(review, decision)
+        classification = review[:contact_classification].presence
+        return classification if classification.present?
+
+        decision == "reject" ? "invalid" : "active_contact"
+      end
+
+      def intake_review_status_updates(classification, decision, supporter)
+        rejected = decision == "reject" || %w[duplicate invalid archived].include?(classification)
+        updates = {
+          review_status: rejected ? "rejected" : (classification == "new_intake" ? "pending" : "approved")
+        }
+        updates[:public_review_status] = rejected ? "rejected" : "approved" if supporter.public_review_status == "pending"
+        updates[:status] = "duplicate" if classification == "duplicate"
+        updates[:status] = "removed" if classification == "archived"
+        updates
+      end
+
+      def create_intake_review_contact_attempt!(supporter, attempt_params)
+        return nil if attempt_params.blank?
+
+        attrs = attempt_params.to_h.symbolize_keys
+        return nil if attrs[:channel].blank? && attrs[:outcome].blank? && attrs[:note].blank?
+
+        attrs[:recorded_at] = parsed_contact_attempt_recorded_at(attrs[:recorded_at]) if attrs.key?(:recorded_at)
+        attrs[:recorded_at] ||= Time.current
+        supporter.supporter_contact_attempts.create!(attrs.merge(recorded_by_user: current_user))
+      end
+
+      def parsed_contact_attempt_recorded_at(value)
+        return nil if value.blank?
+
+        Time.zone.parse(value.to_s)
+      rescue ArgumentError, TypeError
+        nil
       end
 
       def normalize_registered_voter_fields(attributes)

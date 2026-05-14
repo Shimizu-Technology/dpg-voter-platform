@@ -6,7 +6,18 @@ export const CONTACT_CLASSIFICATION_OPTIONS = [
   { value: 'volunteer', label: 'Volunteer' },
   { value: 'undecided', label: 'Undecided' },
   { value: 'not_supporting', label: 'Not supporting' },
+  { value: 'duplicate', label: 'Duplicate' },
+  { value: 'invalid', label: 'Invalid' },
+  { value: 'archived', label: 'Archived' },
 ] as const;
+
+export const ACTIVE_RELATIONSHIP_OPTIONS = CONTACT_CLASSIFICATION_OPTIONS.filter(
+  (option) => !['new_intake', 'duplicate', 'invalid', 'archived'].includes(option.value)
+);
+
+export const INTAKE_REVIEW_CLASSIFICATION_OPTIONS = CONTACT_CLASSIFICATION_OPTIONS.filter(
+  (option) => option.value !== 'new_intake'
+);
 
 export function contactClassificationLabel(status?: string | null) {
   return CONTACT_CLASSIFICATION_OPTIONS.find((entry) => entry.value === status)?.label || 'Contact';
@@ -28,6 +39,12 @@ export function contactClassificationChipClass(status?: string | null) {
       return 'bg-slate-100 text-slate-700';
     case 'not_supporting':
       return 'bg-red-100 text-red-700';
+    case 'duplicate':
+      return 'bg-orange-100 text-orange-700';
+    case 'invalid':
+      return 'bg-zinc-200 text-zinc-700';
+    case 'archived':
+      return 'bg-slate-200 text-slate-700';
     default:
       return 'bg-gray-100 text-gray-700';
   }

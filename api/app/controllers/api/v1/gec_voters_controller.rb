@@ -108,12 +108,15 @@ module Api
           .limit(250)
           .to_a
 
+        latest_contact_attempts = latest_contact_attempts_for(contacts)
+
         render json: {
           households: build_households(
             voters,
             contacts,
             linked_contacts_by_voter: linked_contacts_by_voter,
-            possible_contacts_by_voter: possible_contacts_by_voter
+            possible_contacts_by_voter: possible_contacts_by_voter,
+            latest_contact_attempts: latest_contact_attempts
           ),
           voter_count: voters.length,
           contact_count: contacts.length
@@ -714,7 +717,7 @@ module Api
         end
       end
 
-      def build_households(voters, contacts, linked_contacts_by_voter: {}, possible_contacts_by_voter: {})
+      def build_households(voters, contacts, linked_contacts_by_voter: {}, possible_contacts_by_voter: {}, latest_contact_attempts: {})
         grouped = {}
 
         voters.each do |voter|
@@ -737,7 +740,7 @@ module Api
           next if key.blank?
 
           grouped[key] ||= household_json(contact.street_address, contact.village&.name)
-          grouped[key][:contacts] << supporter_json(contact)
+          grouped[key][:contacts] << supporter_json(contact, latest_contact_attempt: latest_contact_attempts[contact.id])
         end
 
         grouped.values.sort_by { |row| [ row[:village_name].to_s, row[:address].to_s ] }
@@ -1290,7 +1293,7 @@ module Api
         )
       end
 
-      def supporter_json(contact)
+      def supporter_json(contact, latest_contact_attempt: nil)
         {
           id: contact.id,
           first_name: contact.first_name,
@@ -1309,7 +1312,40 @@ module Api
           verification_status: contact.verification_status,
           verification_reason: contact.verification_reason,
           current_gec_match: contact.gec_voter_id.present?,
-          gec_voter_id: contact.gec_voter_id
+          gec_voter_id: contact.gec_voter_id,
+          latest_contact_attempt: latest_contact_attempt && contact_attempt_summary_json(latest_contact_attempt)
+        }
+      end
+
+      def latest_contact_attempts_for(contacts)
+        contact_ids = Array(contacts).map(&:id)
+        return {} if contact_ids.empty?
+
+        ranked_attempts = SupporterContactAttempt
+          .select(
+            "supporter_contact_attempts.*, " \
+            "ROW_NUMBER() OVER (PARTITION BY supporter_id ORDER BY recorded_at DESC, id DESC) AS attempt_rank"
+          )
+          .where(supporter_id: contact_ids)
+
+        SupporterContactAttempt
+          .from(ranked_attempts, :supporter_contact_attempts)
+          .includes(:recorded_by_user)
+          .where("attempt_rank = 1")
+          .each_with_object({}) do |attempt, latest_by_contact|
+            latest_by_contact[attempt.supporter_id] = attempt
+          end
+      end
+
+      def contact_attempt_summary_json(attempt)
+        {
+          id: attempt.id,
+          channel: attempt.channel,
+          outcome: attempt.outcome,
+          note: attempt.note,
+          recorded_at: attempt.recorded_at&.iso8601,
+          recorded_by_name: attempt.recorded_by_user&.name,
+          recorded_by_email: attempt.recorded_by_user&.email
         }
       end
     end

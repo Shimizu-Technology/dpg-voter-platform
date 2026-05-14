@@ -68,4 +68,111 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Shimizu", supporter.last_name
     assert_equal "221 Lirio Ave", supporter.street_address
   end
+
+  test "review intake classifies contact and logs initial outreach" do
+    village = Village.find_or_create_by!(name: "Dededo")
+    supporter = Supporter.create!(
+      first_name: "Malia",
+      last_name: "Cruz",
+      contact_number: "+16715551212",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      public_review_status: "pending",
+      status: "active"
+    )
+
+    assert_difference -> { SupporterContactAttempt.count }, 1 do
+      patch "/api/v1/supporters/#{supporter.id}/review_intake",
+        params: {
+          intake_review: {
+            decision: "approve",
+            contact_classification: "supporter",
+            note: "Confirmed at event table.",
+            contact_attempt: {
+              channel: "in_person",
+              outcome: "reached",
+              note: "Talked through registration status."
+            }
+          }
+        },
+        headers: auth_headers(@admin),
+        as: :json
+    end
+
+    assert_response :success
+    supporter.reload
+    assert_equal "supporter", supporter.contact_classification
+    assert_equal "approved", supporter.review_status
+    assert_equal "not_applicable", supporter.public_review_status
+    assert_equal @admin.id, supporter.reviewed_by_user_id
+    assert_equal @admin.id, supporter.classified_by_user_id
+    assert_equal "in_person", supporter.supporter_contact_attempts.last.channel
+    assert_equal "reached", supporter.supporter_contact_attempts.last.outcome
+    assert_equal "intake_reviewed", AuditLog.where(auditable: supporter).last.action
+  end
+
+  test "review intake can reject invalid records" do
+    village = Village.find_or_create_by!(name: "Yigo")
+    supporter = Supporter.create!(
+      first_name: "Bad",
+      last_name: "Entry",
+      contact_number: "+16715550000",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      public_review_status: "pending",
+      status: "active"
+    )
+
+    patch "/api/v1/supporters/#{supporter.id}/review_intake",
+      params: {
+        intake_review: {
+          decision: "reject",
+          contact_classification: "invalid",
+          note: "Test submission."
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    supporter.reload
+    assert_equal "invalid", supporter.contact_classification
+    assert_equal "rejected", supporter.review_status
+    assert_equal "rejected", supporter.public_review_status
+    refute_includes Supporter.contacts.pluck(:id), supporter.id
+  end
+
+  test "review intake rejects invalid classification" do
+    village = Village.find_or_create_by!(name: "Mangilao")
+    supporter = Supporter.create!(
+      first_name: "Ari",
+      last_name: "Test",
+      contact_number: "+16715553333",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      status: "active"
+    )
+
+    patch "/api/v1/supporters/#{supporter.id}/review_intake",
+      params: {
+        intake_review: {
+          decision: "approve",
+          contact_classification: "maybe"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "new_intake", supporter.reload.contact_classification
+  end
 end
