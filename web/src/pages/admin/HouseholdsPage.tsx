@@ -105,6 +105,10 @@ function initialCanvassDraft(contact: HouseholdContact): CanvassDraft {
   };
 }
 
+function householdCanvassable(contact: HouseholdContact) {
+  return contact.contact_classification === 'active_contact' && contact.review_status === 'approved';
+}
+
 function fullName(person: Pick<GecVoter | HouseholdContact, 'first_name' | 'middle_name' | 'last_name'>) {
   return [person.first_name, person.middle_name, person.last_name].filter(Boolean).join(' ');
 }
@@ -522,7 +526,8 @@ export default function HouseholdsPage() {
                     <div className="space-y-2">
                       {household.contacts.map((contact) => {
                         const draft = draftForContact(contact);
-                        const isExpanded = expandedContactId === contact.id;
+                        const canLogCanvass = householdCanvassable(contact);
+                        const isExpanded = canLogCanvass && expandedContactId === contact.id;
                         return (
                           <div key={contact.id} className="rounded-xl border border-slate-200 p-3">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -563,14 +568,20 @@ export default function HouseholdsPage() {
                               )}
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleCanvassPanel(contact, isExpanded)}
-                                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-2.5 text-xs font-semibold text-white"
-                              >
-                                <MessageSquare className="h-3.5 w-3.5" />
-                                Log canvass
-                              </button>
+                              {canLogCanvass ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCanvassPanel(contact, isExpanded)}
+                                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-2.5 text-xs font-semibold text-white"
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                  Log canvass
+                                </button>
+                              ) : (
+                                <span className="inline-flex min-h-9 items-center rounded-lg bg-amber-50 px-2.5 text-xs font-semibold text-amber-700">
+                                  Intake review needed before canvassing
+                                </span>
+                              )}
                               <Link
                                 to={`/admin/supporters/${contact.id}?return_to=${encodeURIComponent('/admin/households')}`}
                                 className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
