@@ -323,9 +323,12 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
       source: "staff_entry",
       attribution_method: "staff_manual",
       contact_classification: "active_contact",
+      classified_at: 2.days.ago,
+      classified_by_user: @admin,
       review_status: "approved",
       status: "active"
     )
+    original_classified_at = supporter.classified_at
 
     assert_difference -> { SupporterContactAttempt.count }, 1 do
       patch "/api/v1/supporters/#{supporter.id}/canvass_update",
@@ -350,6 +353,7 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "active_contact", supporter.contact_classification
     assert_equal "supporter", supporter.support_status
     assert_equal "interested", supporter.volunteer_status
+    assert_equal original_classified_at.to_i, supporter.classified_at.to_i
     assert_equal @admin.id, supporter.classified_by_user_id
     assert_equal "in_person", supporter.supporter_contact_attempts.last.channel
     assert_equal "household_canvass_logged", AuditLog.where(auditable: supporter).last.action

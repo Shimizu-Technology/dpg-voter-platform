@@ -610,7 +610,7 @@ module Api
       end
 
       def pdf_preview_storage_attributes(file, preview_request_id)
-        return { file_data: File.binread(file.tempfile.path) } unless S3Service.enabled?
+        return { file_data: File.binread(file.tempfile.path) } if Rails.env.development? || !S3Service.enabled?
 
         filename = File.basename(file.original_filename.to_s.presence || "upload.pdf")
         safe_filename = S3Service.safe_filename(filename, fallback: "preview.pdf")
@@ -624,7 +624,7 @@ module Api
       end
 
       def pdf_import_upload_storage_attributes(file, import_id)
-        return { file_data: File.binread(file.tempfile.path) } unless S3Service.enabled?
+        return { file_data: File.binread(file.tempfile.path) } if Rails.env.development? || !S3Service.enabled?
 
         filename = File.basename(file.original_filename.to_s.presence || "gec-list.pdf")
         safe_filename = S3Service.safe_filename(filename, fallback: "gec-list.pdf")

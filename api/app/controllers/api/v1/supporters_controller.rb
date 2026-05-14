@@ -1183,11 +1183,8 @@ module Api
 
       def apply_contact_classification_metadata!(supporter, updates)
         new_classification = updates["contact_classification"] || updates[:contact_classification]
-        relationship_changed = %i[support_status membership_status volunteer_status].any? do |field|
-          updates.key?(field) && updates[field].present? && updates[field] != supporter.public_send(field)
-        end
         classification_changed = new_classification.present? && new_classification != supporter.contact_classification
-        return unless classification_changed || relationship_changed
+        return unless classification_changed
 
         updates[:classified_at] = Time.current
         updates[:classified_by_user_id] = current_user.id
