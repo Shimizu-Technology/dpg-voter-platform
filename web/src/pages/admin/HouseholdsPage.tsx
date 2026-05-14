@@ -19,6 +19,9 @@ type GecVoter = {
   precinct_number?: string | null;
   voter_registration_number?: string | null;
   linked_contact_count?: number;
+  linked_contact?: HouseholdContact | null;
+  possible_contact_count?: number;
+  possible_contact?: HouseholdContact | null;
 };
 
 type HouseholdContact = {
@@ -32,6 +35,9 @@ type HouseholdContact = {
   street_address?: string | null;
   village_name?: string | null;
   contact_classification?: string | null;
+  review_status?: string | null;
+  verification_status?: string | null;
+  verification_reason?: string | null;
   current_gec_match?: boolean | null;
   registered_voter_status?: string | null;
 };
@@ -60,6 +66,10 @@ function fullName(person: Pick<GecVoter | HouseholdContact, 'first_name' | 'midd
 
 function voterLabel(voter: GecVoter) {
   return [voter.precinct_number ? `Pct ${voter.precinct_number}` : null, voter.voter_registration_number].filter(Boolean).join(' · ') || 'GEC voter';
+}
+
+function contactName(contact: Pick<HouseholdContact, 'print_name' | 'first_name' | 'middle_name' | 'last_name'>) {
+  return contact.print_name || fullName(contact);
 }
 
 function getErrorMessage(error: unknown) {
@@ -253,29 +263,83 @@ export default function HouseholdsPage() {
                   <p className="text-sm text-slate-500">No current GEC voters found at this address.</p>
                 ) : (
                   <div className="space-y-2">
-                    {household.gec_voters.map((voter) => (
-                      <div key={voter.id} className="rounded-xl border border-slate-200 p-3">
+                    {household.gec_voters.map((voter) => {
+                      const linkedContact = voter.linked_contact;
+                      const possibleContact = voter.possible_contact;
+                      const isLinked = Boolean(voter.linked_contact_count);
+                      const hasPossibleMatch = !isLinked && Boolean(possibleContact);
+
+                      return (
+                      <div
+                        key={voter.id}
+                        className={`rounded-xl border p-3 ${
+                          isLinked ? 'border-green-100 bg-green-50/50' : hasPossibleMatch ? 'border-amber-200 bg-amber-50/45' : 'border-slate-200'
+                        }`}
+                      >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
                             <div className="font-semibold text-slate-950">{fullName(voter)}</div>
                             <div className="mt-1 text-xs text-slate-500">{voterLabel(voter)}</div>
-                            <div className="mt-2 text-xs font-medium text-slate-600">
-                              {voter.linked_contact_count ? `${voter.linked_contact_count} linked DPG contact${voter.linked_contact_count === 1 ? '' : 's'}` : 'No DPG contact linked'}
-                            </div>
+                            {isLinked ? (
+                              <div className="mt-2 space-y-1 text-xs">
+                                <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 font-semibold text-green-800">DPG contact</span>
+                                {linkedContact && (
+                                  <Link
+                                    to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                    className="block font-semibold text-green-900 hover:underline"
+                                  >
+                                    {contactName(linkedContact)}
+                                  </Link>
+                                )}
+                              </div>
+                            ) : hasPossibleMatch && possibleContact ? (
+                              <div className="mt-2 space-y-1 text-xs">
+                                <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">Possible DPG match</span>
+                                <Link
+                                  to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                  className="block font-semibold text-amber-900 hover:underline"
+                                >
+                                  {contactName(possibleContact)}
+                                </Link>
+                                <div className="text-amber-700">
+                                  {contactClassificationLabel(possibleContact.contact_classification)} · not linked yet
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-2 text-xs font-medium text-slate-600">No DPG contact linked</div>
+                            )}
                           </div>
                           <div className="flex shrink-0 flex-wrap gap-2">
+                            {isLinked && linkedContact ? (
+                              <Link
+                                to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-green-200 bg-white px-2.5 text-xs font-semibold text-green-800 hover:bg-green-50"
+                              >
+                                <Users className="h-3.5 w-3.5" />
+                                Open Contact
+                              </Link>
+                            ) : hasPossibleMatch && possibleContact ? (
+                              <Link
+                                to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-white px-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
+                              >
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                Review Match
+                              </Link>
+                            ) : (
                             <button
                               type="button"
-                              disabled={createContactMutation.isPending || Boolean(voter.linked_contact_count)}
+                              disabled={createContactMutation.isPending}
                               onClick={() => createContactMutation.mutate(voter.id)}
                               className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
                             >
                               <Users className="h-3.5 w-3.5" />
-                              {voter.linked_contact_count ? 'Linked' : 'Create Contact'}
+                              Create Contact
                             </button>
+                            )}
                             <button
                               type="button"
-                              disabled={linkContactMutation.isPending || Boolean(voter.linked_contact_count)}
+                              disabled={linkContactMutation.isPending || isLinked}
                               onClick={() => {
                                 const nextVoterId = linkVoterId === voter.id ? null : voter.id;
                                 setLinkVoterId(nextVoterId);
@@ -337,7 +401,7 @@ export default function HouseholdsPage() {
                           </div>
                         )}
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
               </div>

@@ -107,6 +107,42 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, household["contacts"].length
   end
 
+  test "index and households surface possible pending contacts for unlinked GEC voters" do
+    other_village = Village.find_or_create_by!(name: "Dededo")
+    possible_contact = Supporter.create!(
+      first_name: @voter.first_name,
+      last_name: @voter.last_name,
+      contact_number: "671-555-0199",
+      dob: Date.new(@voter.birth_year, 1, 1),
+      village: other_village,
+      street_address: "999 Different Village Road",
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      status: "active"
+    )
+
+    assert_nil possible_contact.reload.gec_voter_id
+    assert_equal "flagged", possible_contact.verification_status
+
+    get "/api/v1/gec_voters", params: { q: @voter.last_name }, headers: auth_headers(@admin)
+
+    assert_response :success
+    voter_payload = JSON.parse(response.body)["gec_voters"].find { |row| row["id"] == @voter.id }
+    assert_equal 0, voter_payload["linked_contact_count"]
+    assert_equal 1, voter_payload["possible_contact_count"]
+    assert_equal possible_contact.id, voter_payload.dig("possible_contact", "id")
+    assert_equal "new_intake", voter_payload.dig("possible_contact", "contact_classification")
+
+    get "/api/v1/gec_voters/households", params: { q: "123 Chalan" }, headers: auth_headers(@admin)
+
+    assert_response :success
+    household_voter = JSON.parse(response.body).dig("households", 0, "gec_voters").find { |row| row["id"] == @voter.id }
+    assert_equal 1, household_voter["possible_contact_count"]
+    assert_equal possible_contact.id, household_voter.dig("possible_contact", "id")
+  end
+
   test "admin can create a DPG contact from a GEC voter" do
     assert_difference -> { Supporter.count }, 1 do
       post "/api/v1/gec_voters/#{@voter.id}/create_contact", headers: auth_headers(@admin)

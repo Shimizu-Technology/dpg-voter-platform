@@ -44,11 +44,18 @@ module Api
         total = scope.count
         voters = scope.offset((page - 1) * per_page).limit(per_page).to_a
         linked_contacts_by_voter = linked_contacts_by_voter(voters.map(&:id))
+        possible_contacts_by_voter = possible_contacts_by_voter(voters)
 
         render json: {
           gec_voters: voters.map do |voter|
             linked_contacts = linked_contacts_by_voter[voter.id] || []
-            voter_json(voter, linked_contact_count: linked_contacts.size, linked_contact: linked_contacts.first)
+            possible_contacts = possible_contacts_by_voter[voter.id] || []
+            voter_json(
+              voter,
+              linked_contact_count: linked_contacts.size,
+              linked_contact: linked_contacts.first,
+              possible_contacts: possible_contacts
+            )
           end,
           pagination: {
             page: page,
@@ -93,6 +100,7 @@ module Api
           .limit(250)
           .to_a
         linked_contacts_by_voter = linked_contacts_by_voter(voters.map(&:id))
+        possible_contacts_by_voter = possible_contacts_by_voter(voters)
 
         contacts = scope_supporters(Supporter.contacts.includes(:village, :precinct, :gec_voter))
           .where("LOWER(supporters.street_address) LIKE ?", "%#{ActiveRecord::Base.sanitize_sql_like(query.downcase)}%")
@@ -101,7 +109,12 @@ module Api
           .to_a
 
         render json: {
-          households: build_households(voters, contacts, linked_contacts_by_voter: linked_contacts_by_voter),
+          households: build_households(
+            voters,
+            contacts,
+            linked_contacts_by_voter: linked_contacts_by_voter,
+            possible_contacts_by_voter: possible_contacts_by_voter
+          ),
           voter_count: voters.length,
           contact_count: contacts.length
         }
@@ -701,7 +714,7 @@ module Api
         end
       end
 
-      def build_households(voters, contacts, linked_contacts_by_voter: {})
+      def build_households(voters, contacts, linked_contacts_by_voter: {}, possible_contacts_by_voter: {})
         grouped = {}
 
         voters.each do |voter|
@@ -709,8 +722,14 @@ module Api
           next if key.blank?
 
           linked_contacts = linked_contacts_by_voter[voter.id] || []
+          possible_contacts = possible_contacts_by_voter[voter.id] || []
           grouped[key] ||= household_json(voter.address, voter.village_name)
-          grouped[key][:gec_voters] << voter_json(voter, linked_contact_count: linked_contacts.size, linked_contact: linked_contacts.first)
+          grouped[key][:gec_voters] << voter_json(
+            voter,
+            linked_contact_count: linked_contacts.size,
+            linked_contact: linked_contacts.first,
+            possible_contacts: possible_contacts
+          )
         end
 
         contacts.each do |contact|
@@ -1219,7 +1238,42 @@ module Api
           .group_by(&:gec_voter_id)
       end
 
-      def voter_json(voter, linked_contact_count: nil, linked_contact: nil)
+      def possible_contacts_by_voter(voters)
+        voters = Array(voters).compact
+        return {} if voters.empty?
+
+        voter_ids = voters.map(&:id).compact
+        last_names = voters.map { |voter| voter.last_name.to_s.downcase.strip }.reject(&:blank?).uniq
+        return {} if voter_ids.empty? || last_names.empty?
+
+        candidates = scope_supporters(Supporter.contacts.flagged.includes(:village, :precinct, :gec_voter))
+          .where(gec_voter_id: nil)
+          .where.not(review_status: "rejected")
+          .where.not(public_review_status: "rejected")
+          .where("LOWER(supporters.last_name) IN (?)", last_names)
+          .limit(500)
+          .to_a
+        return {} if candidates.empty?
+
+        candidates_by_id = candidates.index_by(&:id)
+        voter_id_lookup = voter_ids.index_with(true)
+        matches_by_supporter = GecVoter.find_matches_for_supporters(candidates)
+
+        matches_by_supporter.each_with_object(Hash.new { |hash, key| hash[key] = [] }) do |(supporter_id, matches), grouped|
+          contact = candidates_by_id[supporter_id]
+          next unless contact
+
+          matches.each do |match|
+            matched_voter_id = match[:gec_voter]&.id
+            next unless voter_id_lookup[matched_voter_id]
+
+            grouped[matched_voter_id] << contact
+          end
+        end.transform_values { |contacts| contacts.uniq(&:id) }
+      end
+
+      def voter_json(voter, linked_contact_count: nil, linked_contact: nil, possible_contacts: nil)
+        possible_contacts ||= []
         voter.as_json(
           only: [
             :id, :first_name, :middle_name, :last_name, :dob, :birth_year, :address,
@@ -1230,7 +1284,9 @@ module Api
         ).merge(
           precinct_label: voter.precinct&.number,
           linked_contact_count: linked_contact_count || scope_supporters(Supporter.contacts).where(gec_voter_id: voter.id).count,
-          linked_contact: linked_contact && supporter_json(linked_contact)
+          linked_contact: linked_contact && supporter_json(linked_contact),
+          possible_contact_count: possible_contacts.size,
+          possible_contact: possible_contacts.first && supporter_json(possible_contacts.first)
         )
       end
 
@@ -1249,6 +1305,9 @@ module Api
           precinct_id: contact.precinct_id,
           precinct_number: contact.precinct&.number,
           contact_classification: contact.contact_classification,
+          review_status: contact.review_status,
+          verification_status: contact.verification_status,
+          verification_reason: contact.verification_reason,
           current_gec_match: contact.gec_voter_id.present?,
           gec_voter_id: contact.gec_voter_id
         }

@@ -55,6 +55,8 @@ type GecVoter = {
   gec_list_date: string;
   linked_contact_count?: number;
   linked_contact?: ContactResult | null;
+  possible_contact_count?: number;
+  possible_contact?: ContactResult | null;
 };
 
 type Household = {
@@ -193,12 +195,16 @@ type ContactResult = {
   id: number;
   print_name?: string | null;
   first_name: string;
+  middle_name?: string | null;
   last_name: string;
   contact_number?: string | null;
   email?: string | null;
   street_address?: string | null;
   village_name?: string | null;
   contact_classification?: string | null;
+  review_status?: string | null;
+  verification_status?: string | null;
+  verification_reason?: string | null;
   current_gec_match?: boolean | null;
 };
 
@@ -228,6 +234,10 @@ function getErrorMessage(error: unknown) {
 
 function fullName(voter: Pick<GecVoter, 'first_name' | 'middle_name' | 'last_name'>) {
   return [voter.first_name, voter.middle_name, voter.last_name].filter(Boolean).join(' ');
+}
+
+function contactName(contact: Pick<ContactResult, 'print_name' | 'first_name' | 'middle_name' | 'last_name'>) {
+  return contact.print_name || [contact.first_name, contact.middle_name, contact.last_name].filter(Boolean).join(' ');
 }
 
 function contactClassificationLabel(value?: string | null) {
@@ -1241,11 +1251,13 @@ export default function GecVotersPage() {
                   <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">No GEC voters found</td></tr>
                 ) : voters.map((voter) => {
                   const linkedContact = voter.linked_contact;
+                  const possibleContact = voter.possible_contact;
                   const isLinked = Boolean(voter.linked_contact_count);
+                  const hasPossibleMatch = !isLinked && Boolean(possibleContact);
 
                   return (
                     <Fragment key={voter.id}>
-                    <tr className={`align-top ${isLinked ? 'bg-green-50/45' : ''}`}>
+                    <tr className={`align-top ${isLinked ? 'bg-green-50/45' : hasPossibleMatch ? 'bg-amber-50/45' : ''}`}>
                       <td className="px-4 py-3">
                         <div className="font-semibold text-slate-950">{fullName(voter)}</div>
                         <div className="text-xs text-slate-500">{voter.voter_registration_number || 'No voter number'}{voter.birth_year ? ` · Born ${voter.birth_year}` : ''}</div>
@@ -1264,11 +1276,26 @@ export default function GecVotersPage() {
                                 to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
                                 className="block text-xs font-semibold text-primary hover:underline"
                               >
-                                {linkedContact.print_name || `${linkedContact.first_name} ${linkedContact.last_name}`}
+                                {contactName(linkedContact)}
                               </Link>
                             )}
                             <div className="text-xs text-slate-500">
                               {linkedContact ? contactClassificationLabel(linkedContact.contact_classification) : `${voter.linked_contact_count} linked`}
+                            </div>
+                          </div>
+                        ) : hasPossibleMatch && possibleContact ? (
+                          <div className="space-y-1">
+                            <span className="inline-flex w-fit items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                              Possible DPG match
+                            </span>
+                            <Link
+                              to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                              className="block text-xs font-semibold text-amber-900 hover:underline"
+                            >
+                              {contactName(possibleContact)}
+                            </Link>
+                            <div className="text-xs text-amber-700">
+                              {contactClassificationLabel(possibleContact.contact_classification)} · not linked yet
                             </div>
                           </div>
                         ) : (
@@ -1289,6 +1316,29 @@ export default function GecVotersPage() {
                             ) : (
                               <span className="rounded-xl bg-green-50 px-3 py-2 text-xs font-semibold text-green-800">Already linked</span>
                             )
+                          ) : hasPossibleMatch && possibleContact ? (
+                            <>
+                              <Link
+                                to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-3 text-xs font-semibold text-amber-800 hover:bg-amber-50"
+                              >
+                                <AlertTriangle className="h-4 w-4" />
+                                Review Match
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextId = linkVoterId === voter.id ? null : voter.id;
+                                  setLinkVoterId(nextId);
+                                  setContactSearch(nextId ? fullName(voter) : '');
+                                  setSubmittedContactSearch('');
+                                }}
+                                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              >
+                                <Users className="h-4 w-4" />
+                                Link Existing
+                              </button>
+                            </>
                           ) : (
                             <>
                               <button
@@ -1492,10 +1542,17 @@ export default function GecVotersPage() {
                     <div className="mt-3 space-y-2">
                       {visibleVoters.map((voter) => {
                         const linkedContact = voter.linked_contact;
+                        const possibleContact = voter.possible_contact;
                         const isLinked = Boolean(voter.linked_contact_count);
+                        const hasPossibleMatch = !isLinked && Boolean(possibleContact);
 
                         return (
-                        <div key={voter.id} className={`rounded-lg border p-2 ${isLinked ? 'border-green-100 bg-green-50/50' : 'border-slate-100 bg-white'}`}>
+                        <div
+                          key={voter.id}
+                          className={`rounded-lg border p-2 ${
+                            isLinked ? 'border-green-100 bg-green-50/50' : hasPossibleMatch ? 'border-amber-200 bg-amber-50/45' : 'border-slate-100 bg-white'
+                          }`}
+                        >
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
@@ -1503,10 +1560,21 @@ export default function GecVotersPage() {
                                 {isLinked && (
                                   <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">DPG contact</span>
                                 )}
+                                {hasPossibleMatch && (
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Possible DPG match</span>
+                                )}
                               </div>
                               <div className="text-xs text-slate-500">
                                 {[voter.voter_registration_number, voter.birth_year ? `Born ${voter.birth_year}` : null, voter.precinct_number ? `Pct ${voter.precinct_number}` : null].filter(Boolean).join(' · ')}
                               </div>
+                              {hasPossibleMatch && possibleContact && (
+                                <Link
+                                  to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                  className="mt-1 block text-xs font-semibold text-amber-900 hover:underline"
+                                >
+                                  {contactName(possibleContact)} · {contactClassificationLabel(possibleContact.contact_classification)}
+                                </Link>
+                              )}
                             </div>
                             <div className="flex shrink-0 flex-wrap gap-2">
                               {isLinked ? (
@@ -1521,6 +1589,30 @@ export default function GecVotersPage() {
                                 ) : (
                                   <span className="inline-flex min-h-9 items-center rounded-lg bg-green-100 px-2.5 text-xs font-semibold text-green-800">Linked</span>
                                 )
+                              ) : hasPossibleMatch && possibleContact ? (
+                                <>
+                                  <Link
+                                    to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-white px-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
+                                  >
+                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                    Review
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextVoterId = linkVoterId === voter.id ? null : voter.id;
+                                      setLinkVoterId(nextVoterId);
+                                      setContactSearch(nextVoterId ? fullName(voter) : '');
+                                      setSubmittedContactSearch('');
+                                    }}
+                                    disabled={linkContactMutation.isPending}
+                                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                                  >
+                                    <LinkIcon className="h-3.5 w-3.5" />
+                                    Link
+                                  </button>
+                                </>
                               ) : (
                                 <>
                                   <button
