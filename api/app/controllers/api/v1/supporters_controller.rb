@@ -184,7 +184,7 @@ module Api
         end
 
         classification = normalized_intake_review_classification(review, decision)
-        unless Supporter::CONTACT_CLASSIFICATIONS.include?(classification)
+        unless intake_review_classification_allowed?(classification)
           return render_api_error(
             message: "Invalid contact classification",
             status: :unprocessable_entity,
@@ -1174,6 +1174,12 @@ module Api
         %w[duplicate invalid archived].include?(classification) ? classification : "active_contact"
       end
 
+      def intake_review_classification_allowed?(classification)
+        classification.present? &&
+          Supporter::CONTACT_CLASSIFICATIONS.include?(classification) &&
+          classification != "new_intake"
+      end
+
       def intake_reviewable?(supporter)
         supporter.status == "active" &&
           supporter.contact_classification == "new_intake" &&
@@ -1187,7 +1193,7 @@ module Api
       def intake_review_status_updates(classification, decision, supporter)
         rejected = decision == "reject" || %w[duplicate invalid archived].include?(classification)
         updates = {
-          review_status: rejected ? "rejected" : (classification == "new_intake" ? "pending" : "approved")
+          review_status: rejected ? "rejected" : "approved"
         }
         updates[:public_review_status] = rejected ? "rejected" : "approved" if supporter.public_review_status == "pending"
         updates[:status] = "duplicate" if classification == "duplicate"

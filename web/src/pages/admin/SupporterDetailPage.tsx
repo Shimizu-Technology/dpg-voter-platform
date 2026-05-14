@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ChevronLeft, Loader2, Mail, MapPin, MessageSquare, Pencil, Phone, Plus, Save, StickyNote, UserRound, X } from 'lucide-react';
@@ -305,6 +305,17 @@ const CONTACT_ATTEMPT_CHANNELS = CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) =>
 }));
 
 const CONTACT_ATTEMPT_OUTCOMES = CONTACT_ATTEMPT_OUTCOME_OPTIONS;
+
+function DetailField({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <label className={`block space-y-1.5 ${className}`}>
+      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
 
 function localDateTimeInputValue(date = new Date()) {
   const localTime = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -841,157 +852,185 @@ export default function SupporterDetailPage() {
             </p>
           )}
           <div className="grid md:grid-cols-3 gap-3">
-            <input
-              value={String(currentForm.first_name || '')}
-              onChange={(e) => updateDraft({ first_name: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              placeholder="First Name"
-            />
-            <input
-              value={String(currentForm.middle_name || '')}
-              onChange={(e) => updateDraft({ middle_name: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              placeholder="Middle Name"
-            />
-            <input
-              value={String(currentForm.last_name || '')}
-              onChange={(e) => updateDraft({ last_name: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              placeholder="Last Name"
-            />
-            <input
-              value={String(currentForm.contact_number || '')}
-              onChange={(e) => updateDraft({ contact_number: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              placeholder="Phone Number"
-            />
-            <input
-              value={String(currentForm.email || '')}
-              onChange={(e) => updateDraft({ email: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              placeholder="Email"
-            />
-            <input
-              type="date"
-              value={String(currentForm.dob || '')}
-              onChange={(e) => updateDraft({ dob: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-            />
-            <input
-              value={String(currentForm.street_address || '')}
-              onChange={(e) => updateDraft({ street_address: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 md:col-span-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              placeholder="Street Address"
-            />
-            <select
-              value={String(currentForm.village_id || '')}
-              onChange={(e) => {
-                const nextVillageId = Number(e.target.value);
-                const nextVillage = villages.find((v) => v.id === nextVillageId);
-                const nextPrecinctId = assignPrecinctIdByLastName(currentForm.last_name, nextVillage?.precincts || []);
+            <DetailField label="First name">
+              <input
+                value={String(currentForm.first_name || '')}
+                onChange={(e) => updateDraft({ first_name: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+                placeholder="First Name"
+              />
+            </DetailField>
+            <DetailField label="Middle name">
+              <input
+                value={String(currentForm.middle_name || '')}
+                onChange={(e) => updateDraft({ middle_name: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+                placeholder="Middle Name"
+              />
+            </DetailField>
+            <DetailField label="Last name">
+              <input
+                value={String(currentForm.last_name || '')}
+                onChange={(e) => updateDraft({ last_name: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+                placeholder="Last Name"
+              />
+            </DetailField>
+            <DetailField label="Phone number">
+              <input
+                value={String(currentForm.contact_number || '')}
+                onChange={(e) => updateDraft({ contact_number: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+                placeholder="Phone Number"
+              />
+            </DetailField>
+            <DetailField label="Email">
+              <input
+                value={String(currentForm.email || '')}
+                onChange={(e) => updateDraft({ email: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+                placeholder="Email"
+              />
+            </DetailField>
+            <DetailField label="Date of birth">
+              <input
+                type="date"
+                value={String(currentForm.dob || '')}
+                onChange={(e) => updateDraft({ dob: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+              />
+            </DetailField>
+            <DetailField label="Street address" className="md:col-span-2">
+              <input
+                value={String(currentForm.street_address || '')}
+                onChange={(e) => updateDraft({ street_address: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+                placeholder="Street Address"
+              />
+            </DetailField>
+            <DetailField label="Village">
+              <select
+                value={String(currentForm.village_id || '')}
+                onChange={(e) => {
+                  const nextVillageId = Number(e.target.value);
+                  const nextVillage = villages.find((v) => v.id === nextVillageId);
+                  const nextPrecinctId = assignPrecinctIdByLastName(currentForm.last_name, nextVillage?.precincts || []);
 
-                updateDraft({
-                  village_id: nextVillageId,
-                  precinct_id: nextPrecinctId,
-                });
-              }}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-            >
-              {villages.map((v) => (
-                <option key={v.id} value={v.id}>{v.name}</option>
-              ))}
-            </select>
-            <select
-              value={currentForm.precinct_id ? String(currentForm.precinct_id) : ''}
-              onChange={(e) => updateDraft({ precinct_id: e.target.value ? Number(e.target.value) : null })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-            >
-              <option value="">Not assigned</option>
-              {(selectedVillage?.precincts || []).map((p) => (
-                <option key={p.id} value={p.id}>Precinct {p.number} ({p.alpha_range})</option>
-              ))}
-            </select>
-            <select
-              value={String(currentForm.contact_classification || 'new_intake')}
-              onChange={(e) => updateDraft({ contact_classification: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              aria-label="Record status"
-            >
-              {CONTACT_CLASSIFICATION_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
-              value={String(currentForm.support_status || 'unknown')}
-              onChange={(e) => updateDraft({ support_status: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              aria-label="Support status"
-            >
-              {SUPPORT_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
-              value={String(currentForm.membership_status || 'not_member')}
-              onChange={(e) => updateDraft({ membership_status: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              aria-label="Membership status"
-            >
-              {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
-              value={String(currentForm.volunteer_status || 'unknown')}
-              onChange={(e) => updateDraft({ volunteer_status: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              aria-label="Volunteer status"
-            >
-              {VOLUNTEER_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
-              value={String(currentForm.registered_voter_status || 'not_sure')}
-              onChange={(e) => updateDraft({
-                registered_voter_status: e.target.value,
-                self_reported_registered_voter: e.target.value === 'yes' ? true : e.target.value === 'no' ? false : null,
-                registered_voter_location_note: e.target.value === 'yes' ? currentForm.registered_voter_location_note : '',
-              })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-            >
-              <option value="yes">Self-reported voter: Yes</option>
-              <option value="no">Self-reported voter: No</option>
-              <option value="not_sure">Self-reported voter: Not sure</option>
-            </select>
-            <input
-              value={String(currentForm.registered_voter_location_note || '')}
-              onChange={(e) => updateDraft({ registered_voter_location_note: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 md:col-span-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing || currentForm.registered_voter_status !== 'yes'}
-              placeholder="Votes elsewhere note"
-            />
-            <input
-              value={String(currentForm.referred_by_name || '')}
-              onChange={(e) => updateDraft({ referred_by_name: e.target.value })}
-              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-              disabled={!isEditing}
-              placeholder="Referred by"
-            />
+                  updateDraft({
+                    village_id: nextVillageId,
+                    precinct_id: nextPrecinctId,
+                  });
+                }}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+              >
+                {villages.map((v) => (
+                  <option key={v.id} value={v.id}>{v.name}</option>
+                ))}
+              </select>
+            </DetailField>
+            <DetailField label="Precinct">
+              <select
+                value={currentForm.precinct_id ? String(currentForm.precinct_id) : ''}
+                onChange={(e) => updateDraft({ precinct_id: e.target.value ? Number(e.target.value) : null })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+              >
+                <option value="">Not assigned</option>
+                {(selectedVillage?.precincts || []).map((p) => (
+                  <option key={p.id} value={p.id}>Precinct {p.number} ({p.alpha_range})</option>
+                ))}
+              </select>
+            </DetailField>
+            <DetailField label="Record status">
+              <select
+                value={String(currentForm.contact_classification || 'new_intake')}
+                onChange={(e) => updateDraft({ contact_classification: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+              >
+                {CONTACT_CLASSIFICATION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </DetailField>
+            <DetailField label="Support status">
+              <select
+                value={String(currentForm.support_status || 'unknown')}
+                onChange={(e) => updateDraft({ support_status: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+              >
+                {SUPPORT_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </DetailField>
+            <DetailField label="Membership">
+              <select
+                value={String(currentForm.membership_status || 'not_member')}
+                onChange={(e) => updateDraft({ membership_status: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+              >
+                {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </DetailField>
+            <DetailField label="Volunteer status">
+              <select
+                value={String(currentForm.volunteer_status || 'unknown')}
+                onChange={(e) => updateDraft({ volunteer_status: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+              >
+                {VOLUNTEER_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </DetailField>
+            <DetailField label="Self-reported voter">
+              <select
+                value={String(currentForm.registered_voter_status || 'not_sure')}
+                onChange={(e) => updateDraft({
+                  registered_voter_status: e.target.value,
+                  self_reported_registered_voter: e.target.value === 'yes' ? true : e.target.value === 'no' ? false : null,
+                  registered_voter_location_note: e.target.value === 'yes' ? currentForm.registered_voter_location_note : '',
+                })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+              >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+                <option value="not_sure">Not sure</option>
+              </select>
+            </DetailField>
+            <DetailField label="Votes elsewhere note" className="md:col-span-2">
+              <input
+                value={String(currentForm.registered_voter_location_note || '')}
+                onChange={(e) => updateDraft({ registered_voter_location_note: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing || currentForm.registered_voter_status !== 'yes'}
+                placeholder="Votes elsewhere note"
+              />
+            </DetailField>
+            <DetailField label="Referred by">
+              <input
+                value={String(currentForm.referred_by_name || '')}
+                onChange={(e) => updateDraft({ referred_by_name: e.target.value })}
+                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+                disabled={!isEditing}
+                placeholder="Referred by"
+              />
+            </DetailField>
           </div>
 
           {isEditing ? (

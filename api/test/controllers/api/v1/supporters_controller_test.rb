@@ -178,6 +178,36 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "new_intake", supporter.reload.contact_classification
   end
 
+  test "review intake rejects new intake as submitted review classification" do
+    village = Village.find_or_create_by!(name: "Agat")
+    supporter = Supporter.create!(
+      first_name: "Still",
+      last_name: "Pending",
+      contact_number: "+16715553444",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      status: "active"
+    )
+
+    patch "/api/v1/supporters/#{supporter.id}/review_intake",
+      params: {
+        intake_review: {
+          decision: "approve",
+          contact_classification: "new_intake"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    supporter.reload
+    assert_equal "new_intake", supporter.contact_classification
+    assert_equal "pending", supporter.review_status
+  end
+
   test "review intake only accepts pending new intake records" do
     village = Village.find_or_create_by!(name: "Tamuning")
     supporter = Supporter.create!(

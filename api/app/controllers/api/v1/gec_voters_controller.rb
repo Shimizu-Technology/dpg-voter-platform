@@ -618,9 +618,13 @@ module Api
         uploaded = File.open(file.tempfile.path, "rb") do |io|
           S3Service.upload(s3_key, io, content_type: file.content_type.presence || "application/pdf")
         end
-        raise "Could not store PDF preview upload" unless uploaded
+        return { file_s3_key: s3_key } if uploaded
 
-        { file_s3_key: s3_key }
+        Rails.logger.warn(
+          "GEC PDF preview #{preview_request_id}: S3 upload unavailable for #{s3_key}; " \
+          "falling back to database-backed preview storage"
+        )
+        { file_data: File.binread(file.tempfile.path) }
       end
 
       def pdf_import_upload_storage_attributes(file, import_id)
@@ -632,9 +636,13 @@ module Api
         uploaded = File.open(file.tempfile.path, "rb") do |io|
           S3Service.upload(s3_key, io, content_type: file.content_type.presence || "application/pdf")
         end
-        raise "Could not store PDF import upload" unless uploaded
+        return { file_s3_key: s3_key } if uploaded
 
-        { file_s3_key: s3_key }
+        Rails.logger.warn(
+          "GEC import #{import_id}: S3 upload unavailable for #{s3_key}; " \
+          "falling back to database-backed import upload storage"
+        )
+        { file_data: File.binread(file.tempfile.path) }
       end
 
       def pdf_preview_json(preview)
