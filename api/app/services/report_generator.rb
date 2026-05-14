@@ -36,6 +36,9 @@ class ReportGenerator
     campaign_id: nil,
     preview_limit: 100,
     registered_voter_status: nil,
+    support_status: nil,
+    membership_status: nil,
+    volunteer_status: nil,
     support_need: nil,
     registration_outreach_status: nil,
     support_follow_up_status: nil,
@@ -48,6 +51,9 @@ class ReportGenerator
     @campaign_id = campaign_id
     @preview_limit = preview_limit
     @registered_voter_status = registered_voter_status
+    @support_status = support_status
+    @membership_status = membership_status
+    @volunteer_status = volunteer_status
     @support_need = support_need
     @registration_outreach_status = registration_outreach_status.presence || outreach_status
     @support_follow_up_status = support_follow_up_status
@@ -110,6 +116,9 @@ class ReportGenerator
 
   def apply_supporter_report_filters(scope)
     scope = scope.where(registered_voter_status: @registered_voter_status) if @registered_voter_status.present?
+    scope = scope.where(support_status: @support_status) if @support_status.present?
+    scope = scope.where(membership_status: @membership_status) if @membership_status.present?
+    scope = scope.where(volunteer_status: @volunteer_status) if @volunteer_status.present?
     scope = scope.where(registration_outreach_status: @registration_outreach_status) if @registration_outreach_status.present?
     scope = scope.where(support_follow_up_status: @support_follow_up_status) if @support_follow_up_status.present?
     apply_support_need_filter(scope)
@@ -778,6 +787,9 @@ class ReportGenerator
       "Village",
       "Precinct",
       "Classification",
+      "Support Status",
+      "Membership",
+      "Volunteer Status",
       "Verification",
       "Cross-Reference Status",
       "Last Contact Method",
@@ -801,6 +813,9 @@ class ReportGenerator
       supporter.village&.name,
       supporter.precinct&.number,
       supporter.contact_classification&.humanize,
+      supporter.support_status&.humanize,
+      supporter.membership_status&.humanize,
+      supporter.volunteer_status&.humanize,
       supporter.verification_status&.humanize,
       status_label,
       latest_contact_attempt&.channel&.humanize,

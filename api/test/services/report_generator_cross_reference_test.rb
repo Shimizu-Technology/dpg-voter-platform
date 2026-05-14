@@ -39,7 +39,8 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
       precinct: @precinct,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active",
       verification_status: "verified"
     )
@@ -77,7 +78,9 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
       village: @village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "member",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      membership_status: "member",
       status: "active"
     )
     @possible_match.update_columns(

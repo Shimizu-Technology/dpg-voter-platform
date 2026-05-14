@@ -193,12 +193,15 @@ module Api
         end
 
         attempt = nil
-        old_review_state = supporter.slice("contact_classification", "review_status", "public_review_status", "status")
+        old_review_state = supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status")
 
         begin
           ApplicationRecord.transaction do
             updates = {
-              contact_classification: classification,
+              contact_classification: normalized_intake_record_classification(classification),
+              support_status: review[:support_status].presence || "unknown",
+              membership_status: review[:membership_status].presence || "not_member",
+              volunteer_status: review[:volunteer_status].presence || "unknown",
               reviewed_at: Time.current,
               reviewed_by_user_id: current_user.id
             }.merge(intake_review_status_updates(classification, decision, supporter))
@@ -209,7 +212,7 @@ module Api
 
             log_audit!(supporter, action: "intake_reviewed", changed_data: {
               "before" => old_review_state,
-              "after" => supporter.slice("contact_classification", "review_status", "public_review_status", "status"),
+              "after" => supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status"),
               "decision" => decision,
               "note" => review[:note].presence,
               "contact_attempt_id" => attempt&.id
@@ -242,8 +245,8 @@ module Api
 
         supporter = scope_supporters(Supporter.contacts).find(params[:id])
         canvass = canvass_update_params
-        classification = canvass[:contact_classification].presence
-        if classification.present? && !household_canvass_classification_allowed?(classification)
+        classification = canvass[:contact_classification].presence || "active_contact"
+        if !household_canvass_classification_allowed?(classification)
           return render_api_error(
             message: "Invalid household canvassing classification",
             status: :unprocessable_entity,
@@ -252,19 +255,27 @@ module Api
         end
 
         old_classification = supporter.contact_classification
+        old_relationship_state = supporter.slice("support_status", "membership_status", "volunteer_status")
         attempt = nil
 
         begin
           ApplicationRecord.transaction do
-            if classification.present? && classification != supporter.contact_classification
-              updates = { contact_classification: classification }
-              apply_contact_classification_metadata!(supporter, updates)
-              supporter.update!(updates)
-            end
+            updates = {
+              contact_classification: classification,
+              support_status: canvass[:support_status].presence || supporter.support_status,
+              membership_status: canvass[:membership_status].presence || supporter.membership_status,
+              volunteer_status: canvass[:volunteer_status].presence || supporter.volunteer_status
+            }
+            apply_contact_classification_metadata!(supporter, updates)
+            supporter.update!(updates)
 
             attempt = create_required_canvass_contact_attempt!(supporter, canvass[:contact_attempt])
             log_audit!(supporter, action: "household_canvass_logged", changed_data: {
               "contact_classification" => old_classification == supporter.contact_classification ? nil : [ old_classification, supporter.contact_classification ],
+              "relationship" => old_relationship_state == supporter.slice("support_status", "membership_status", "volunteer_status") ? nil : {
+                "before" => old_relationship_state,
+                "after" => supporter.slice("support_status", "membership_status", "volunteer_status")
+              },
               "contact_attempt_id" => attempt.id,
               "channel" => attempt.channel,
               "outcome" => attempt.outcome,
@@ -430,6 +441,9 @@ module Api
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
         supporters = supporters.where(contact_classification: params[:contact_classification]) if params[:contact_classification].present?
         supporters = supporters.where.not(contact_classification: params[:exclude_contact_classification]) if params[:exclude_contact_classification].present?
+        supporters = supporters.where(support_status: params[:support_status]) if params[:support_status].present?
+        supporters = supporters.where(membership_status: params[:membership_status]) if params[:membership_status].present?
+        supporters = supporters.where(volunteer_status: params[:volunteer_status]) if params[:volunteer_status].present?
 
         supporters = apply_supporter_search(supporters, params[:search]) if params[:search].present?
         supporters = apply_index_sort(supporters)
@@ -1063,6 +1077,9 @@ module Api
         supporters = supporters.where(verification_status: params[:verification_status]) if params[:verification_status].present?
         supporters = supporters.where(contact_classification: params[:contact_classification]) if params[:contact_classification].present?
         supporters = supporters.where.not(contact_classification: params[:exclude_contact_classification]) if params[:exclude_contact_classification].present?
+        supporters = supporters.where(support_status: params[:support_status]) if params[:support_status].present?
+        supporters = supporters.where(membership_status: params[:membership_status]) if params[:membership_status].present?
+        supporters = supporters.where(volunteer_status: params[:volunteer_status]) if params[:volunteer_status].present?
 
         supporters = apply_supporter_search(supporters, params[:search]) if params[:search].present?
 
@@ -1094,7 +1111,7 @@ module Api
           :registered_voter_location_note, :wants_to_volunteer, :needs_absentee_ballot_help,
           :needs_homebound_voting_help, :needs_voter_registration_help, :needs_election_day_ride, :referred_by_name,
           :household_primary,
-          :opt_in_email, :opt_in_text, :status, :contact_classification
+          :opt_in_email, :opt_in_text, :status, :contact_classification, :support_status, :membership_status, :volunteer_status
         )
       end
 
@@ -1102,6 +1119,9 @@ module Api
         params.require(:intake_review).permit(
           :decision,
           :contact_classification,
+          :support_status,
+          :membership_status,
+          :volunteer_status,
           :note,
           contact_attempt: [ :channel, :outcome, :note, :recorded_at ]
         )
@@ -1110,6 +1130,9 @@ module Api
       def canvass_update_params
         params.require(:canvass_update).permit(
           :contact_classification,
+          :support_status,
+          :membership_status,
+          :volunteer_status,
           contact_attempt: [ :channel, :outcome, :note, :recorded_at ]
         )
       end
@@ -1128,14 +1151,16 @@ module Api
       end
 
       def apply_contact_classification_metadata!(supporter, updates)
-        return unless updates.key?("contact_classification") || updates.key?(:contact_classification)
-
         new_classification = updates["contact_classification"] || updates[:contact_classification]
-        return if new_classification.blank? || new_classification == supporter.contact_classification
+        relationship_changed = %i[support_status membership_status volunteer_status].any? do |field|
+          updates.key?(field) && updates[field].present? && updates[field] != supporter.public_send(field)
+        end
+        classification_changed = new_classification.present? && new_classification != supporter.contact_classification
+        return unless classification_changed || relationship_changed
 
         updates[:classified_at] = Time.current
         updates[:classified_by_user_id] = current_user.id
-        updates[:review_status] ||= new_classification == "new_intake" ? "pending" : "approved"
+        updates[:review_status] ||= new_classification == "new_intake" ? "pending" : "approved" if classification_changed
       end
 
       def normalized_intake_review_classification(review, decision)
@@ -1145,6 +1170,10 @@ module Api
         decision == "reject" ? "invalid" : "active_contact"
       end
 
+      def normalized_intake_record_classification(classification)
+        %w[duplicate invalid archived].include?(classification) ? classification : "active_contact"
+      end
+
       def intake_reviewable?(supporter)
         supporter.status == "active" &&
           supporter.contact_classification == "new_intake" &&
@@ -1152,7 +1181,7 @@ module Api
       end
 
       def household_canvass_classification_allowed?(classification)
-        %w[active_contact supporter member volunteer undecided not_supporting].include?(classification)
+        classification == "active_contact"
       end
 
       def intake_review_status_updates(classification, decision, supporter)
@@ -1414,6 +1443,9 @@ module Api
           verified_by_user_id: supporter.verified_by_user_id,
           source: supporter.source,
           contact_classification: supporter.contact_classification,
+          support_status: supporter.support_status,
+          membership_status: supporter.membership_status,
+          volunteer_status: supporter.volunteer_status,
           intake_status: supporter.intake_status,
           review_status: supporter.review_status,
           public_review_status: supporter.public_review_status,
@@ -1491,6 +1523,9 @@ module Api
           latest_contact_attempt: latest_contact_attempt && contact_attempt_summary_json(latest_contact_attempt),
           status: supporter.status,
           contact_classification: supporter.contact_classification,
+          support_status: supporter.support_status,
+          membership_status: supporter.membership_status,
+          volunteer_status: supporter.volunteer_status,
           created_at: supporter.created_at&.iso8601
         }
       end

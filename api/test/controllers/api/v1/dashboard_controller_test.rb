@@ -23,7 +23,8 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551000",
       village: @village,
       source: "staff_entry",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active",
       verification_status: "verified",
       # Created before this week, but vetted now.
@@ -35,7 +36,9 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551001",
       village: @village,
       source: "staff_entry",
-      contact_classification: "member",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      membership_status: "member",
       status: "active",
       verification_status: "verified"
     )
@@ -53,7 +56,8 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551004",
       village: @village,
       source: "qr_signup",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       intake_status: "accepted",
       public_review_status: "approved",
       review_status: "approved",
@@ -94,7 +98,7 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal 6, payload.dig("summary", "total_contacts")
     assert_equal 2, payload.dig("summary", "new_intake")
-    assert_equal 2, payload.dig("summary", "supporters")
+    assert_equal 3, payload.dig("summary", "supporters")
     assert_equal 1, payload.dig("summary", "members")
     assert_equal 0, payload.dig("summary", "volunteers")
     assert_equal 3, payload.dig("summary", "matched_to_gec")
@@ -112,7 +116,7 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_equal 6, village["total_count"]
     assert_equal 6, village["total_contacts"]
     assert_equal 2, village["new_intake_count"]
-    assert_equal 2, village["supporter_count"]
+    assert_equal 3, village["supporter_count"]
     assert_equal 1, village["member_count"]
     assert_equal 3, village["unverified_count"]
     assert_equal 4, village["team_input_count"]
@@ -140,7 +144,8 @@ class Api::V1::DashboardControllerTest < ActionDispatch::IntegrationTest
       contact_number: "6715551003",
       village: other_village,
       source: "staff_entry",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active",
       verification_status: "verified",
       verified_at: Time.current

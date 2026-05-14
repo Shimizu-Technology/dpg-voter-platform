@@ -89,7 +89,8 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
         params: {
           intake_review: {
             decision: "approve",
-            contact_classification: "supporter",
+            contact_classification: "active_contact",
+            support_status: "supporter",
             note: "Confirmed at event table.",
             contact_attempt: {
               channel: "in_person",
@@ -104,7 +105,8 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     supporter.reload
-    assert_equal "supporter", supporter.contact_classification
+    assert_equal "active_contact", supporter.contact_classification
+    assert_equal "supporter", supporter.support_status
     assert_equal "approved", supporter.review_status
     assert_equal "not_applicable", supporter.public_review_status
     assert_equal @admin.id, supporter.reviewed_by_user_id
@@ -185,7 +187,8 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
       village: village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       review_status: "approved",
       status: "active"
     )
@@ -202,7 +205,8 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :conflict
     supporter.reload
-    assert_equal "supporter", supporter.contact_classification
+    assert_equal "active_contact", supporter.contact_classification
+    assert_equal "supporter", supporter.support_status
     assert_equal "active", supporter.status
   end
 
@@ -224,7 +228,9 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
       patch "/api/v1/supporters/#{supporter.id}/canvass_update",
         params: {
           canvass_update: {
-            contact_classification: "volunteer",
+            contact_classification: "active_contact",
+            support_status: "supporter",
+            volunteer_status: "interested",
             contact_attempt: {
               channel: "in_person",
               outcome: "reached",
@@ -238,7 +244,9 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     supporter.reload
-    assert_equal "volunteer", supporter.contact_classification
+    assert_equal "active_contact", supporter.contact_classification
+    assert_equal "supporter", supporter.support_status
+    assert_equal "interested", supporter.volunteer_status
     assert_equal @admin.id, supporter.classified_by_user_id
     assert_equal "in_person", supporter.supporter_contact_attempts.last.channel
     assert_equal "household_canvass_logged", AuditLog.where(auditable: supporter).last.action
@@ -262,7 +270,8 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
       patch "/api/v1/supporters/#{supporter.id}/canvass_update",
         params: {
           canvass_update: {
-            contact_classification: "supporter",
+            contact_classification: "active_contact",
+            support_status: "supporter",
             contact_attempt: {
               channel: "in_person",
               outcome: "maybe"
@@ -275,5 +284,6 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_equal "active_contact", supporter.reload.contact_classification
+    assert_equal "unknown", supporter.support_status
   end
 end

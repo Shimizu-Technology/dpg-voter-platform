@@ -4,15 +4,13 @@ class Supporter < ApplicationRecord
   CONTACT_CLASSIFICATIONS = %w[
     new_intake
     active_contact
-    supporter
-    member
-    volunteer
-    undecided
-    not_supporting
     duplicate
     invalid
     archived
   ].freeze
+  SUPPORT_STATUSES = %w[unknown supporter undecided not_supporting].freeze
+  MEMBERSHIP_STATUSES = %w[not_member member].freeze
+  VOLUNTEER_STATUSES = %w[unknown interested active not_interested].freeze
   REVIEW_STATUSES = %w[pending approved rejected].freeze
   PUBLIC_REVIEW_STATUSES = %w[not_applicable pending approved rejected].freeze
   REGISTERED_VOTER_STATUSES = %w[yes no not_sure].freeze
@@ -80,6 +78,9 @@ class Supporter < ApplicationRecord
   validates :public_review_status, inclusion: { in: PUBLIC_REVIEW_STATUSES }
   validates :registered_voter_status, inclusion: { in: REGISTERED_VOTER_STATUSES }
   validates :contact_classification, inclusion: { in: CONTACT_CLASSIFICATIONS }
+  validates :support_status, inclusion: { in: SUPPORT_STATUSES }
+  validates :membership_status, inclusion: { in: MEMBERSHIP_STATUSES }
+  validates :volunteer_status, inclusion: { in: VOLUNTEER_STATUSES }
   validates :support_follow_up_status, inclusion: { in: SUPPORT_FOLLOW_UP_STATUSES }, allow_nil: true
   validates :turnout_status, inclusion: { in: TURNOUT_STATUSES }
   validates :turnout_source, inclusion: { in: TURNOUT_SOURCES }, allow_blank: true
@@ -91,9 +92,9 @@ class Supporter < ApplicationRecord
   scope :active, -> { where(status: "active") }
   scope :contacts, -> { active.where.not(contact_classification: %w[archived invalid duplicate]) }
   scope :intake, -> { contacts.where(contact_classification: "new_intake") }
-  scope :classified_supporters, -> { contacts.where(contact_classification: "supporter") }
-  scope :members, -> { contacts.where(contact_classification: "member") }
-  scope :volunteers, -> { contacts.where(contact_classification: "volunteer") }
+  scope :classified_supporters, -> { contacts.where(support_status: "supporter") }
+  scope :members, -> { contacts.where(membership_status: "member") }
+  scope :volunteers, -> { contacts.where(volunteer_status: %w[interested active]) }
   scope :verified, -> { where(verification_status: "verified") }
   scope :unverified, -> { where(verification_status: "unverified") }
   scope :flagged, -> { where(verification_status: "flagged") }
@@ -114,8 +115,8 @@ class Supporter < ApplicationRecord
   scope :public_review_rejected, -> { where(public_review_status: "rejected", source: PUBLIC_SOURCES) }
   scope :public_origin, -> { where(source: PUBLIC_SOURCES) }
   scope :accepted_public_signups, -> { public_origin.review_approved }
-  scope :engaged_contacts, -> { contacts.where(contact_classification: %w[active_contact supporter member volunteer undecided]) }
-  scope :official_supporters, -> { contacts.where(contact_classification: %w[supporter member volunteer]) }
+  scope :engaged_contacts, -> { contacts.where(contact_classification: "active_contact").where.not(support_status: "not_supporting") }
+  scope :official_supporters, -> { contacts.where(support_status: "supporter") }
   scope :pending_supporter_review, -> { active.review_pending.where(public_review_status: %w[approved not_applicable]) }
   scope :working_supporters, -> { official_supporters }
   scope :team_input, -> { official_supporters.where(source: TEAM_SOURCES) }

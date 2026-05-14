@@ -70,7 +70,7 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Public signup creates visible DPG contact records.
 - Public signup, staff entry, and imported contacts default to `new_intake`.
 - New records appear in Contacts and Intake immediately.
-- New records do not count as official supporters/members until classified by staff.
+- New records do not count as official supporters/members until reviewed and marked with support/member status by staff.
 - Local browser smoke testing previously covered landing, signup, village selection, submit, and thank-you redirect.
 - Deployed public signup still needs a fresh staging smoke test after the latest merged phases.
 
@@ -96,23 +96,26 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Contact list and contact detail exist.
 - Pending Intake now has a structured reviewer workflow on this branch:
   - approve or reject intake
-  - classify relationship as active contact, supporter, member, volunteer, undecided, not supporting, duplicate, invalid, or archived
+  - set record status as active contact, duplicate, invalid, or archived
+  - separately set support status as unknown, supporter, undecided, or not supporting
+  - separately set membership status as not a member or member
+  - separately set volunteer status as unknown, interested, active, or not interested
   - add reviewer note
   - optionally log the first outreach/contact outcome during review
   - audit the review decision
-- Contacts can be classified as:
+- Contact record lifecycle can be classified as:
   - new intake
   - active contact
-  - supporter
-  - member
-  - volunteer
-  - undecided
-  - not supporting
   - duplicate
   - invalid
   - archived
+- DPG relationship tracking is now split into separate fields:
+  - support status: unknown, supporter, undecided, not supporting
+  - membership status: not a member, member
+  - volunteer status: unknown, interested, active, not interested
+  - outreach/contacted status: derived from contact-attempt history, not from the relationship fields
 - Manual staff entry exists.
-- Search/filter basics exist, including name, phone, email, village, precinct, origin, opt-in, voter-check, classification, and address-style lookup.
+- Search/filter basics exist, including name, phone, email, village, precinct, origin, opt-in, voter-check, record status, support status, and address-style lookup.
 - Village/precinct fields exist.
 - Voter-help/support fields exist:
   - volunteer interest
@@ -153,10 +156,10 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - `/admin/households` searches addresses across GEC voters and DPG contacts.
 - Household lookup can now create/link contacts from household results.
 - Household DPG records can now show the latest contact attempt and log a canvassing update directly from the household view.
-- Household canvassing updates can change the person's relationship classification and log method/outcome/note in one action.
+- Household canvassing updates can set support/member/volunteer status and log method/outcome/note in one atomic action.
 - `/admin/outreach` Follow-Up Queue shows latest contact attempt per card.
 - Staff can log call/SMS/in-person attempts from queue cards without leaving the queue.
-- Contact detail pages now include GEC check, follow-up workflow, contact history, audit history, and classification.
+- Contact detail pages now include GEC check, follow-up workflow, contact history, audit history, record status, support status, membership status, and volunteer status.
 
 ### SMS/email outreach
 
@@ -188,13 +191,15 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
   - mapping issues
   - purge list
 - DPG/GEC contact cross-reference exports now include latest contact method, outcome, date, and note.
+- Cross-reference exports and previews now include separate record status, support status, membership status, and volunteer status columns.
 - Explicit list-type imports are still needed so these reports can distinguish DPG members, registered Democrats, supporters/contacts, and custom lists cleanly.
 
 ### Tests/checks
 
 Latest branch validation:
 
-- Rails full test suite: `230 runs, 931 assertions, 0 failures, 0 errors`
+- Rails full test suite: `233 runs, 951 assertions, 0 failures, 0 errors`
+- RuboCop: passing
 - Web lint: passing
 - Web build: passing, with existing local Node version warning from Vite (`Node.js 22.0.0`; Vite prefers `20.19+` or `22.12+`)
 

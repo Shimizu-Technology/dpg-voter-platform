@@ -13,6 +13,17 @@ import {
   contactClassificationChipClass,
   contactClassificationLabel,
 } from '../../lib/contactClassification';
+import {
+  MEMBERSHIP_STATUS_OPTIONS,
+  SUPPORT_STATUS_OPTIONS,
+  VOLUNTEER_STATUS_OPTIONS,
+  membershipStatusChipClass,
+  membershipStatusLabel,
+  supportStatusChipClass,
+  supportStatusLabel,
+  volunteerStatusChipClass,
+  volunteerStatusLabel,
+} from '../../lib/relationshipStatus';
 
 interface VillageOption {
   id: number;
@@ -52,6 +63,9 @@ interface SupporterDetail {
   opt_in_text: boolean;
   verification_status: string;
   contact_classification: string;
+  support_status: string;
+  membership_status: string;
+  volunteer_status: string;
   referred_from_village_id?: number | null;
   referred_from_village_name?: string | null;
   verification_reason?: string | null;
@@ -137,7 +151,10 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   village_id: 'Village ID',
   precinct_id: 'Precinct ID',
   source: 'Source',
-  contact_classification: 'Classification',
+  contact_classification: 'Record status',
+  support_status: 'Support status',
+  membership_status: 'Membership',
+  volunteer_status: 'Volunteer status',
   intake_status: 'Supporter status',
   review_status: 'Review status',
   public_review_status: 'Public review status',
@@ -212,14 +229,25 @@ const AUDIT_VALUE_LABELS: Record<string, Record<string, string>> = {
   contact_classification: {
     new_intake: 'New intake',
     active_contact: 'Active contact',
-    supporter: 'Supporter',
-    member: 'Member',
-    volunteer: 'Volunteer',
-    undecided: 'Undecided',
-    not_supporting: 'Not supporting',
     duplicate: 'Duplicate',
     invalid: 'Invalid',
     archived: 'Archived',
+  },
+  support_status: {
+    unknown: 'Unknown',
+    supporter: 'Supporter',
+    undecided: 'Undecided',
+    not_supporting: 'Not supporting',
+  },
+  membership_status: {
+    not_member: 'Not a member',
+    member: 'Member',
+  },
+  volunteer_status: {
+    unknown: 'Unknown',
+    interested: 'Interested',
+    active: 'Active volunteer',
+    not_interested: 'Not interested',
   },
   public_review_status: {
     not_applicable: 'Not applicable',
@@ -420,28 +448,6 @@ function supporterStatusLabel(supporter: Pick<SupporterDetail, 'source' | 'revie
   return 'Accepted contact';
 }
 
-function supporterStatusDetail(supporter: Pick<SupporterDetail, 'source' | 'review_status' | 'public_review_status'>) {
-  if (isPendingPublicSignup(supporter)) {
-    return 'This contact came from the public signup form and is waiting for intake review.';
-  }
-  if (supporter.review_status === 'pending') {
-    return 'This submission is waiting for review before it joins the active contact workspace.';
-  }
-  if (supporter.review_status === 'rejected') {
-    return 'This submission was rejected and is kept only for audit and possible follow-up.';
-  }
-  if (isApprovedPublicSignup(supporter)) {
-    return 'This contact came from the public signup form and is available for DPG follow-up.';
-  }
-  if (supporter.source === 'staff_entry') {
-    return 'This contact was entered by staff and is available for DPG follow-up.';
-  }
-  if (supporter.source === 'bulk_import') {
-    return 'This contact was added through an import and is available for DPG follow-up.';
-  }
-  return 'This contact is part of the DPG contact workspace.';
-}
-
 function activitySourceLabel(supporter: Pick<SupporterDetail, 'source' | 'attribution_method'>) {
   if (supporter.source === 'public_signup' || supporter.source === 'qr_signup') return 'Public signup';
   if (supporter.attribution_method === 'staff_scan') return 'Staff scan';
@@ -621,6 +627,9 @@ export default function SupporterDetailPage() {
       registered_voter_location_note: supporter.registered_voter_location_note || '',
       registered_voter: supporter.registered_voter,
       contact_classification: supporter.contact_classification,
+      support_status: supporter.support_status || 'unknown',
+      membership_status: supporter.membership_status || 'not_member',
+      volunteer_status: supporter.volunteer_status || 'unknown',
       wants_to_volunteer: supporter.wants_to_volunteer,
       needs_absentee_ballot_help: supporter.needs_absentee_ballot_help,
       needs_homebound_voting_help: supporter.needs_homebound_voting_help,
@@ -744,6 +753,19 @@ export default function SupporterDetailPage() {
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${contactClassificationChipClass(supporter.contact_classification)}`}>
             {contactClassificationLabel(supporter.contact_classification)}
           </span>
+          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${supportStatusChipClass(supporter.support_status)}`}>
+            {supportStatusLabel(supporter.support_status)}
+          </span>
+          {supporter.membership_status === 'member' && (
+            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${membershipStatusChipClass(supporter.membership_status)}`}>
+              {membershipStatusLabel(supporter.membership_status)}
+            </span>
+          )}
+          {supporter.volunteer_status && supporter.volunteer_status !== 'unknown' && (
+            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${volunteerStatusChipClass(supporter.volunteer_status)}`}>
+              {volunteerStatusLabel(supporter.volunteer_status)}
+            </span>
+          )}
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
             supporter.verification_status === 'verified' ? 'bg-green-100 text-green-800' :
             supporter.verification_status === 'flagged' ? 'bg-red-100 text-red-800' :
@@ -903,8 +925,42 @@ export default function SupporterDetailPage() {
               onChange={(e) => updateDraft({ contact_classification: e.target.value })}
               className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
               disabled={!isEditing}
+              aria-label="Record status"
             >
               {CONTACT_CLASSIFICATION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <select
+              value={String(currentForm.support_status || 'unknown')}
+              onChange={(e) => updateDraft({ support_status: e.target.value })}
+              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+              disabled={!isEditing}
+              aria-label="Support status"
+            >
+              {SUPPORT_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <select
+              value={String(currentForm.membership_status || 'not_member')}
+              onChange={(e) => updateDraft({ membership_status: e.target.value })}
+              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+              disabled={!isEditing}
+              aria-label="Membership status"
+            >
+              {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <select
+              value={String(currentForm.volunteer_status || 'unknown')}
+              onChange={(e) => updateDraft({ volunteer_status: e.target.value })}
+              className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
+              disabled={!isEditing}
+              aria-label="Volunteer status"
+            >
+              {VOLUNTEER_STATUS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
@@ -1090,16 +1146,25 @@ export default function SupporterDetailPage() {
         </section>
 
         <section className="app-card p-4">
-          <h2 className="font-semibold text-[var(--text-primary)] mb-2">Contact Classification</h2>
+          <h2 className="font-semibold text-[var(--text-primary)] mb-2">Contact Relationship</h2>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-[var(--text-secondary)]">Current classification:</span>
+              <span className="text-sm text-[var(--text-secondary)]">Current status:</span>
               <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${contactClassificationChipClass(supporter.contact_classification)}`}>
                 {contactClassificationLabel(supporter.contact_classification)}
               </span>
+              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${supportStatusChipClass(supporter.support_status)}`}>
+                {supportStatusLabel(supporter.support_status)}
+              </span>
+              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${membershipStatusChipClass(supporter.membership_status)}`}>
+                {membershipStatusLabel(supporter.membership_status)}
+              </span>
+              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${volunteerStatusChipClass(supporter.volunteer_status)}`}>
+                {volunteerStatusLabel(supporter.volunteer_status)}
+              </span>
             </div>
             <p className="text-sm text-[var(--text-secondary)]">
-              {supporterStatusLabel(supporter)}. {supporterStatusDetail(supporter)}
+              {supporterStatusLabel(supporter)}. Contact record status, support, membership, volunteer interest, and outreach history are tracked separately.
             </p>
           </div>
         </section>

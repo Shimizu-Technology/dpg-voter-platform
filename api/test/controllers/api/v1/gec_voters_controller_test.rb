@@ -67,7 +67,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
     contact.update!(gec_voter: @voter)
@@ -81,7 +82,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal [ @voter.id ], payload["gec_voters"].map { |row| row["id"] }
     assert_equal 1, payload["gec_voters"].first["linked_contact_count"]
     assert_equal contact.id, payload["gec_voters"].first.dig("linked_contact", "id")
-    assert_equal "supporter", payload["gec_voters"].first.dig("linked_contact", "contact_classification")
+    assert_equal "active_contact", payload["gec_voters"].first.dig("linked_contact", "contact_classification")
+    assert_equal "supporter", payload["gec_voters"].first.dig("linked_contact", "support_status")
   end
 
   test "households groups GEC voters and DPG contacts at an address" do
@@ -93,7 +95,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       street_address: @voter.address,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
 
@@ -173,7 +176,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
     contact.update!(gec_voter: previous_voter)
@@ -226,7 +230,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
     barrigada_contact.update!(gec_voter: @voter)
@@ -237,7 +242,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       village: other_village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
     dededo_contact.update!(gec_voter: other_voter)

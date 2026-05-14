@@ -16,6 +16,17 @@ import {
   contactClassificationChipClass,
   contactClassificationLabel,
 } from '../../lib/contactClassification';
+import {
+  MEMBERSHIP_STATUS_OPTIONS,
+  SUPPORT_STATUS_OPTIONS,
+  VOLUNTEER_STATUS_OPTIONS,
+  membershipStatusChipClass,
+  membershipStatusLabel,
+  supportStatusChipClass,
+  supportStatusLabel,
+  volunteerStatusChipClass,
+  volunteerStatusLabel,
+} from '../../lib/relationshipStatus';
 
 interface VillageOption {
   id: number;
@@ -59,6 +70,9 @@ interface SupporterItem {
   potential_duplicate: boolean;
   source: string;
   contact_classification: string;
+  support_status?: string | null;
+  membership_status?: string | null;
+  volunteer_status?: string | null;
   attribution_method?: string | null;
   intake_status?: string;
   review_status?: string;
@@ -89,6 +103,9 @@ const ALL_CLASSIFICATIONS_FILTER = 'all_classifications';
 type IntakeReviewDraft = {
   decision: 'approve' | 'reject';
   contact_classification: string;
+  support_status: string;
+  membership_status: string;
+  volunteer_status: string;
   note: string;
   contact_attempt_channel: string;
   contact_attempt_outcome: string;
@@ -244,6 +261,7 @@ export default function SupportersPage() {
   const [optInFilter, setOptInFilter] = useState(searchParams.get('opt_in') || '');
   const [verificationFilter, setVerificationFilter] = useState(searchParams.get('verification_status') || '');
   const [classificationFilter, setClassificationFilter] = useState(searchParams.get('contact_classification') || defaultClassificationFilter(isIntakeView));
+  const [supportStatusFilter, setSupportStatusFilter] = useState(searchParams.get('support_status') || '');
   const [registeredStatusFilter, setRegisteredStatusFilter] = useState(searchParams.get('registered_voter_status') || '');
   const [supportNeedFilter, setSupportNeedFilter] = useState(searchParams.get('support_need') || '');
   const [lifecycleFilter, setLifecycleFilter] = useState(searchParams.get('status') || 'active');
@@ -258,6 +276,9 @@ export default function SupportersPage() {
   const [reviewDraft, setReviewDraft] = useState<IntakeReviewDraft>({
     decision: 'approve',
     contact_classification: 'active_contact',
+    support_status: 'unknown',
+    membership_status: 'not_member',
+    volunteer_status: 'unknown',
     note: '',
     contact_attempt_channel: '',
     contact_attempt_outcome: '',
@@ -309,6 +330,7 @@ export default function SupportersPage() {
     if (optInFilter) params.set('opt_in', optInFilter);
     if (verificationFilter) params.set('verification_status', verificationFilter);
     if (classificationFilter && classificationFilter !== defaultClassificationFilter(isIntakeView)) params.set('contact_classification', classificationFilter);
+    if (supportStatusFilter) params.set('support_status', supportStatusFilter);
     if (registeredStatusFilter) params.set('registered_voter_status', registeredStatusFilter);
     if (supportNeedFilter) params.set('support_need', supportNeedFilter);
     if (lifecycleFilter) params.set('status', lifecycleFilter);
@@ -318,10 +340,10 @@ export default function SupportersPage() {
     params.set('per_page', String(perPage));
     if (returnTo) params.set('return_to', returnTo);
     setSearchParams(params, { replace: true });
-  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, isIntakeView, setSearchParams]);
+  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, isIntakeView, setSearchParams]);
 
   const { data, isFetching } = useQuery<SupportersResponse>({
-    queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
+    queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
     queryFn: () => getSupporters({
       search: debouncedSearch,
       village_id: effectiveVillageFilter || undefined,
@@ -332,6 +354,7 @@ export default function SupportersPage() {
       verification_status: verificationFilter || undefined,
       contact_classification: contactClassificationParam,
       exclude_contact_classification: excludeContactClassificationParam,
+      support_status: supportStatusFilter || undefined,
       registered_voter_status: registeredStatusFilter || undefined,
       support_need: supportNeedFilter || undefined,
       status: lifecycleFilter || undefined,
@@ -354,7 +377,7 @@ export default function SupportersPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => setVisibleRows(80), 0);
     return () => window.clearTimeout(timer);
-  }, [progressiveRenderingEnabled, page, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage]);
+  }, [progressiveRenderingEnabled, page, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage]);
 
   useEffect(() => {
     if (!progressiveRenderingEnabled) return;
@@ -371,7 +394,7 @@ export default function SupportersPage() {
     const totalPages = data.pagination.pages;
     if (page < totalPages) {
       void queryClient.prefetchQuery({
-        queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
+        queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
         queryFn: () => getSupporters({
           search: debouncedSearch,
           village_id: effectiveVillageFilter || undefined,
@@ -382,6 +405,7 @@ export default function SupportersPage() {
           verification_status: verificationFilter || undefined,
           contact_classification: contactClassificationParam,
           exclude_contact_classification: excludeContactClassificationParam,
+          support_status: supportStatusFilter || undefined,
           registered_voter_status: registeredStatusFilter || undefined,
           support_need: supportNeedFilter || undefined,
           status: lifecycleFilter || undefined,
@@ -393,7 +417,7 @@ export default function SupportersPage() {
         }),
       });
     }
-  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
+  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
 
   const assignPrecinctMutation = useMutation({
     mutationFn: ({ supporterId, precinctId }: { supporterId: number; precinctId: number }) =>
@@ -416,6 +440,9 @@ export default function SupportersPage() {
       return reviewIntakeSupporter(supporterId, {
         decision: draft.decision,
         contact_classification: draft.contact_classification,
+        support_status: draft.support_status,
+        membership_status: draft.membership_status,
+        volunteer_status: draft.volunteer_status,
         note: draft.note.trim() || undefined,
         contact_attempt: hasContactAttempt ? {
           channel: draft.contact_attempt_channel,
@@ -445,6 +472,9 @@ export default function SupportersPage() {
     setReviewDraft({
       decision: ['duplicate', 'invalid', 'archived'].includes(classification) ? 'reject' : 'approve',
       contact_classification: classification,
+      support_status: supporter.support_status || 'unknown',
+      membership_status: supporter.membership_status || 'not_member',
+      volunteer_status: supporter.volunteer_status || (supporter.wants_to_volunteer ? 'interested' : 'unknown'),
       note: '',
       contact_attempt_channel: '',
       contact_attempt_outcome: '',
@@ -547,6 +577,7 @@ export default function SupportersPage() {
                 verification_status: verificationFilter || undefined,
                 contact_classification: contactClassificationParam,
                 exclude_contact_classification: excludeContactClassificationParam,
+                support_status: supportStatusFilter || undefined,
                 registered_voter_status: registeredStatusFilter || undefined,
                 support_need: supportNeedFilter || undefined,
                 status: lifecycleFilter || undefined,
@@ -663,9 +694,22 @@ export default function SupportersPage() {
             {CONTACT_CLASSIFICATION_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
-          </select>
-          <select
-            value={verificationFilter}
+            </select>
+            <select
+              value={supportStatusFilter}
+              onChange={(e) => {
+                setSupportStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="md:col-span-2 px-3 py-3 border border-[var(--border-soft)] rounded-xl bg-[var(--surface-raised)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary focus:border-transparent min-w-0"
+            >
+              <option value="">All support status</option>
+              {SUPPORT_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <select
+              value={verificationFilter}
             onChange={(e) => {
               setVerificationFilter(e.target.value);
               setPage(1);
@@ -820,6 +864,19 @@ export default function SupportersPage() {
                 <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
                   {contactClassificationLabel(s.contact_classification)}
                 </span>
+                <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
+                  {supportStatusLabel(s.support_status)}
+                </span>
+                {s.membership_status === 'member' && (
+                  <span className={`app-chip ${membershipStatusChipClass(s.membership_status)}`}>
+                    {membershipStatusLabel(s.membership_status)}
+                  </span>
+                )}
+                {s.volunteer_status && s.volunteer_status !== 'unknown' && (
+                  <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
+                    {volunteerStatusLabel(s.volunteer_status)}
+                  </span>
+                )}
                 <span className={`app-chip ${
                   s.verification_status === 'verified' ? 'bg-green-100 text-green-700' :
                   s.verification_status === 'flagged' ? 'bg-red-100 text-red-700' :
@@ -865,14 +922,14 @@ export default function SupportersPage() {
                 </div>
                 {isIntakeView && sessionData?.permissions?.can_edit_supporters && s.contact_classification === 'new_intake' && (
                   <div className="flex flex-wrap gap-2 pt-2">
-	                    <button
-	                      type="button"
-	                      onClick={() => openIntakeReview(s)}
-	                      disabled={reviewIntakeMutation.isPending}
-	                      className="app-btn-primary text-xs"
-	                    >
-	                      <CheckCircle className="w-4 h-4" /> Review intake
-	                    </button>
+                      <button
+                        type="button"
+                        onClick={() => openIntakeReview(s)}
+                        disabled={reviewIntakeMutation.isPending}
+                        className="app-btn-primary text-xs"
+                      >
+                        <CheckCircle className="w-4 h-4" /> Review intake
+                      </button>
                     <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
                       Review details
                     </Link>
@@ -919,7 +976,7 @@ export default function SupportersPage() {
                     Origin <ArrowUpDown className="w-3.5 h-3.5" /> {sortLabel('source')}
                   </button>
                 </th>
-                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Classification</th>
+                  <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Status</th>
                 <th className="w-[320px] min-w-[320px] text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Voter Check</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Lifecycle</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">
@@ -988,11 +1045,26 @@ export default function SupportersPage() {
                       {sourceLabel(s)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap align-middle">
-                    <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
-                      {contactClassificationLabel(s.contact_classification)}
-                    </span>
-                  </td>
+                    <td className="px-4 py-3 whitespace-nowrap align-middle">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
+                          {contactClassificationLabel(s.contact_classification)}
+                        </span>
+                        <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
+                          {supportStatusLabel(s.support_status)}
+                        </span>
+                        {s.membership_status === 'member' && (
+                          <span className={`app-chip ${membershipStatusChipClass(s.membership_status)}`}>
+                            {membershipStatusLabel(s.membership_status)}
+                          </span>
+                        )}
+                        {s.volunteer_status && s.volunteer_status !== 'unknown' && (
+                          <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
+                            {volunteerStatusLabel(s.volunteer_status)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                   <td className="w-[320px] min-w-[320px] px-4 py-3 align-top">
                     <div className="space-y-2">
                       <span className={`app-chip ${
@@ -1023,14 +1095,14 @@ export default function SupportersPage() {
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {sessionData?.permissions?.can_edit_supporters && s.contact_classification === 'new_intake' ? (
                         <div className="inline-flex items-center justify-end gap-2">
-	                          <button
-	                            type="button"
-	                            onClick={() => openIntakeReview(s)}
-	                            disabled={reviewIntakeMutation.isPending}
-	                            className="app-btn-primary text-xs"
-	                          >
-	                            <CheckCircle className="w-4 h-4" /> Review
-	                          </button>
+                            <button
+                              type="button"
+                              onClick={() => openIntakeReview(s)}
+                              disabled={reviewIntakeMutation.isPending}
+                              className="app-btn-primary text-xs"
+                            >
+                              <CheckCircle className="w-4 h-4" /> Review
+                            </button>
                           <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
                             Review
                           </Link>
@@ -1079,142 +1151,183 @@ export default function SupportersPage() {
               Next
             </button>
           </div>
-	        )}
-	      </div>
+          )}
+        </div>
 
-	      {reviewingSupporter && (
-	        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/55 px-3 py-6 backdrop-blur-sm sm:px-6">
-	          <div className="my-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
-	            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
-	              <div className="min-w-0">
-	                <div className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">Intake review</div>
-	                <h2 className="mt-1 truncate text-xl font-semibold text-slate-950">{supporterSortName(reviewingSupporter)}</h2>
-	                <div className="mt-1 text-sm text-slate-500">
-	                  {[reviewingSupporter.contact_number, reviewingSupporter.village_name, verificationStatusLabel(reviewingSupporter)].filter(Boolean).join(' · ')}
-	                </div>
-	              </div>
-	              <button
-	                type="button"
-	                onClick={() => setReviewingSupporter(null)}
-	                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-950"
-	                aria-label="Close intake review"
-	              >
-	                <X className="h-5 w-5" />
-	              </button>
-	            </div>
-	            <div className="space-y-4 px-5 py-4">
-	              <div className="grid gap-3 sm:grid-cols-2">
-	                <label className="space-y-1.5">
-	                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Relationship</span>
-	                  <select
-	                    value={reviewDraft.contact_classification}
-	                    onChange={(event) => {
-	                      const classification = event.target.value;
-	                      setReviewDraft((draft) => ({
-	                        ...draft,
-	                        contact_classification: classification,
-	                        decision: ['duplicate', 'invalid', 'archived'].includes(classification) ? 'reject' : 'approve',
-	                      }));
-	                    }}
-	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-	                  >
-	                    {INTAKE_REVIEW_CLASSIFICATION_OPTIONS.map((option) => (
-	                      <option key={option.value} value={option.value}>{option.label}</option>
-	                    ))}
-	                  </select>
-	                </label>
-	                <label className="space-y-1.5">
-	                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Review decision</span>
-	                  <select
-	                    value={reviewDraft.decision}
-	                    onChange={(event) => setReviewDraft((draft) => ({ ...draft, decision: event.target.value as 'approve' | 'reject' }))}
-	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-	                  >
-	                    <option value="approve">Approve into DPG records</option>
-	                    <option value="reject">Reject / remove from active queue</option>
-	                  </select>
-	                </label>
-	              </div>
+        {reviewingSupporter && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/55 px-3 py-6 backdrop-blur-sm sm:px-6">
+            <div className="my-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">Intake review</div>
+                  <h2 className="mt-1 truncate text-xl font-semibold text-slate-950">{supporterSortName(reviewingSupporter)}</h2>
+                  <div className="mt-1 text-sm text-slate-500">
+                    {[reviewingSupporter.contact_number, reviewingSupporter.village_name, verificationStatusLabel(reviewingSupporter)].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReviewingSupporter(null)}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+                  aria-label="Close intake review"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-4 px-5 py-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Record status</span>
+                    <select
+                      value={reviewDraft.contact_classification}
+                      onChange={(event) => {
+                        const classification = event.target.value;
+                        setReviewDraft((draft) => ({
+                          ...draft,
+                          contact_classification: classification,
+                          decision: ['duplicate', 'invalid', 'archived'].includes(classification) ? 'reject' : 'approve',
+                        }));
+                      }}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    >
+                      {INTAKE_REVIEW_CLASSIFICATION_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    </label>
+                    <label className="space-y-1.5">
+                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Review decision</span>
+                    <select
+                      value={reviewDraft.decision}
+                      onChange={(event) => setReviewDraft((draft) => ({ ...draft, decision: event.target.value as 'approve' | 'reject' }))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    >
+                      <option value="approve">Approve into DPG records</option>
+                      <option value="reject">Reject / remove from active queue</option>
+                    </select>
+                    </label>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Support status</span>
+                      <select
+                        value={reviewDraft.support_status}
+                        onChange={(event) => setReviewDraft((draft) => ({ ...draft, support_status: event.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                      >
+                        {SUPPORT_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Membership</span>
+                      <select
+                        value={reviewDraft.membership_status}
+                        onChange={(event) => setReviewDraft((draft) => ({ ...draft, membership_status: event.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                      >
+                        {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Volunteer</span>
+                      <select
+                        value={reviewDraft.volunteer_status}
+                        onChange={(event) => setReviewDraft((draft) => ({ ...draft, volunteer_status: event.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                      >
+                        {VOLUNTEER_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
 
-	              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-	                <div className="flex flex-wrap items-center gap-2">
-	                  <span className={`app-chip ${contactClassificationChipClass(reviewDraft.contact_classification)}`}>
-	                    {contactClassificationLabel(reviewDraft.contact_classification)}
-	                  </span>
-	                  <span className={gecMatchClass(reviewingSupporter)}>{gecMatchLabel(reviewingSupporter)}</span>
-	                </div>
-	                {verificationStatusDetail(reviewingSupporter) && (
-	                  <p className="mt-2 text-xs leading-5 text-slate-600">{verificationStatusDetail(reviewingSupporter)}</p>
-	                )}
-	                <Link to={supporterDetailLink(reviewingSupporter.id)} className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">
-	                  Open full record to confirm or link GEC match
-	                </Link>
-	              </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`app-chip ${contactClassificationChipClass(reviewDraft.contact_classification)}`}>
+                      {contactClassificationLabel(reviewDraft.contact_classification)}
+                    </span>
+                    <span className={`app-chip ${supportStatusChipClass(reviewDraft.support_status)}`}>
+                      {supportStatusLabel(reviewDraft.support_status)}
+                    </span>
+                    <span className={gecMatchClass(reviewingSupporter)}>{gecMatchLabel(reviewingSupporter)}</span>
+                  </div>
+                  {verificationStatusDetail(reviewingSupporter) && (
+                    <p className="mt-2 text-xs leading-5 text-slate-600">{verificationStatusDetail(reviewingSupporter)}</p>
+                  )}
+                  <Link to={supporterDetailLink(reviewingSupporter.id)} className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">
+                    Open full record to confirm or link GEC match
+                  </Link>
+                </div>
 
-	              <label className="space-y-1.5">
-	                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Reviewer note</span>
-	                <textarea
-	                  value={reviewDraft.note}
-	                  onChange={(event) => setReviewDraft((draft) => ({ ...draft, note: event.target.value }))}
-	                  rows={3}
-	                  placeholder="Optional note for why this was approved, rejected, or classified this way"
-	                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-	                />
-	              </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Reviewer note</span>
+                  <textarea
+                    value={reviewDraft.note}
+                    onChange={(event) => setReviewDraft((draft) => ({ ...draft, note: event.target.value }))}
+                    rows={3}
+                    placeholder="Optional note for why this was approved, rejected, or classified this way"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                  />
+                </label>
 
-	              <div className="rounded-xl border border-slate-200 p-3">
-	                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-	                  <MessageSquare className="h-4 w-4 text-slate-500" />
-	                  Initial outreach outcome
-	                </div>
-	                <div className="grid gap-3 sm:grid-cols-2">
-	                  <select
-	                    value={reviewDraft.contact_attempt_channel}
-	                    onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_channel: event.target.value }))}
-	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-	                  >
-	                    {OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) => (
-	                      <option key={option.value} value={option.value}>{option.label}</option>
-	                    ))}
-	                  </select>
-	                  <select
-	                    value={reviewDraft.contact_attempt_outcome}
-	                    onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_outcome: event.target.value }))}
-	                    disabled={!reviewDraft.contact_attempt_channel}
-	                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
-	                  >
-	                    {OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS.map((option) => (
-	                      <option key={option.value} value={option.value}>{option.label}</option>
-	                    ))}
-	                  </select>
-	                </div>
-	                <textarea
-	                  value={reviewDraft.contact_attempt_note}
-	                  onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_note: event.target.value }))}
-	                  disabled={!reviewDraft.contact_attempt_channel}
-	                  rows={2}
-	                  placeholder="Optional outreach note"
-	                  className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
-	                />
-	              </div>
-	            </div>
-	            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
-	              <button type="button" onClick={() => setReviewingSupporter(null)} className="app-btn-secondary justify-center">
-	                Cancel
-	              </button>
-	              <button
-	                type="button"
-	                onClick={submitIntakeReview}
-	                disabled={reviewIntakeMutation.isPending}
-	                className="app-btn-primary justify-center disabled:opacity-50"
-	              >
-	                <CheckCircle className="h-4 w-4" />
-	                Save review
-	              </button>
-	            </div>
-	          </div>
-	        </div>
-	      )}
-	    </WorkspacePage>
-	  );
-	}
+                <div className="rounded-xl border border-slate-200 p-3">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <MessageSquare className="h-4 w-4 text-slate-500" />
+                    Initial outreach outcome
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <select
+                      value={reviewDraft.contact_attempt_channel}
+                      onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_channel: event.target.value }))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    >
+                      {OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={reviewDraft.contact_attempt_outcome}
+                      onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_outcome: event.target.value }))}
+                      disabled={!reviewDraft.contact_attempt_channel}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+                    >
+                      {OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <textarea
+                    value={reviewDraft.contact_attempt_note}
+                    onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_note: event.target.value }))}
+                    disabled={!reviewDraft.contact_attempt_channel}
+                    rows={2}
+                    placeholder="Optional outreach note"
+                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
+                <button type="button" onClick={() => setReviewingSupporter(null)} className="app-btn-secondary justify-center">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitIntakeReview}
+                  disabled={reviewIntakeMutation.isPending}
+                  className="app-btn-primary justify-center disabled:opacity-50"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Save review
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </WorkspacePage>
+    );
+  }

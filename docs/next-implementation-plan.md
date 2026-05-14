@@ -46,7 +46,7 @@ The immediate goal is to turn the working foundation into a workflow DPG can con
 
 ## Next PR recommendation
 
-### Intake Review + Relationship Classification Polish
+### Intake Review + Relationship Status Polish
 
 This was the most important next implementation step because it clarifies how a person moves from raw intake into DPG's working contact/member/supporter universe.
 
@@ -54,12 +54,15 @@ Built on `feature/intake-relationship-household-polish`:
 
 - A clear Intake reviewer flow.
 - Approve/reject actions.
-- Mark duplicate, invalid, archived, or not supporting.
-- Classify as active contact, supporter, member, volunteer, undecided, or not supporting.
+- Mark record lifecycle as active contact, duplicate, invalid, or archived.
+- Track support status separately as unknown, supporter, undecided, or not supporting.
+- Track membership separately as not a member or member.
+- Track volunteer status separately as unknown, interested, active, or not interested.
+- Keep contacted/not-contacted status derived from contact-attempt history.
 - Link out to the full GEC match review context from the intake review dialog.
 - Surface current/possible GEC match status in the review context.
 - Add optional initial note/contact outcome during review.
-- Make official supporter/member counts depend on classification, not just record existence.
+- Make official supporter/member/volunteer counts depend on relationship fields, not just record existence.
 - Ensure audit logs capture review decisions.
 
 Implemented acceptance criteria:
@@ -68,7 +71,7 @@ Implemented acceptance criteria:
 - Reviewer can classify it without leaving the review workflow.
 - Reviewer can open the full record to confirm/link GEC match.
 - Rejected/invalid/duplicate records stop appearing as normal working contacts.
-- Supporter/member/volunteer counts only include classified records.
+- Supporter/member/volunteer counts only include records marked with those relationship statuses.
 - DPG terminology is clear to non-technical staff.
 
 Still worth polishing later:
@@ -119,7 +122,7 @@ Partially completed on `feature/intake-relationship-household-polish`:
 
 - Household search shows latest contact attempt for DPG records.
 - Staff can log a canvassing/contact outcome directly from household results.
-- Staff can update relationship classification from the household view.
+- Staff can update support/member/volunteer status from the household view.
 
 Still turn household search into a fuller field action:
 
