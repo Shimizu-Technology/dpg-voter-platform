@@ -321,7 +321,7 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     pdf&.close!
   end
 
-  test "PDF preview falls back to database storage when S3 upload fails" do
+  test "PDF preview returns storage error when enabled S3 upload fails" do
     pdf = Tempfile.new([ "gec-preview-s3-fail", ".pdf" ])
     pdf.binmode
     pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
@@ -333,18 +333,16 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     S3Service.define_singleton_method(:enabled?) { true }
     S3Service.define_singleton_method(:upload) { |_key, _io, content_type: nil| false }
 
-    assert_difference -> { GecPdfPreview.count }, 1 do
-      assert_enqueued_with(job: GecPdfPreviewJob) do
-        post "/api/v1/gec_voters/preview",
-          params: { file: upload, preview_request_id: "preview-storage-fail-test" },
-          headers: auth_headers(@admin)
-      end
+    assert_no_difference -> { GecPdfPreview.count } do
+      post "/api/v1/gec_voters/preview",
+        params: { file: upload, preview_request_id: "preview-storage-fail-test" },
+        headers: auth_headers(@admin)
     end
 
-    assert_response :accepted
-    preview = GecPdfPreview.find_by!(preview_request_id: "preview-storage-fail-test")
-    assert_nil preview.file_s3_key
-    assert_equal File.binread(pdf.path), preview.file_data
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "pdf_preview_storage_failed", payload["code"]
+    assert_match "Could not store PDF preview upload", payload["error"]
   ensure
     S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
     S3Service.define_singleton_method(:upload, original_s3_upload) if original_s3_upload
@@ -545,7 +543,7 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     pdf&.close!
   end
 
-  test "failed PDF upload storage falls back to database payload" do
+  test "failed enabled S3 PDF import storage returns JSON error" do
     pdf = Tempfile.new([ "gec-upload-s3-fail", ".pdf" ])
     pdf.binmode
     pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
@@ -558,7 +556,7 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     S3Service.define_singleton_method(:upload) { |_key, _io, content_type: nil| false }
 
     assert_difference -> { GecImport.count }, 1 do
-      assert_difference -> { GecImportUpload.count }, 1 do
+      assert_no_difference -> { GecImportUpload.count } do
         post "/api/v1/gec_voters/upload",
           params: {
             file: upload,
@@ -570,10 +568,10 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       end
     end
 
-    assert_response :accepted
-    upload_record = GecImportUpload.order(:id).last
-    assert_nil upload_record.file_s3_key
-    assert_equal File.binread(pdf.path), upload_record.file_data
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "pdf_import_storage_failed", payload["code"]
+    assert_equal "failed", GecImport.order(:id).last.status
   ensure
     S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
     S3Service.define_singleton_method(:upload, original_s3_upload) if original_s3_upload

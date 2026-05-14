@@ -610,7 +610,7 @@ module Api
       end
 
       def pdf_preview_storage_attributes(file, preview_request_id)
-        return { file_data: File.binread(file.tempfile.path) } if Rails.env.development? || !S3Service.enabled?
+        return { file_data: File.binread(file.tempfile.path) } unless S3Service.enabled?
 
         filename = File.basename(file.original_filename.to_s.presence || "upload.pdf")
         safe_filename = S3Service.safe_filename(filename, fallback: "preview.pdf")
@@ -620,15 +620,11 @@ module Api
         end
         return { file_s3_key: s3_key } if uploaded
 
-        Rails.logger.warn(
-          "GEC PDF preview #{preview_request_id}: S3 upload unavailable for #{s3_key}; " \
-          "falling back to database-backed preview storage"
-        )
-        { file_data: File.binread(file.tempfile.path) }
+        raise "S3 upload failed for GEC PDF preview #{preview_request_id}"
       end
 
       def pdf_import_upload_storage_attributes(file, import_id)
-        return { file_data: File.binread(file.tempfile.path) } if Rails.env.development? || !S3Service.enabled?
+        return { file_data: File.binread(file.tempfile.path) } unless S3Service.enabled?
 
         filename = File.basename(file.original_filename.to_s.presence || "gec-list.pdf")
         safe_filename = S3Service.safe_filename(filename, fallback: "gec-list.pdf")
@@ -638,11 +634,7 @@ module Api
         end
         return { file_s3_key: s3_key } if uploaded
 
-        Rails.logger.warn(
-          "GEC import #{import_id}: S3 upload unavailable for #{s3_key}; " \
-          "falling back to database-backed import upload storage"
-        )
-        { file_data: File.binread(file.tempfile.path) }
+        raise "S3 upload failed for GEC import #{import_id}"
       end
 
       def pdf_preview_json(preview)
