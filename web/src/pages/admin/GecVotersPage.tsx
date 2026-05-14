@@ -527,6 +527,9 @@ export default function GecVotersPage() {
     onSuccess: () => {
       setActionError(null);
       setActionMessage('Created a pending intake contact and linked it to this GEC voter.');
+      setLinkVoterId(null);
+      setContactSearch('');
+      setSubmittedContactSearch('');
       void queryClient.invalidateQueries({ queryKey: ['gec-voters'] });
       void queryClient.invalidateQueries({ queryKey: ['gec-households'] });
       void queryClient.invalidateQueries({ queryKey: ['session'] });

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getSupporters, exportSupporters, getVillages, updateSupporter } from '../../lib/api';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft } from 'lucide-react';
+import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
@@ -235,6 +235,8 @@ export default function SupportersPage() {
   const [page, setPage] = useState(1);
   const [visibleRows, setVisibleRows] = useState(80);
   const [pendingPrecinctBySupporter, setPendingPrecinctBySupporter] = useState<Record<number, string>>({});
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const debouncedSearch = useDebouncedValue(search, 250);
   const contactClassificationParam = [REVIEWED_CLASSIFICATION_FILTER, ALL_CLASSIFICATIONS_FILTER].includes(classificationFilter) ? undefined : classificationFilter || undefined;
@@ -380,6 +382,22 @@ export default function SupportersPage() {
     },
   });
 
+  const approveIntakeMutation = useMutation({
+    mutationFn: (supporterId: number) =>
+      updateSupporter(supporterId, { contact_classification: 'active_contact' }),
+    onSuccess: () => {
+      setActionError(null);
+      setActionMessage('Approved into Contacts as an active contact.');
+      void queryClient.invalidateQueries({ queryKey: ['supporters'] });
+      void queryClient.invalidateQueries({ queryKey: ['session'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (error: unknown) => {
+      setActionMessage(null);
+      setActionError(error instanceof Error ? error.message : 'Could not approve this intake record.');
+    },
+  });
+
   const renderPrecinctAssignControl = (supporter: SupporterItem) => {
     if (supporter.precinct_number) {
       return <span className="text-[var(--text-primary)]">Precinct {supporter.precinct_number}</span>;
@@ -488,6 +506,16 @@ export default function SupportersPage() {
           </div>
         </div>
       </div>
+
+      {(actionMessage || actionError) && (
+        <div
+          className={`rounded-xl px-4 py-3 text-sm ${
+            actionError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+          }`}
+        >
+          {actionError || actionMessage}
+        </div>
+      )}
 
       <div>
         {/* Filters */}
@@ -771,6 +799,21 @@ export default function SupportersPage() {
                   <span className={gecMatchClass(s)}>{gecMatchLabel(s)}</span>
                   <span>{formatDateTime(s.created_at)}</span>
                 </div>
+                {isIntakeView && sessionData?.permissions?.can_edit_supporters && s.contact_classification === 'new_intake' && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => approveIntakeMutation.mutate(s.id)}
+                      disabled={approveIntakeMutation.isPending}
+                      className="app-btn-primary text-xs"
+                    >
+                      <CheckCircle className="w-4 h-4" /> Approve as contact
+                    </button>
+                    <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
+                      Review details
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -820,6 +863,9 @@ export default function SupportersPage() {
                     Date <ArrowUpDown className="w-3.5 h-3.5" /> {sortLabel('created_at')}
                   </button>
                 </th>
+                {isIntakeView && (
+                  <th className="text-right px-4 py-3 font-medium text-[var(--text-secondary)]">Review</th>
+                )}
               </tr>
             </thead>
             <motion.tbody layout={shouldAnimateRows}>
@@ -909,11 +955,34 @@ export default function SupportersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">{formatDateTime(s.created_at)}</td>
+                  {isIntakeView && (
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {sessionData?.permissions?.can_edit_supporters && s.contact_classification === 'new_intake' ? (
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => approveIntakeMutation.mutate(s.id)}
+                            disabled={approveIntakeMutation.isPending}
+                            className="app-btn-primary text-xs"
+                          >
+                            <CheckCircle className="w-4 h-4" /> Approve
+                          </button>
+                          <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
+                            Review
+                          </Link>
+                        </div>
+                      ) : (
+                        <Link to={supporterDetailLink(s.id)} className="app-btn-secondary text-xs">
+                          Open
+                        </Link>
+                      )}
+                    </td>
+                  )}
                 </motion.tr>
               ))}
               {supportersRows.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                  <td colSpan={isIntakeView ? 12 : 11} className="px-4 py-8 text-center text-[var(--text-muted)]">
                     {isIntakeView ? 'No intake records found' : 'No contacts found'}
                   </td>
                 </tr>
