@@ -34,6 +34,19 @@ class SplitDpgRelationshipFields < ActiveRecord::Migration[8.1]
   end
 
   def down
+    execute <<~SQL.squish
+      UPDATE supporters
+      SET contact_classification = CASE
+        WHEN contact_classification IN ('new_intake', 'duplicate', 'invalid', 'archived') THEN contact_classification
+        WHEN membership_status = 'member' THEN 'member'
+        WHEN volunteer_status IN ('interested', 'active') THEN 'volunteer'
+        WHEN support_status = 'supporter' THEN 'supporter'
+        WHEN support_status = 'undecided' THEN 'undecided'
+        WHEN support_status = 'not_supporting' THEN 'not_supporting'
+        ELSE contact_classification
+      END
+    SQL
+
     remove_index :supporters, :volunteer_status
     remove_index :supporters, :membership_status
     remove_index :supporters, :support_status

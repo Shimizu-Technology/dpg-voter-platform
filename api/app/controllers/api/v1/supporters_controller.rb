@@ -244,6 +244,14 @@ module Api
         end
 
         supporter = scope_supporters(Supporter.contacts).find(params[:id])
+        unless household_canvassable?(supporter)
+          return render_api_error(
+            message: "Only active contact records can be updated from household canvassing",
+            status: :conflict,
+            code: "not_household_canvassable"
+          )
+        end
+
         canvass = canvass_update_params
         classification = canvass[:contact_classification].presence || "active_contact"
         if !household_canvass_classification_allowed?(classification)
@@ -1196,6 +1204,10 @@ module Api
 
       def household_canvass_classification_allowed?(classification)
         classification == "active_contact"
+      end
+
+      def household_canvassable?(supporter)
+        supporter.contact_classification == "active_contact" && supporter.review_status == "approved"
       end
 
       def intake_review_status_updates(classification, decision, supporter)

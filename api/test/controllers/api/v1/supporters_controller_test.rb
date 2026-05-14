@@ -282,6 +282,44 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "household_canvass_logged", AuditLog.where(auditable: supporter).last.action
   end
 
+  test "canvass update cannot bypass intake review" do
+    village = Village.find_or_create_by!(name: "Hågat")
+    supporter = Supporter.create!(
+      first_name: "Pending",
+      last_name: "Intake",
+      contact_number: "+16715557666",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      status: "active"
+    )
+
+    assert_no_difference -> { SupporterContactAttempt.count } do
+      patch "/api/v1/supporters/#{supporter.id}/canvass_update",
+        params: {
+          canvass_update: {
+            contact_classification: "active_contact",
+            support_status: "supporter",
+            contact_attempt: {
+              channel: "in_person",
+              outcome: "reached"
+            }
+          }
+        },
+        headers: auth_headers(@admin),
+        as: :json
+    end
+
+    assert_response :conflict
+    supporter.reload
+    assert_equal "new_intake", supporter.contact_classification
+    assert_equal "pending", supporter.review_status
+    assert_equal "unknown", supporter.support_status
+    assert_equal "not_household_canvassable", response.parsed_body["code"]
+  end
+
   test "canvass update rolls back classification if contact attempt is invalid" do
     village = Village.find_or_create_by!(name: "Malesso")
     supporter = Supporter.create!(
