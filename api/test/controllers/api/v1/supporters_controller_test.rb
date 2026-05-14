@@ -316,4 +316,35 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "active_contact", supporter.reload.contact_classification
     assert_equal "unknown", supporter.support_status
   end
+
+  test "canvass update requires contact attempt details" do
+    village = Village.find_or_create_by!(name: "Mongmong-Toto-Maite")
+    supporter = Supporter.create!(
+      first_name: "Missing",
+      last_name: "Attempt",
+      contact_number: "+16715558888",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "active"
+    )
+
+    assert_no_difference -> { SupporterContactAttempt.count } do
+      patch "/api/v1/supporters/#{supporter.id}/canvass_update",
+        params: {
+          canvass_update: {
+            contact_classification: "active_contact",
+            support_status: "supporter"
+          }
+        },
+        headers: auth_headers(@admin),
+        as: :json
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal "unknown", supporter.reload.support_status
+    assert_equal "contact_attempt_required", response.parsed_body["code"]
+  end
 end
