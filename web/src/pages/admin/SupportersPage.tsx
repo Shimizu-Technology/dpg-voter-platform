@@ -237,6 +237,18 @@ function supportFollowUpResultClass(supporter: Pick<SupporterItem, 'support_foll
   return 'bg-gray-100 text-gray-700';
 }
 
+function hasAnyIntakeContactAttemptField(draft: IntakeReviewDraft) {
+  return Boolean(
+    draft.contact_attempt_channel ||
+    draft.contact_attempt_outcome ||
+    draft.contact_attempt_note.trim()
+  );
+}
+
+function hasCompleteIntakeContactAttempt(draft: IntakeReviewDraft) {
+  return Boolean(draft.contact_attempt_channel && draft.contact_attempt_outcome);
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error && 'response' in error) {
@@ -436,7 +448,7 @@ export default function SupportersPage() {
 
   const reviewIntakeMutation = useMutation({
     mutationFn: ({ supporterId, draft }: { supporterId: number; draft: IntakeReviewDraft }) => {
-      const hasContactAttempt = draft.contact_attempt_channel && draft.contact_attempt_outcome;
+      const hasContactAttempt = hasCompleteIntakeContactAttempt(draft);
       return reviewIntakeSupporter(supporterId, {
         decision: draft.decision,
         contact_classification: draft.contact_classification,
@@ -484,9 +496,9 @@ export default function SupportersPage() {
 
   const submitIntakeReview = () => {
     if (!reviewingSupporter) return;
-    if (reviewDraft.contact_attempt_channel && !reviewDraft.contact_attempt_outcome) {
+    if (hasAnyIntakeContactAttemptField(reviewDraft) && !hasCompleteIntakeContactAttempt(reviewDraft)) {
       setActionMessage(null);
-      setActionError('Choose an outcome for the outreach note, or leave outreach blank.');
+      setActionError('Choose both a contact method and outcome for outreach, or leave outreach blank.');
       return;
     }
     reviewIntakeMutation.mutate({ supporterId: reviewingSupporter.id, draft: reviewDraft });
@@ -1283,7 +1295,15 @@ export default function SupportersPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <select
                       value={reviewDraft.contact_attempt_channel}
-                      onChange={(event) => setReviewDraft((draft) => ({ ...draft, contact_attempt_channel: event.target.value }))}
+                      onChange={(event) => setReviewDraft((draft) => {
+                        const channel = event.target.value;
+                        return {
+                          ...draft,
+                          contact_attempt_channel: channel,
+                          contact_attempt_outcome: channel ? draft.contact_attempt_outcome : '',
+                          contact_attempt_note: channel ? draft.contact_attempt_note : '',
+                        };
+                      })}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
                     >
                       {OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) => (

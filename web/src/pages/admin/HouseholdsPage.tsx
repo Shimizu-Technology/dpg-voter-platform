@@ -93,6 +93,18 @@ type CanvassDraft = {
   note: string;
 };
 
+function initialCanvassDraft(contact: HouseholdContact): CanvassDraft {
+  return {
+    contact_classification: 'active_contact',
+    support_status: contact.support_status || 'unknown',
+    membership_status: contact.membership_status || 'not_member',
+    volunteer_status: contact.volunteer_status || 'unknown',
+    channel: 'in_person',
+    outcome: 'reached',
+    note: '',
+  };
+}
+
 function fullName(person: Pick<GecVoter | HouseholdContact, 'first_name' | 'middle_name' | 'last_name'>) {
   return [person.first_name, person.middle_name, person.last_name].filter(Boolean).join(' ');
 }
@@ -194,10 +206,15 @@ export default function HouseholdsPage() {
           note: draft.note.trim() || undefined,
         },
       }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       setActionError(null);
       setActionMessage('Saved the household canvassing update.');
       setExpandedContactId(null);
+      setCanvassDrafts((current) => {
+        const next = { ...current };
+        delete next[variables.contact.id];
+        return next;
+      });
       void queryClient.invalidateQueries({ queryKey: ['households-workspace'] });
       void queryClient.invalidateQueries({ queryKey: ['supporters'] });
       void queryClient.invalidateQueries({ queryKey: ['outreach-supporters'] });
@@ -209,15 +226,7 @@ export default function HouseholdsPage() {
     },
   });
 
-  const draftForContact = (contact: HouseholdContact): CanvassDraft => canvassDrafts[contact.id] || {
-    contact_classification: 'active_contact',
-    support_status: contact.support_status || 'unknown',
-    membership_status: contact.membership_status || 'not_member',
-    volunteer_status: contact.volunteer_status || 'unknown',
-    channel: 'in_person',
-    outcome: 'reached',
-    note: '',
-  };
+  const draftForContact = (contact: HouseholdContact): CanvassDraft => canvassDrafts[contact.id] || initialCanvassDraft(contact);
 
   const updateCanvassDraft = (contact: HouseholdContact, updates: Partial<CanvassDraft>) => {
     setCanvassDrafts((current) => ({
@@ -228,6 +237,18 @@ export default function HouseholdsPage() {
 
   const saveCanvassUpdate = (contact: HouseholdContact) => {
     canvassMutation.mutate({ contact, draft: draftForContact(contact) });
+  };
+
+  const toggleCanvassPanel = (contact: HouseholdContact, isExpanded: boolean) => {
+    if (isExpanded) {
+      setExpandedContactId(null);
+      return;
+    }
+    setCanvassDrafts((current) => ({
+      ...current,
+      [contact.id]: initialCanvassDraft(contact),
+    }));
+    setExpandedContactId(contact.id);
   };
 
   return (
@@ -544,7 +565,7 @@ export default function HouseholdsPage() {
                             <div className="mt-3 flex flex-wrap gap-2">
                               <button
                                 type="button"
-                                onClick={() => setExpandedContactId(isExpanded ? null : contact.id)}
+                                onClick={() => toggleCanvassPanel(contact, isExpanded)}
                                 className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-2.5 text-xs font-semibold text-white"
                               >
                                 <MessageSquare className="h-3.5 w-3.5" />
