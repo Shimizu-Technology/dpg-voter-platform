@@ -204,6 +204,8 @@ module Api
 
         begin
           ApplicationRecord.transaction do
+            validate_optional_intake_contact_attempt!(review[:contact_attempt])
+
             updates = {
               contact_classification: normalized_intake_record_classification(classification),
               support_status: review[:support_status].presence || "unknown",
@@ -230,6 +232,12 @@ module Api
             message: e.record.errors.full_messages.to_sentence,
             status: :unprocessable_entity,
             code: "intake_review_failed"
+          )
+        rescue ArgumentError => e
+          return render_api_error(
+            message: e.message,
+            status: :unprocessable_entity,
+            code: "contact_attempt_required"
           )
         end
 
@@ -1241,6 +1249,16 @@ module Api
         attrs[:recorded_at] = parsed_contact_attempt_recorded_at(attrs[:recorded_at]) if attrs.key?(:recorded_at)
         attrs[:recorded_at] ||= Time.current
         supporter.supporter_contact_attempts.create!(attrs.merge(recorded_by_user: current_user))
+      end
+
+      def validate_optional_intake_contact_attempt!(attempt_params)
+        return if attempt_params.blank?
+
+        attrs = attempt_params.to_h.symbolize_keys
+        return if attrs[:channel].blank? && attrs[:outcome].blank? && attrs[:note].blank?
+        return if attrs[:channel].present? && attrs[:outcome].present?
+
+        raise ArgumentError, "Contact attempt channel and outcome are required when logging intake outreach"
       end
 
       def create_required_canvass_contact_attempt!(supporter, attempt_params)

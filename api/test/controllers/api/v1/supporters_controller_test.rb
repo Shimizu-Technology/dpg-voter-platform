@@ -185,6 +185,44 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "invalid_intake_review_decision_classification", response.parsed_body["code"]
   end
 
+  test "review intake requires complete initial outreach details when any outreach is provided" do
+    village = Village.find_or_create_by!(name: "Piti")
+    supporter = Supporter.create!(
+      first_name: "Partial",
+      last_name: "Outreach",
+      contact_number: "+16715552323",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      status: "active"
+    )
+
+    assert_no_difference -> { SupporterContactAttempt.count } do
+      assert_no_difference -> { AuditLog.count } do
+        patch "/api/v1/supporters/#{supporter.id}/review_intake",
+          params: {
+            intake_review: {
+              decision: "approve",
+              contact_classification: "active_contact",
+              contact_attempt: {
+                note: "Reached at the village table."
+              }
+            }
+          },
+          headers: auth_headers(@admin),
+          as: :json
+      end
+    end
+
+    assert_response :unprocessable_entity
+    supporter.reload
+    assert_equal "new_intake", supporter.contact_classification
+    assert_equal "pending", supporter.review_status
+    assert_equal "contact_attempt_required", response.parsed_body["code"]
+  end
+
   test "review intake rejects invalid classification" do
     village = Village.find_or_create_by!(name: "Mangilao")
     supporter = Supporter.create!(
