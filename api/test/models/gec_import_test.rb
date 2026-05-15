@@ -38,6 +38,21 @@ class GecImportTest < ActiveSupport::TestCase
     assert_match "no active worker heartbeat", gec_import.metadata["error"]
   end
 
+  test "does not fail imports that are no longer queued" do
+    gec_import = GecImport.create!(
+      gec_list_date: Date.new(2026, 1, 25),
+      filename: "gec-voters.csv",
+      import_type: "full_list",
+      status: "completed",
+      metadata: { "stage" => "completed", "progress_percent" => 100 },
+      updated_at: 3.hours.ago
+    )
+
+    refute gec_import.fail_as_stale!
+    assert_equal "completed", gec_import.reload.status
+    assert_equal "completed", gec_import.metadata["stage"]
+  end
+
   test "keeps stale-looking imports when a live heartbeat exists" do
     gec_import = GecImport.create!(
       gec_list_date: Date.new(2026, 1, 25),

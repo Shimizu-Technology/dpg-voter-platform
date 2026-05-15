@@ -56,6 +56,8 @@ class GecImport < ApplicationRecord
   end
 
   def fail_as_stale!
+    return false unless queued?
+
     update!(
       status: "failed",
       metadata: (metadata || {}).merge({
@@ -64,6 +66,7 @@ class GecImport < ApplicationRecord
         "error" => "Background import did not finish and no active worker heartbeat was found. Please upload the file again."
       })
     )
+    true
   end
 
   def activate_for_election!(actor_user:)
