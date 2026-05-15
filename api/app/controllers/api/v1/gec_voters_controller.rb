@@ -267,7 +267,7 @@ module Api
       end
 
       def imports
-        GecImport.fail_stale_queued!
+        fail_stale_gec_imports_safely
         imports = GecImport.includes(:uploaded_by_user).latest.limit(25)
         render json: {
           imports: imports.map { |import| import_json(import) }
@@ -581,6 +581,12 @@ module Api
       end
 
       private
+
+      def fail_stale_gec_imports_safely
+        GecImport.fail_stale_queued!
+      rescue StandardError => e
+        Rails.logger.warn("GecVotersController stale GEC import cleanup failed: #{e.class}: #{e.message}")
+      end
 
       def require_gec_upload_access!
         return if can_upload_gec?

@@ -47,16 +47,20 @@ class GecImportTest < ActiveSupport::TestCase
       metadata: { "stage" => "importing", "progress_percent" => 65 },
       updated_at: 3.hours.ago
     )
-    cache = Rails.cache
-    original_read = cache.method(:read)
-    cache.define_singleton_method(:read) do |key, *args, **kwargs|
-      key == "gec_import_heartbeat:#{gec_import.id}" ? 5.minutes.ago.iso8601 : original_read.call(key, *args, **kwargs)
+
+    original_read = Rails.cache.method(:read)
+    read_cache = lambda do |key, *args, **kwargs|
+      if key == "gec_import_heartbeat:#{gec_import.id}"
+        5.minutes.ago.iso8601
+      else
+        original_read.call(key, *args, **kwargs)
+      end
     end
 
-    GecImport.fail_stale_queued!(stale_after: 2.hours)
+    with_stubbed_singleton_method(Rails.cache, :read, read_cache) do
+      GecImport.fail_stale_queued!(stale_after: 2.hours)
+    end
 
     assert_equal "processing", gec_import.reload.status
-  ensure
-    Rails.cache.define_singleton_method(:read, original_read) if original_read
   end
 end

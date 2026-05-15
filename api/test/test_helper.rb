@@ -5,6 +5,16 @@ require "active_job/test_helper"
 
 class ActiveSupport::TestCase
   include ActiveSupport::Testing::TimeHelpers
+
+  private
+
+  def with_stubbed_singleton_method(receiver, method_name, replacement)
+    original = receiver.method(method_name)
+    receiver.define_singleton_method(method_name, &replacement)
+    yield
+  ensure
+    receiver.define_singleton_method(method_name, original) if original
+  end
 end
 
 class ActionDispatch::IntegrationTest
