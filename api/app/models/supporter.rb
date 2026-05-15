@@ -120,7 +120,7 @@ class Supporter < ApplicationRecord
   scope :official_supporters, -> {
     relationship_contacts.where(support_status: "supporter")
       .or(relationship_contacts.where(membership_status: "member"))
-      .or(relationship_contacts.where(volunteer_status: %w[interested active]))
+      .or(relationship_contacts.where(volunteer_status: "active"))
   }
   scope :pending_supporter_review, -> { active.review_pending.where(public_review_status: %w[approved not_applicable]) }
   scope :working_supporters, -> { official_supporters }

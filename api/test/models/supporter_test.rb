@@ -187,7 +187,18 @@ class SupporterTest < ActiveSupport::TestCase
       village: @village_one,
       source: "staff_entry",
       contact_classification: "active_contact",
+      volunteer_status: "active",
+      status: "active"
+    )
+    volunteer_interest = Supporter.create!(
+      first_name: "Interested",
+      last_name: "Volunteer",
+      contact_number: "6715552006",
+      village: @village_one,
+      source: "staff_entry",
+      contact_classification: "active_contact",
       volunteer_status: "interested",
+      wants_to_volunteer: true,
       status: "active"
     )
     undecided = Supporter.create!(
@@ -219,6 +230,7 @@ class SupporterTest < ActiveSupport::TestCase
     assert_includes official_ids, supporter.id
     assert_includes official_ids, member.id
     assert_includes official_ids, volunteer.id
+    refute_includes official_ids, volunteer_interest.id
     refute_includes official_ids, undecided.id
     refute_includes official_ids, pending_intake.id
     refute_includes Supporter.classified_supporters.pluck(:id), pending_intake.id

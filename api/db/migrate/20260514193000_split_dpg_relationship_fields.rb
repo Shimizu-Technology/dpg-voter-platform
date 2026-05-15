@@ -23,7 +23,8 @@ class SplitDpgRelationshipFields < ActiveRecord::Migration[8.1]
           ELSE membership_status
         END,
         volunteer_status = CASE
-          WHEN contact_classification = 'volunteer' OR wants_to_volunteer = TRUE THEN 'interested'
+          WHEN contact_classification = 'volunteer' THEN 'active'
+          WHEN wants_to_volunteer = TRUE THEN 'interested'
           ELSE volunteer_status
         END,
         contact_classification = CASE
@@ -39,7 +40,7 @@ class SplitDpgRelationshipFields < ActiveRecord::Migration[8.1]
       SET contact_classification = CASE
         WHEN contact_classification IN ('new_intake', 'duplicate', 'invalid', 'archived') THEN contact_classification
         WHEN membership_status = 'member' THEN 'member'
-        WHEN volunteer_status IN ('interested', 'active') THEN 'volunteer'
+        WHEN volunteer_status = 'active' THEN 'volunteer'
         WHEN support_status = 'supporter' THEN 'supporter'
         WHEN support_status = 'undecided' THEN 'undecided'
         WHEN support_status = 'not_supporting' THEN 'not_supporting'
