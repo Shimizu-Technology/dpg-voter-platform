@@ -136,6 +136,9 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
         intake_review: {
           decision: "reject",
           contact_classification: "invalid",
+          support_status: "supporter",
+          membership_status: "member",
+          volunteer_status: "active",
           note: "Test submission."
         }
       },
@@ -145,6 +148,9 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     supporter.reload
     assert_equal "invalid", supporter.contact_classification
+    assert_equal "unknown", supporter.support_status
+    assert_equal "not_member", supporter.membership_status
+    assert_equal "unknown", supporter.volunteer_status
     assert_equal "rejected", supporter.review_status
     assert_equal "rejected", supporter.public_review_status
     refute_includes Supporter.contacts.pluck(:id), supporter.id

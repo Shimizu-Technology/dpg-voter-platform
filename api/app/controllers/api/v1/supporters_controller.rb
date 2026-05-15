@@ -215,12 +215,11 @@ module Api
 
             updates = {
               contact_classification: normalized_intake_record_classification(classification),
-              support_status: review[:support_status].presence || "unknown",
-              membership_status: review[:membership_status].presence || "not_member",
-              volunteer_status: review[:volunteer_status].presence || "unknown",
               reviewed_at: Time.current,
               reviewed_by_user_id: current_user.id
-            }.merge(intake_review_status_updates(classification, decision, supporter))
+            }
+              .merge(intake_review_relationship_updates(review, classification))
+              .merge(intake_review_status_updates(classification, decision, supporter))
 
             apply_contact_classification_metadata!(supporter, updates)
             supporter.update!(updates)
@@ -1217,6 +1216,20 @@ module Api
 
       def intake_rejection_classification?(classification)
         %w[duplicate invalid archived].include?(classification)
+      end
+
+      def intake_review_relationship_updates(review, classification)
+        return {
+          support_status: "unknown",
+          membership_status: "not_member",
+          volunteer_status: "unknown"
+        } if intake_rejection_classification?(classification)
+
+        {
+          support_status: review[:support_status].presence || "unknown",
+          membership_status: review[:membership_status].presence || "not_member",
+          volunteer_status: review[:volunteer_status].presence || "unknown"
+        }
       end
 
       def intake_reviewable?(supporter)
