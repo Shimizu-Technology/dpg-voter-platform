@@ -3,6 +3,7 @@
 class GecImport < ApplicationRecord
   STATUSES = %w[pending processing completed failed].freeze
   IMPORT_TYPES = %w[full_list changes_only].freeze
+  STALE_QUEUED_AFTER = 2.hours
 
   belongs_to :uploaded_by_user, class_name: "User", optional: true
   belongs_to :activated_for_election_by_user, class_name: "User", optional: true
@@ -18,9 +19,19 @@ class GecImport < ApplicationRecord
   scope :latest, -> { order(created_at: :desc, id: :desc) }
   scope :completed, -> { where(status: "completed") }
   scope :active_election_day, -> { completed.where(active_election_day: true) }
+  scope :queued_for_import, -> { where(status: %w[pending processing]) }
 
   def self.active_election_day_import
     active_election_day.latest.first
+  end
+
+  def self.fail_stale_queued!(stale_after: STALE_QUEUED_AFTER)
+    cutoff = Time.current - stale_after
+    queued_for_import.where(updated_at: ...cutoff).find_each do |gec_import|
+      next if gec_import.live_heartbeat?(cutoff)
+
+      gec_import.fail_as_stale!
+    end
   end
 
   def completed?
@@ -33,6 +44,26 @@ class GecImport < ApplicationRecord
 
   def queued?
     %w[pending processing].include?(status)
+  end
+
+  def live_heartbeat?(cutoff = STALE_QUEUED_AFTER.ago)
+    heartbeat = Rails.cache.read("gec_import_heartbeat:#{id}")
+    return false if heartbeat.blank?
+
+    Time.zone.parse(heartbeat.to_s) >= cutoff
+  rescue ArgumentError
+    false
+  end
+
+  def fail_as_stale!
+    update!(
+      status: "failed",
+      metadata: (metadata || {}).merge({
+        "stage" => "failed",
+        "progress_percent" => 100,
+        "error" => "Background import did not finish and no active worker heartbeat was found. Please upload the file again."
+      })
+    )
   end
 
   def activate_for_election!(actor_user:)

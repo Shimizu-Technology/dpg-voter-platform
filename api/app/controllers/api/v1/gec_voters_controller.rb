@@ -267,6 +267,7 @@ module Api
       end
 
       def imports
+        GecImport.fail_stale_queued!
         imports = GecImport.includes(:uploaded_by_user).latest.limit(25)
         render json: {
           imports: imports.map { |import| import_json(import) }
