@@ -92,9 +92,10 @@ class Supporter < ApplicationRecord
   scope :active, -> { where(status: "active") }
   scope :contacts, -> { active.where.not(contact_classification: %w[archived invalid duplicate]) }
   scope :intake, -> { contacts.where(contact_classification: "new_intake") }
-  scope :classified_supporters, -> { contacts.where(support_status: "supporter") }
-  scope :members, -> { contacts.where(membership_status: "member") }
-  scope :volunteers, -> { contacts.where(volunteer_status: %w[interested active]) }
+  scope :relationship_contacts, -> { contacts.where(contact_classification: "active_contact") }
+  scope :classified_supporters, -> { relationship_contacts.where(support_status: "supporter") }
+  scope :members, -> { relationship_contacts.where(membership_status: "member") }
+  scope :volunteers, -> { relationship_contacts.where(volunteer_status: %w[interested active]) }
   scope :verified, -> { where(verification_status: "verified") }
   scope :unverified, -> { where(verification_status: "unverified") }
   scope :flagged, -> { where(verification_status: "flagged") }
@@ -117,9 +118,9 @@ class Supporter < ApplicationRecord
   scope :accepted_public_signups, -> { public_origin.review_approved }
   scope :engaged_contacts, -> { contacts.where(contact_classification: "active_contact").where.not(support_status: "not_supporting") }
   scope :official_supporters, -> {
-    contacts.where(support_status: "supporter")
-      .or(contacts.where(membership_status: "member"))
-      .or(contacts.where(volunteer_status: %w[interested active]))
+    relationship_contacts.where(support_status: "supporter")
+      .or(relationship_contacts.where(membership_status: "member"))
+      .or(relationship_contacts.where(volunteer_status: %w[interested active]))
   }
   scope :pending_supporter_review, -> { active.review_pending.where(public_review_status: %w[approved not_applicable]) }
   scope :working_supporters, -> { official_supporters }

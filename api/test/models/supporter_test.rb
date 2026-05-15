@@ -200,6 +200,19 @@ class SupporterTest < ActiveSupport::TestCase
       support_status: "undecided",
       status: "active"
     )
+    pending_intake = Supporter.create!(
+      first_name: "Pending",
+      last_name: "Relationship",
+      contact_number: "6715552005",
+      village: @village_one,
+      source: "staff_entry",
+      contact_classification: "new_intake",
+      support_status: "supporter",
+      membership_status: "member",
+      volunteer_status: "interested",
+      review_status: "pending",
+      status: "active"
+    )
 
     official_ids = Supporter.official_supporters.pluck(:id)
 
@@ -207,6 +220,10 @@ class SupporterTest < ActiveSupport::TestCase
     assert_includes official_ids, member.id
     assert_includes official_ids, volunteer.id
     refute_includes official_ids, undecided.id
+    refute_includes official_ids, pending_intake.id
+    refute_includes Supporter.classified_supporters.pluck(:id), pending_intake.id
+    refute_includes Supporter.members.pluck(:id), pending_intake.id
+    refute_includes Supporter.volunteers.pluck(:id), pending_intake.id
   end
 
   test "household_members excludes self from preloaded household supporters" do
