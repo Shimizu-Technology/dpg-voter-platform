@@ -277,13 +277,14 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       metadata: { "stage" => "queued", "progress_percent" => 0 }
     )
     progress = { "stage" => "importing", "progress_percent" => 67, "pages_processed" => 500, "page_count" => 760 }
-    cache = Rails.cache
-    original_read = cache.method(:read)
-    cache.define_singleton_method(:read) do |key, *args, **kwargs|
+    original_read = Rails.cache.method(:read)
+    read_cache = lambda do |key, *args, **kwargs|
       key == "gec_import_progress:#{import.id}" ? progress : original_read.call(key, *args, **kwargs)
     end
 
-    get "/api/v1/gec_voters/imports", headers: auth_headers(@admin)
+    with_stubbed_singleton_method(Rails.cache, :read, read_cache) do
+      get "/api/v1/gec_voters/imports", headers: auth_headers(@admin)
+    end
 
     assert_response :success
     payload = JSON.parse(response.body)
@@ -291,8 +292,24 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "importing", row.dig("metadata", "stage")
     assert_equal 67, row.dig("metadata", "progress_percent")
     assert_equal 500, row.dig("metadata", "pages_processed")
-  ensure
-    Rails.cache.define_singleton_method(:read, original_read) if original_read
+  end
+
+  test "imports endpoint still returns history when stale cleanup fails" do
+    import = GecImport.create!(
+      gec_list_date: Date.new(2026, 2, 25),
+      filename: "gec-voters.csv",
+      status: "pending",
+      import_type: "full_list",
+      metadata: { "stage" => "queued", "progress_percent" => 0 }
+    )
+
+    with_stubbed_singleton_method(GecImport, :fail_stale_queued!, ->(*_args, **_kwargs) { raise StandardError, "cache unavailable" }) do
+      get "/api/v1/gec_voters/imports", headers: auth_headers(@admin)
+    end
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert payload["imports"].any? { |row| row["id"] == import.id }
   end
 
   test "admin can enqueue a PDF preview job" do

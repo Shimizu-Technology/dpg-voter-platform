@@ -30,6 +30,7 @@ class GecImportJob < ApplicationJob
           "active_job_id" => job_id
         })
       )
+      write_import_progress_cache(gec_import.id, stage: "parsing", progress_percent: 5)
 
       upload_is_pdf = pdf_upload?(upload)
       source_tmp = Tempfile.new([ "gec_import_source", upload_is_pdf ? ".pdf" : safe_upload_extension(upload) ])
@@ -47,7 +48,10 @@ class GecImportJob < ApplicationJob
 
       if upload_is_pdf
         merge_metadata!(gec_import, stage: "validating_pdf", progress_percent: 10)
-        parser = GecPdfParserService.new(file_path: source_tmp.path)
+        parser = GecPdfParserService.new(
+          file_path: source_tmp.path,
+          progress_callback: pdf_validation_progress_callback(gec_import)
+        )
         parsed = parser.parse
         raise "PDF parsing failed: #{parsed.errors.first}" if parsed.errors.any?
 
@@ -124,7 +128,40 @@ class GecImportJob < ApplicationJob
   end
 
   def merge_metadata!(gec_import, **attrs)
-    gec_import.update!(metadata: (gec_import.metadata || {}).merge(attrs.compact.stringify_keys))
+    metadata_attrs = attrs.compact.stringify_keys
+    write_import_progress_cache(gec_import.id, metadata_attrs) if metadata_attrs.key?("stage") || metadata_attrs.key?("progress_percent")
+    gec_import.update!(metadata: (gec_import.metadata || {}).merge(metadata_attrs))
+  end
+
+  def pdf_validation_progress_callback(gec_import)
+    lambda do |pages_processed:, page_count:|
+      next if page_count.to_i <= 0
+
+      percent = 10 + ((pages_processed.to_f / page_count) * 20).round
+      write_import_progress_cache(
+        gec_import.id,
+        stage: "validating_pdf",
+        progress_percent: [ percent, 30 ].min,
+        pages_processed: pages_processed,
+        page_count: page_count
+      )
+    end
+  end
+
+  def write_import_progress_cache(import_id, attrs)
+    now = Time.current.iso8601
+    Rails.cache.write(
+      "gec_import_progress:#{import_id}",
+      attrs.compact.stringify_keys.merge("updated_at" => now),
+      expires_in: GecImportService::IMPORT_CACHE_TTL
+    )
+    Rails.cache.write(
+      "gec_import_heartbeat:#{import_id}",
+      now,
+      expires_in: GecImportService::IMPORT_CACHE_TTL
+    )
+  rescue StandardError => e
+    Rails.logger.warn("GecImportJob #{import_id}: progress cache write failed: #{e.class}: #{e.message}")
   end
 
   def fail_import!(gec_import, message)

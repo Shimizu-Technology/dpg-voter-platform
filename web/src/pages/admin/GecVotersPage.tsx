@@ -103,6 +103,7 @@ type GecImport = {
     pdf_qa?: Record<string, unknown>;
     active_job_id?: string;
     enqueued_at?: string;
+    updated_at?: string;
     [key: string]: unknown;
   };
 };
@@ -405,9 +406,11 @@ export default function GecVotersPage() {
     queryFn: getGecImports,
     enabled: canUploadGec,
     refetchInterval: (query) => {
+      if (query.state.status === 'error') return 10_000;
       const rows = (query.state.data?.imports ?? []) as GecImport[];
-      return shouldContinueImportPolling(rows) ? 3000 : false;
+      return shouldContinueImportPolling(rows) ? 2000 : false;
     },
+    refetchIntervalInBackground: true,
   });
   const votersQuery = useQuery({
     queryKey: ['gec-voters', submittedSearch, voterVillage, voterPrecinct, voterLinkedStatus, voterSort, voterDirection, voterPage],
@@ -636,6 +639,9 @@ export default function GecVotersPage() {
   const activeImportIsPdf = Boolean(activeImport?.metadata?.source_type === 'pdf' || activeImport?.metadata?.pdf_qa || activeImport?.raw_content_type?.includes('pdf'));
   const activeStageLabel = getImportStageLabel(activeStage, activeImportIsPdf);
   const activeStageMessage = getImportStageMessage(activeStage, activeProgress, activeImportIsPdf, activeImport?.metadata);
+  const activeProgressUpdatedAt = typeof activeImport?.metadata?.updated_at === 'string' ? activeImport.metadata.updated_at : activeImport?.created_at;
+  const activePagesProcessed = typeof activeImport?.metadata?.pages_processed === 'number' ? activeImport.metadata.pages_processed : null;
+  const activePageCount = typeof activeImport?.metadata?.page_count === 'number' ? activeImport.metadata.page_count : null;
   const previouslyHadActiveImport = useRef(false);
   const contactResults = useMemo<ContactResult[]>(() => contactResultsQuery.data?.supporters ?? [], [contactResultsQuery.data]);
   const selectedImport = useMemo(
@@ -900,17 +906,31 @@ export default function GecVotersPage() {
       )}
 
       {activeImport && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold text-blue-900">
-              {activeImports.length > 1 ? `${activeImports.length} imports in progress` : 'Background import in progress'}
+            <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-blue-900">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              <span>
+                {activeImports.length > 1 ? `${activeImports.length} imports in progress` : 'Background import in progress'}
+              </span>
             </div>
-            <div className="text-xs font-semibold text-blue-700">{activeStageLabel}</div>
+            <div className="shrink-0 rounded-full bg-white/70 px-2 py-1 text-xs font-semibold text-blue-700">{activeStageLabel}</div>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
-            <div className="h-full bg-blue-600 transition-all" style={{ width: `${activeProgressDisplay}%` }} />
+            <div className="h-full rounded-full bg-blue-600 transition-all duration-500" style={{ width: `${activeProgressDisplay}%` }} />
           </div>
           <div className="mt-2 text-xs text-blue-700">{activeStageMessage}</div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-medium text-blue-700/80">
+            <span className="inline-flex items-center gap-1">
+              <RefreshCw className="h-3 w-3" />
+              Auto-refreshing every 2 seconds
+            </span>
+            <span>Import #{activeImport.id}</span>
+            {activePagesProcessed !== null && activePageCount !== null && (
+              <span>{activePagesProcessed.toLocaleString()} / {activePageCount.toLocaleString()} pages checked</span>
+            )}
+            <span>Last update: {formatDateTime(activeProgressUpdatedAt)}</span>
+          </div>
           {activeImport.metadata?.error && (
             <div className="mt-2 text-xs font-medium text-red-700">{String(activeImport.metadata.error)}</div>
           )}
