@@ -30,3 +30,12 @@ export function contactAttemptChannelLabel(channel?: string | null) {
 export function contactAttemptOutcomeLabel(outcome?: string | null) {
   return CONTACT_ATTEMPT_OUTCOME_OPTIONS.find((option) => option.value === outcome)?.label || outcome?.replaceAll('_', ' ') || '';
 }
+
+export function getErrorMessage(error: unknown, fallback = 'The request failed.') {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
+    return response?.data?.message || response?.data?.error || fallback;
+  }
+  return fallback;
+}

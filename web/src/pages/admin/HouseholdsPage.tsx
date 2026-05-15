@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Database, Home, Link as LinkIcon, MapPin, MessageSquare, Search, Users } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
 import { createContactFromGecVoter, getGecHouseholds, getSupporters, linkContactToGecVoter, updateSupporterCanvass } from '../../lib/api';
-import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS } from '../../lib/contactAttempt';
+import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, getErrorMessage } from '../../lib/contactAttempt';
 import { formatDateTime } from '../../lib/datetime';
 import {
   contactClassificationChipClass,
@@ -119,15 +119,6 @@ function voterLabel(voter: GecVoter) {
 
 function contactName(contact: Pick<HouseholdContact, 'print_name' | 'first_name' | 'middle_name' | 'last_name'>) {
   return contact.print_name || fullName(contact);
-}
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'object' && error && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
-    return response?.data?.message || response?.data?.error || 'The request failed.';
-  }
-  return 'The request failed.';
 }
 
 export default function HouseholdsPage() {

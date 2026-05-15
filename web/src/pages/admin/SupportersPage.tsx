@@ -6,7 +6,7 @@ import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle,
 import { motion, useReducedMotion } from 'framer-motion';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
-import { OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS } from '../../lib/contactAttempt';
+import { OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, getErrorMessage } from '../../lib/contactAttempt';
 import { useSession } from '../../hooks/useSession';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import WorkspacePage from '../../components/WorkspacePage';
@@ -251,15 +251,6 @@ function hasCompleteIntakeContactAttempt(draft: IntakeReviewDraft) {
 
 function isTerminalIntakeClassification(classification: string) {
   return ['duplicate', 'invalid', 'archived'].includes(classification);
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'object' && error && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
-    return response?.data?.message || response?.data?.error || fallback;
-  }
-  return fallback;
 }
 
 export default function SupportersPage() {
