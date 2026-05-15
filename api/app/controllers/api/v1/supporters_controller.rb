@@ -198,6 +198,13 @@ module Api
             code: "invalid_intake_review_decision_classification"
           )
         end
+        if decision == "approve" && intake_rejection_classification?(classification)
+          return render_api_error(
+            message: "An approved intake review must use active contact",
+            status: :unprocessable_entity,
+            code: "invalid_intake_review_decision_classification"
+          )
+        end
 
         attempt = nil
         old_review_state = supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status")
