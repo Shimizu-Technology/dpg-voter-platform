@@ -19,6 +19,10 @@ class GecImportTest < ActiveSupport::TestCase
     refute gec_import.queued?
   end
 
+  test "import heartbeat cache lasts longer than stale import threshold" do
+    assert_operator GecImportService::IMPORT_CACHE_TTL.to_i, :>, GecImport::STALE_QUEUED_AFTER.to_i
+  end
+
   test "fails stale queued imports without a live heartbeat" do
     gec_import = GecImport.create!(
       gec_list_date: Date.new(2026, 1, 25),

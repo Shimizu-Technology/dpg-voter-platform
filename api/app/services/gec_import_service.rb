@@ -105,11 +105,10 @@ class GecImportService
   PLACEHOLDER_VOTER_REGISTRATION_NUMBERS = %w[NEW].freeze
   VRN_LOOKUP_BATCH_SIZE = 5_000
 
-  # Cache TTL for heartbeat and progress keys. Must exceed the longest
-  # plausible import runtime (60K rows on a loaded DB can take >1 hour).
-  # Keep this higher than any caller-level processing timeout so stale
-  # artifacts do not disappear while an import is still being parsed.
-  IMPORT_CACHE_TTL = 90.minutes
+  # Cache TTL for heartbeat and progress keys. Must exceed the stale-import
+  # cleanup threshold so an active worker's heartbeat cannot expire before
+  # the stale detector checks it.
+  IMPORT_CACHE_TTL = 3.hours
 
 
   Result = Struct.new(:success, :gec_import, :errors, :stats, keyword_init: true)
