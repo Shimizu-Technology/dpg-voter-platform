@@ -54,7 +54,7 @@ gem "rqrcode"
 gem "kaminari"
 gem "dotenv-rails", groups: [ :development, :test ]
 
-gem "resend", "~> 1.0"
+gem "resend", "~> 1.3"
 
 # Excel/spreadsheet parsing for bulk import
 gem "roo", "~> 2.10"
