@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Database, Home, Link as LinkIcon, MapPin, MessageSquare, Search, Users } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
 import { createContactFromGecVoter, getGecHouseholds, getSupporters, linkContactToGecVoter, updateSupporterCanvass } from '../../lib/api';
-import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, CONTACT_ATTEMPT_OUTCOME_OPTIONS } from '../../lib/contactAttempt';
+import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS } from '../../lib/contactAttempt';
 import { formatDateTime } from '../../lib/datetime';
 import {
   contactClassificationChipClass,
@@ -100,7 +100,7 @@ function initialCanvassDraft(contact: HouseholdContact): CanvassDraft {
     membership_status: contact.membership_status || 'not_member',
     volunteer_status: contact.volunteer_status || 'unknown',
     channel: 'in_person',
-    outcome: 'reached',
+    outcome: '',
     note: '',
   };
 }
@@ -240,7 +240,14 @@ export default function HouseholdsPage() {
   };
 
   const saveCanvassUpdate = (contact: HouseholdContact) => {
-    canvassMutation.mutate({ contact, draft: draftForContact(contact) });
+    const draft = draftForContact(contact);
+    if (!draft.channel || !draft.outcome) {
+      setActionMessage(null);
+      setActionError('Choose a contact method and outcome before saving the canvass update.');
+      return;
+    }
+
+    canvassMutation.mutate({ contact, draft });
   };
 
   const toggleCanvassPanel = (contact: HouseholdContact, isExpanded: boolean) => {
@@ -640,7 +647,7 @@ export default function HouseholdsPage() {
                                     className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                                     aria-label="Contact outcome"
                                   >
-                                    {CONTACT_ATTEMPT_OUTCOME_OPTIONS.map((option) => (
+                                    {OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS.map((option) => (
                                       <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                   </select>
@@ -656,7 +663,7 @@ export default function HouseholdsPage() {
                                   <button
                                     type="button"
                                     onClick={() => saveCanvassUpdate(contact)}
-                                    disabled={canvassMutation.isPending}
+                                    disabled={canvassMutation.isPending || !draft.channel || !draft.outcome}
                                     className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-white disabled:opacity-50"
                                   >
                                     <CheckCircle2 className="h-3.5 w-3.5" />
