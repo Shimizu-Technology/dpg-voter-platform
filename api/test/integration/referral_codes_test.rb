@@ -93,4 +93,41 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
     assert_nil supporter_payload.fetch("leader_code")
     assert_nil supporter_payload.fetch("referral_code_id")
   end
+
+  test "create returns json error when village does not exist" do
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Unknown Village Link",
+          source_type: "village",
+          village_id: Village.maximum(:id).to_i + 10_000
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :not_found
+    payload = JSON.parse(response.body)
+    assert_equal "Village not found", payload.fetch("error")
+    assert_equal "village_not_found", payload.fetch("code")
+  end
+
+  test "create returns json error when assigned user does not exist" do
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Unknown User Link",
+          source_type: "canvasser",
+          village_id: @village.id,
+          assigned_user_id: User.maximum(:id).to_i + 10_000
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :not_found
+    payload = JSON.parse(response.body)
+    assert_equal "Assigned user not found", payload.fetch("error")
+    assert_equal "user_not_found", payload.fetch("code")
+  end
 end

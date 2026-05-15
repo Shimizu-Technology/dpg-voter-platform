@@ -29,7 +29,10 @@ module Api
       # POST /api/v1/referral_codes
       def create
         attrs = referral_code_params
-        village = Village.find(attrs[:village_id])
+        village = Village.find_by(id: attrs[:village_id])
+        unless village
+          return render_api_error(message: "Village not found", status: :not_found, code: "village_not_found")
+        end
 
         unless village_allowed?(village.id)
           return render_api_error(message: "Village not in your assigned scope", status: :forbidden, code: "village_scope_required")
@@ -99,7 +102,12 @@ module Api
       def resolve_assigned_user(user_id)
         return nil if user_id.blank?
 
-        user = User.find(user_id)
+        user = User.find_by(id: user_id)
+        unless user
+          render_api_error(message: "Assigned user not found", status: :not_found, code: "user_not_found")
+          return nil
+        end
+
         if scoped_village_ids && user.assigned_village_id.present? && !scoped_village_ids.include?(user.assigned_village_id)
           render_api_error(message: "Assigned user is outside your village scope", status: :forbidden, code: "user_scope_required")
           return nil

@@ -55,6 +55,7 @@ interface DraftState {
 
 const sourceTypes = [
   { value: 'village', label: 'Village' },
+  { value: 'precinct', label: 'Precinct' },
   { value: 'canvasser', label: 'Canvasser' },
   { value: 'outreach', label: 'Outreach Push' },
   { value: 'custom', label: 'Custom' },
