@@ -49,4 +49,16 @@ class ApplicationController < ActionController::API
 
     render json: payload, status: status
   end
+
+  def contact_attempt_summary_json(attempt)
+    {
+      id: attempt.id,
+      channel: attempt.channel,
+      outcome: attempt.outcome,
+      note: attempt.note,
+      recorded_at: attempt.recorded_at&.iso8601,
+      recorded_by_name: attempt.recorded_by_user&.name,
+      recorded_by_email: attempt.recorded_by_user&.email
+    }
+  end
 end

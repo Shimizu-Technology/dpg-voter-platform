@@ -1589,18 +1589,6 @@ module Api
         }
       end
 
-      def contact_attempt_summary_json(attempt)
-        {
-          id: attempt.id,
-          channel: attempt.channel,
-          outcome: attempt.outcome,
-          note: attempt.note,
-          recorded_at: attempt.recorded_at&.iso8601,
-          recorded_by_name: attempt.recorded_by_user&.name,
-          recorded_by_email: attempt.recorded_by_user&.email
-        }
-      end
-
       def supporter_detail_json(supporter)
         reason_payload = SupporterVerificationReasonService.new(supporter, allow_match_lookup: true).payload || {}
 
