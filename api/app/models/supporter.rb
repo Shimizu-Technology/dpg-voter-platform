@@ -116,7 +116,11 @@ class Supporter < ApplicationRecord
   scope :public_origin, -> { where(source: PUBLIC_SOURCES) }
   scope :accepted_public_signups, -> { public_origin.review_approved }
   scope :engaged_contacts, -> { contacts.where(contact_classification: "active_contact").where.not(support_status: "not_supporting") }
-  scope :official_supporters, -> { contacts.where(support_status: "supporter") }
+  scope :official_supporters, -> {
+    contacts.where(support_status: "supporter")
+      .or(contacts.where(membership_status: "member"))
+      .or(contacts.where(volunteer_status: %w[interested active]))
+  }
   scope :pending_supporter_review, -> { active.review_pending.where(public_review_status: %w[approved not_applicable]) }
   scope :working_supporters, -> { official_supporters }
   scope :team_input, -> { official_supporters.where(source: TEAM_SOURCES) }
