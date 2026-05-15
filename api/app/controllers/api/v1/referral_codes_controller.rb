@@ -61,7 +61,9 @@ module Api
 
       # PATCH /api/v1/referral_codes/:id
       def update
-        code = referral_code_scope.find(params[:id])
+        code = find_referral_code
+        return unless code
+
         attrs = referral_code_params
         updates = {}
         updates[:display_name] = attrs[:display_name].to_s.strip if attrs.key?(:display_name)
@@ -81,6 +83,15 @@ module Api
       def referral_code_scope
         ids = scoped_village_ids
         ids ? ReferralCode.where(village_id: ids) : ReferralCode.all
+      end
+
+      def find_referral_code
+        code = referral_code_scope.find_by(id: params[:id])
+        unless code
+          render_api_error(message: "Signup link not found", status: :not_found, code: "referral_code_not_found")
+        end
+
+        code
       end
 
       def referral_code_params

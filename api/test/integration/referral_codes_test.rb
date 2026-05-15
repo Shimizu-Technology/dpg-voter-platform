@@ -130,4 +130,53 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
     assert_equal "Assigned user not found", payload.fetch("error")
     assert_equal "user_not_found", payload.fetch("code")
   end
+
+  test "update returns json error when signup link does not exist" do
+    patch "/api/v1/referral_codes/#{ReferralCode.maximum(:id).to_i + 10_000}",
+      params: {
+        referral_code: {
+          active: false
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :not_found
+    payload = JSON.parse(response.body)
+    assert_equal "Signup link not found", payload.fetch("error")
+    assert_equal "referral_code_not_found", payload.fetch("code")
+  end
+
+  test "update returns json error when signup link is outside user village scope" do
+    other_village = Village.create!(name: "Yigo #{SecureRandom.hex(3)}")
+    referral = ReferralCode.create!(
+      display_name: "Other Village Link",
+      code: "OTHER-#{SecureRandom.hex(2).upcase}",
+      village: other_village,
+      active: true,
+      metadata: { "source_type" => "custom" }
+    )
+    leader = User.create!(
+      clerk_id: "clerk-leader-#{SecureRandom.hex(4)}",
+      email: "leader-#{SecureRandom.hex(4)}@example.com",
+      name: "Village Leader",
+      role: "block_leader",
+      assigned_village_id: @village.id
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          active: false
+        }
+      },
+      headers: auth_headers(leader),
+      as: :json
+
+    assert_response :not_found
+    payload = JSON.parse(response.body)
+    assert_equal "Signup link not found", payload.fetch("error")
+    assert_equal "referral_code_not_found", payload.fetch("code")
+    assert referral.reload.active?
+  end
 end
