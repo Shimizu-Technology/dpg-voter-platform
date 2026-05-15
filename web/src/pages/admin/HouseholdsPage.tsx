@@ -1,13 +1,26 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Database, Home, Link as LinkIcon, MapPin, Search, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Database, Home, Link as LinkIcon, MapPin, MessageSquare, Search, Users } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
-import { createContactFromGecVoter, getGecHouseholds, getSupporters, linkContactToGecVoter } from '../../lib/api';
+import { createContactFromGecVoter, getGecHouseholds, getSupporters, linkContactToGecVoter, updateSupporterCanvass } from '../../lib/api';
+import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, getErrorMessage } from '../../lib/contactAttempt';
+import { formatDateTime } from '../../lib/datetime';
 import {
   contactClassificationChipClass,
   contactClassificationLabel,
 } from '../../lib/contactClassification';
+import {
+  MEMBERSHIP_STATUS_OPTIONS,
+  SUPPORT_STATUS_OPTIONS,
+  VOLUNTEER_STATUS_OPTIONS,
+  membershipStatusChipClass,
+  membershipStatusLabel,
+  supportStatusChipClass,
+  supportStatusLabel,
+  volunteerStatusChipClass,
+  volunteerStatusLabel,
+} from '../../lib/relationshipStatus';
 
 type GecVoter = {
   id: number;
@@ -35,11 +48,21 @@ type HouseholdContact = {
   street_address?: string | null;
   village_name?: string | null;
   contact_classification?: string | null;
+  support_status?: string | null;
+  membership_status?: string | null;
+  volunteer_status?: string | null;
   review_status?: string | null;
   verification_status?: string | null;
   verification_reason?: string | null;
   current_gec_match?: boolean | null;
   registered_voter_status?: string | null;
+  latest_contact_attempt?: {
+    channel: string;
+    outcome: string;
+    note?: string | null;
+    recorded_at?: string | null;
+    recorded_by_name?: string | null;
+  } | null;
 };
 
 type Household = {
@@ -60,6 +83,32 @@ type ContactResult = {
   village_name?: string | null;
 };
 
+type CanvassDraft = {
+  contact_classification: string;
+  support_status: string;
+  membership_status: string;
+  volunteer_status: string;
+  channel: string;
+  outcome: string;
+  note: string;
+};
+
+function initialCanvassDraft(contact: HouseholdContact): CanvassDraft {
+  return {
+    contact_classification: 'active_contact',
+    support_status: contact.support_status || 'unknown',
+    membership_status: contact.membership_status || 'not_member',
+    volunteer_status: contact.volunteer_status || 'unknown',
+    channel: 'in_person',
+    outcome: '',
+    note: '',
+  };
+}
+
+function householdCanvassable(contact: HouseholdContact) {
+  return contact.contact_classification === 'active_contact' && contact.review_status === 'approved';
+}
+
 function fullName(person: Pick<GecVoter | HouseholdContact, 'first_name' | 'middle_name' | 'last_name'>) {
   return [person.first_name, person.middle_name, person.last_name].filter(Boolean).join(' ');
 }
@@ -72,15 +121,6 @@ function contactName(contact: Pick<HouseholdContact, 'print_name' | 'first_name'
   return contact.print_name || fullName(contact);
 }
 
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'object' && error && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
-    return response?.data?.message || response?.data?.error || 'The request failed.';
-  }
-  return 'The request failed.';
-}
-
 export default function HouseholdsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -88,6 +128,8 @@ export default function HouseholdsPage() {
   const [linkVoterId, setLinkVoterId] = useState<number | null>(null);
   const [contactSearch, setContactSearch] = useState('');
   const [submittedContactSearch, setSubmittedContactSearch] = useState('');
+  const [expandedContactId, setExpandedContactId] = useState<number | null>(null);
+  const [canvassDrafts, setCanvassDrafts] = useState<Record<number, CanvassDraft>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -145,6 +187,71 @@ export default function HouseholdsPage() {
       setActionError(getErrorMessage(error));
     },
   });
+
+  const canvassMutation = useMutation({
+    mutationFn: ({ contact, draft }: { contact: HouseholdContact; draft: CanvassDraft }) =>
+      updateSupporterCanvass(contact.id, {
+        contact_classification: draft.contact_classification,
+        support_status: draft.support_status,
+        membership_status: draft.membership_status,
+        volunteer_status: draft.volunteer_status,
+        contact_attempt: {
+          channel: draft.channel,
+          outcome: draft.outcome,
+          note: draft.note.trim() || undefined,
+        },
+      }),
+    onSuccess: (_data, variables) => {
+      setActionError(null);
+      setActionMessage('Saved the household canvassing update.');
+      setExpandedContactId(null);
+      setCanvassDrafts((current) => {
+        const next = { ...current };
+        delete next[variables.contact.id];
+        return next;
+      });
+      void queryClient.invalidateQueries({ queryKey: ['households-workspace'] });
+      void queryClient.invalidateQueries({ queryKey: ['supporters'] });
+      void queryClient.invalidateQueries({ queryKey: ['outreach-supporters'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (error: unknown) => {
+      setActionMessage(null);
+      setActionError(getErrorMessage(error));
+    },
+  });
+
+  const draftForContact = (contact: HouseholdContact): CanvassDraft => canvassDrafts[contact.id] || initialCanvassDraft(contact);
+
+  const updateCanvassDraft = (contact: HouseholdContact, updates: Partial<CanvassDraft>) => {
+    setCanvassDrafts((current) => ({
+      ...current,
+      [contact.id]: { ...draftForContact(contact), ...updates },
+    }));
+  };
+
+  const saveCanvassUpdate = (contact: HouseholdContact) => {
+    const draft = draftForContact(contact);
+    if (!draft.channel || !draft.outcome) {
+      setActionMessage(null);
+      setActionError('Choose a contact method and outcome before saving the canvass update.');
+      return;
+    }
+
+    canvassMutation.mutate({ contact, draft });
+  };
+
+  const toggleCanvassPanel = (contact: HouseholdContact, isExpanded: boolean) => {
+    if (isExpanded) {
+      setExpandedContactId(null);
+      return;
+    }
+    setCanvassDrafts((current) => ({
+      ...current,
+      [contact.id]: initialCanvassDraft(contact),
+    }));
+    setExpandedContactId(contact.id);
+  };
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -302,7 +409,7 @@ export default function HouseholdsPage() {
                                   {contactName(possibleContact)}
                                 </Link>
                                 <div className="text-amber-700">
-                                  {contactClassificationLabel(possibleContact.contact_classification)} · not linked yet
+                                  {contactClassificationLabel(possibleContact.contact_classification)} · {supportStatusLabel(possibleContact.support_status)} · not linked yet
                                 </div>
                               </div>
                             ) : (
@@ -414,30 +521,152 @@ export default function HouseholdsPage() {
                 {household.contacts.length === 0 ? (
                   <p className="text-sm text-slate-500">No DPG records found at this address yet.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {household.contacts.map((contact) => (
-                      <Link
-                        key={contact.id}
-                        to={`/admin/supporters/${contact.id}?return_to=${encodeURIComponent('/admin/households')}`}
-                        className="block rounded-xl border border-slate-200 p-3 hover:bg-slate-50"
-                      >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
-                            <div className="font-semibold text-slate-950">{contact.print_name || fullName(contact)}</div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {[contact.contact_number, contact.email].filter(Boolean).join(' · ') || 'No phone or email'}
+                    <div className="space-y-2">
+                      {household.contacts.map((contact) => {
+                        const draft = draftForContact(contact);
+                        const canLogCanvass = householdCanvassable(contact);
+                        const isExpanded = canLogCanvass && expandedContactId === contact.id;
+                        return (
+                          <div key={contact.id} className="rounded-xl border border-slate-200 p-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <div className="font-semibold text-slate-950">{contact.print_name || fullName(contact)}</div>
+                                <div className="mt-1 text-xs text-slate-500">
+                                  {[contact.contact_number, contact.email].filter(Boolean).join(' · ') || 'No phone or email'}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${contactClassificationChipClass(contact.contact_classification || 'new_intake')}`}>
+                                  {contactClassificationLabel(contact.contact_classification || 'new_intake')}
+                                </span>
+                                <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${supportStatusChipClass(contact.support_status)}`}>
+                                  {supportStatusLabel(contact.support_status)}
+                                </span>
+                                {contact.membership_status === 'member' && (
+                                  <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${membershipStatusChipClass(contact.membership_status)}`}>
+                                    {membershipStatusLabel(contact.membership_status)}
+                                  </span>
+                                )}
+                                {contact.volunteer_status && contact.volunteer_status !== 'unknown' && (
+                                  <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${volunteerStatusChipClass(contact.volunteer_status)}`}>
+                                    {volunteerStatusLabel(contact.volunteer_status)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
+                            <div className="mt-2 flex flex-col gap-2 text-xs font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                              <span>{contact.current_gec_match ? 'Linked to current GEC voter' : 'No current GEC link'}</span>
+                              {contact.latest_contact_attempt ? (
+                                <span>
+                                  Last: {contact.latest_contact_attempt.channel.replaceAll('_', ' ')} / {contact.latest_contact_attempt.outcome.replaceAll('_', ' ')}
+                                  {contact.latest_contact_attempt.recorded_at ? ` on ${formatDateTime(contact.latest_contact_attempt.recorded_at)}` : ''}
+                                </span>
+                              ) : (
+                                <span>No outreach logged yet</span>
+                              )}
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {canLogCanvass ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCanvassPanel(contact, isExpanded)}
+                                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-2.5 text-xs font-semibold text-white"
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                  Log canvass
+                                </button>
+                              ) : (
+                                <span className="inline-flex min-h-9 items-center rounded-lg bg-amber-50 px-2.5 text-xs font-semibold text-amber-700">
+                                  Intake review needed before canvassing
+                                </span>
+                              )}
+                              <Link
+                                to={`/admin/supporters/${contact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              >
+                                Open Record
+                              </Link>
+                            </div>
+                            {isExpanded && (
+                              <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                              <div className="grid gap-2 sm:grid-cols-3">
+                                  <select
+                                    value={draft.support_status}
+                                    onChange={(event) => updateCanvassDraft(contact, { support_status: event.target.value })}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    aria-label="Support status"
+                                  >
+                                  {SUPPORT_STATUS_OPTIONS.map((option) => (
+                                      <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                  </select>
+                                <select
+                                  value={draft.membership_status}
+                                  onChange={(event) => updateCanvassDraft(contact, { membership_status: event.target.value })}
+                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                  aria-label="Membership status"
+                                >
+                                  {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={draft.volunteer_status}
+                                  onChange={(event) => updateCanvassDraft(contact, { volunteer_status: event.target.value })}
+                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                  aria-label="Volunteer status"
+                                >
+                                  {VOLUNTEER_STATUS_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                  <select
+                                    value={draft.channel}
+                                    onChange={(event) => updateCanvassDraft(contact, { channel: event.target.value })}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    aria-label="Contact method"
+                                  >
+                                    {CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) => (
+                                      <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={draft.outcome}
+                                    onChange={(event) => updateCanvassDraft(contact, { outcome: event.target.value })}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    aria-label="Contact outcome"
+                                  >
+                                    {OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS.map((option) => (
+                                      <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <textarea
+                                  value={draft.note}
+                                  onChange={(event) => updateCanvassDraft(contact, { note: event.target.value })}
+                                  rows={2}
+                                  placeholder="Canvassing note"
+                                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                />
+                                <div className="mt-2 flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => saveCanvassUpdate(contact)}
+                                    disabled={canvassMutation.isPending || !draft.channel || !draft.outcome}
+                                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-white disabled:opacity-50"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    Save update
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${contactClassificationChipClass(contact.contact_classification || 'new_intake')}`}>
-                            {contactClassificationLabel(contact.contact_classification || 'new_intake')}
-                          </span>
-                        </div>
-                        <div className="mt-2 text-xs font-medium text-slate-600">
-                          {contact.current_gec_match ? 'Linked to current GEC voter' : 'No current GEC link'}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
+                        );
+                      })}
+                    </div>
                 )}
               </div>
             </div>

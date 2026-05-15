@@ -1,7 +1,7 @@
 # DPG Deployment And QA Checklist
 
-**Last updated:** May 12, 2026  
-**Current verified commit:** `547c4c7` - merged Phase 5 communications governance
+**Last updated:** May 14, 2026
+**Current verified branch:** `feature/intake-relationship-household-polish`
 
 ## Current deployment status
 
@@ -27,6 +27,8 @@ The main remaining risk is not missing code for the current foundation. It is th
 - [ ] `ALLOWED_ORIGINS` includes only the DPG frontend domain(s).
 - [ ] SMS sender settings are DPG-specific or explicitly approved shared infrastructure.
 - [ ] Email sender/domain settings are DPG-specific or explicitly approved shared infrastructure.
+- [ ] GEC import storage is DPG-specific. If `AWS_S3_BUCKET=dpg-voter-platform`, the configured AWS access key must have `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` for `arn:aws:s3:::dpg-voter-platform/*`.
+- [ ] Render is not using the campaign-tracker-only S3 IAM policy against the DPG bucket. The May 14 prod failure showed `campaign-tracker-s3` denied on `dpg-voter-platform`; code now falls back to database-backed upload storage, but IAM should still be corrected before routine imports.
 - [ ] `DPG_LIVE_OUTREACH_ENABLED=true` is set only on the intended DPG environment after confirming SMS/email credentials.
 - [ ] Database backups are configured before DPG enters real data.
 

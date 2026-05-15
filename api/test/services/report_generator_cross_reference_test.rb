@@ -39,11 +39,26 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
       precinct: @precinct,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active",
       verification_status: "verified"
     )
     @linked_contact.update_columns(gec_voter_id: @linked_voter.id, verification_status: "verified", verification_reason: "matched_current_gec")
+    recorder = User.create!(
+      clerk_id: "report-recorder-#{SecureRandom.hex(4)}",
+      email: "report-recorder-#{SecureRandom.hex(4)}@example.com",
+      name: "Report Recorder",
+      role: "campaign_admin"
+    )
+    SupporterContactAttempt.create!(
+      supporter: @linked_contact,
+      recorded_by_user: recorder,
+      channel: "call",
+      outcome: "reached",
+      note: "Confirmed support by phone.",
+      recorded_at: Time.zone.local(2026, 5, 14, 10, 0, 0)
+    )
     @unlinked_contact = Supporter.create!(
       first_name: "Ana",
       last_name: "Reyes",
@@ -63,7 +78,9 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
       village: @village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "member",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      membership_status: "member",
       status: "active"
     )
     @possible_match.update_columns(
@@ -84,7 +101,10 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
     assert_equal 1, preview[:total_count]
     assert_equal "Maria", preview[:rows].first[1]
     assert_includes preview[:columns], "GEC Reg #"
+    assert_includes preview[:columns], "Last Contact Outcome"
     assert_includes preview[:rows].first, @linked_voter.voter_registration_number
+    assert_includes preview[:rows].first, "Reached"
+    assert_includes preview[:rows].first, "Confirmed support by phone."
   end
 
   test "unlinked DPG contact report includes contacts without GEC links" do

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_13_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_14_193000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -581,6 +581,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_130000) do
     t.string "intake_status", default: "accepted", null: false
     t.string "last_name"
     t.string "leader_code"
+    t.string "membership_status", default: "not_member", null: false
     t.string "middle_name"
     t.boolean "motorcade_available"
     t.boolean "needs_absentee_ballot_help", default: false, null: false
@@ -617,6 +618,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_130000) do
     t.datetime "support_follow_up_date"
     t.text "support_follow_up_notes"
     t.string "support_follow_up_status"
+    t.string "support_status", default: "unknown", null: false
     t.text "turnout_note"
     t.string "turnout_source"
     t.string "turnout_status", default: "not_yet_voted", null: false
@@ -629,6 +631,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_130000) do
     t.datetime "verified_at"
     t.bigint "verified_by_user_id"
     t.bigint "village_id", null: false
+    t.string "volunteer_status", default: "unknown", null: false
     t.boolean "wants_to_volunteer", default: false, null: false
     t.boolean "yard_sign"
     t.index "lower((email)::text)", name: "index_supporters_on_lower_email", where: "(email IS NOT NULL)"
@@ -648,6 +651,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_130000) do
     t.index ["last_name", "first_name"], name: "index_supporters_on_last_name_and_first_name"
     t.index ["last_name"], name: "index_supporters_on_last_name"
     t.index ["leader_code"], name: "index_supporters_on_leader_code"
+    t.index ["membership_status"], name: "index_supporters_on_membership_status"
     t.index ["needs_voter_registration_help"], name: "index_supporters_on_needs_voter_registration_help"
     t.index ["normalized_phone"], name: "index_supporters_on_normalized_phone"
     t.index ["potential_duplicate"], name: "index_supporters_on_potential_duplicate"
@@ -670,6 +674,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_130000) do
     t.index ["status"], name: "index_supporters_on_status"
     t.index ["submitted_village_id"], name: "index_supporters_on_submitted_village_id"
     t.index ["support_follow_up_status"], name: "index_supporters_on_support_follow_up_status"
+    t.index ["support_status"], name: "index_supporters_on_support_status"
     t.index ["turnout_status"], name: "index_supporters_on_turnout_status"
     t.index ["turnout_updated_by_user_id"], name: "index_supporters_on_turnout_updated_by_user_id"
     t.index ["verification_reason"], name: "index_supporters_on_verification_reason"
@@ -677,6 +682,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_13_130000) do
     t.index ["verified_by_user_id"], name: "index_supporters_on_verified_by_user_id"
     t.index ["village_id", "created_at"], name: "index_supporters_on_village_id_and_created_at"
     t.index ["village_id"], name: "index_supporters_on_village_id"
+    t.index ["volunteer_status"], name: "index_supporters_on_volunteer_status"
   end
 
   create_table "users", force: :cascade do |t|

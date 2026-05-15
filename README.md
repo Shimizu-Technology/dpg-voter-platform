@@ -28,7 +28,7 @@ This app should become a DPG-owned platform centered on:
 - role-scoped party operations
 - later Election Day operations
 
-The Phase 1 DPG workflow reset is now implemented. Public signups, staff entries, and contact imports are visible immediately as DPG contacts and default into Intake for classification; they do not count as official supporters or members until DPG classifies them.
+The Phase 1 DPG workflow reset is now implemented. Public signups, staff entries, and contact imports are visible immediately as DPG contacts and default into Intake for review; they do not count as official supporters or members until DPG marks their separate support and membership statuses.
 
 ## Starter functionality
 

@@ -25,7 +25,8 @@ class Api::V1::SupporterContactAttemptsControllerTest < ActionDispatch::Integrat
       street_address: "123 Chalan Santo Papa",
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
   end
@@ -68,7 +69,8 @@ class Api::V1::SupporterContactAttemptsControllerTest < ActionDispatch::Integrat
       village: @other_village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
 

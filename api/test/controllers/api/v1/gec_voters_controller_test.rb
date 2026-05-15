@@ -67,7 +67,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
     contact.update!(gec_voter: @voter)
@@ -81,7 +82,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal [ @voter.id ], payload["gec_voters"].map { |row| row["id"] }
     assert_equal 1, payload["gec_voters"].first["linked_contact_count"]
     assert_equal contact.id, payload["gec_voters"].first.dig("linked_contact", "id")
-    assert_equal "supporter", payload["gec_voters"].first.dig("linked_contact", "contact_classification")
+    assert_equal "active_contact", payload["gec_voters"].first.dig("linked_contact", "contact_classification")
+    assert_equal "supporter", payload["gec_voters"].first.dig("linked_contact", "support_status")
   end
 
   test "households groups GEC voters and DPG contacts at an address" do
@@ -93,7 +95,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       street_address: @voter.address,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
 
@@ -173,7 +176,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
     contact.update!(gec_voter: previous_voter)
@@ -226,7 +230,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       village: @village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
     barrigada_contact.update!(gec_voter: @voter)
@@ -237,7 +242,8 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
       village: other_village,
       source: "staff_entry",
       attribution_method: "staff_manual",
-      contact_classification: "supporter",
+      contact_classification: "active_contact",
+      support_status: "supporter",
       status: "active"
     )
     dededo_contact.update!(gec_voter: other_voter)
@@ -315,7 +321,7 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     pdf&.close!
   end
 
-  test "PDF preview storage failures return JSON errors" do
+  test "PDF preview returns storage error when enabled S3 upload fails" do
     pdf = Tempfile.new([ "gec-preview-s3-fail", ".pdf" ])
     pdf.binmode
     pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
@@ -330,6 +336,34 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_no_difference -> { GecPdfPreview.count } do
       post "/api/v1/gec_voters/preview",
         params: { file: upload, preview_request_id: "preview-storage-fail-test" },
+        headers: auth_headers(@admin)
+    end
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "pdf_preview_storage_failed", payload["code"]
+    assert_match "Could not store PDF preview upload", payload["error"]
+  ensure
+    S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
+    S3Service.define_singleton_method(:upload, original_s3_upload) if original_s3_upload
+    pdf&.close!
+  end
+
+  test "PDF preview storage exceptions return JSON errors" do
+    pdf = Tempfile.new([ "gec-preview-s3-raise", ".pdf" ])
+    pdf.binmode
+    pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+    pdf.rewind
+    upload = Rack::Test::UploadedFile.new(pdf.path, "application/pdf", original_filename: "gec-preview-raise.pdf")
+
+    original_s3_enabled = S3Service.method(:enabled?)
+    original_s3_upload = S3Service.method(:upload)
+    S3Service.define_singleton_method(:enabled?) { true }
+    S3Service.define_singleton_method(:upload) { |_key, _io, content_type: nil| raise "S3 exploded" }
+
+    assert_no_difference -> { GecPdfPreview.count } do
+      post "/api/v1/gec_voters/preview",
+        params: { file: upload, preview_request_id: "preview-storage-raise-test" },
         headers: auth_headers(@admin)
     end
 
@@ -509,7 +543,7 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     pdf&.close!
   end
 
-  test "failed PDF upload storage marks import failed instead of leaving it pending" do
+  test "failed enabled S3 PDF import storage returns JSON error" do
     pdf = Tempfile.new([ "gec-upload-s3-fail", ".pdf" ])
     pdf.binmode
     pdf.write("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
@@ -535,10 +569,9 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_equal "pdf_import_storage_failed", JSON.parse(response.body)["code"]
-    failed_import = GecImport.order(:id).last
-    assert_equal "failed", failed_import.status
-    assert_equal "failed", failed_import.metadata["stage"]
+    payload = JSON.parse(response.body)
+    assert_equal "pdf_import_storage_failed", payload["code"]
+    assert_equal "failed", GecImport.order(:id).last.status
   ensure
     S3Service.define_singleton_method(:enabled?, original_s3_enabled) if original_s3_enabled
     S3Service.define_singleton_method(:upload, original_s3_upload) if original_s3_upload

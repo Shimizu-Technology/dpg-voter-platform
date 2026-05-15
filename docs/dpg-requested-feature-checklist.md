@@ -19,7 +19,11 @@ Core requirement:
 - contact detail page
 - create/edit contact
 - basic search/filter
-- relationship/classification: supporter, member, volunteer, undecided, not supporting, invalid/duplicate
+- record lifecycle/status: new intake, active contact, duplicate, invalid, archived
+- support status: unknown, supporter, undecided, not supporting
+- membership status: not a member, member
+- volunteer status: unknown, interested, active, not interested
+- contacted/not-contacted status from contact/follow-up history
 - contact/follow-up history
 - export basics
 
@@ -37,7 +41,7 @@ Core requirement:
 - public signups appear in Intake
 - staff/manual entries can appear in Intake when unclassified/incomplete
 - imported DPG rows can appear in Intake when they need cleanup/dedupe/matching
-- staff can classify records as supporter, member, volunteer, undecided, not supporting, duplicate, invalid, archived
+- staff can approve/reject intake, mark duplicate/invalid/archived, and separately set support, membership, and volunteer status
 - staff can link a contact to a GEC voter or mark possible/no match
 
 ### 3. GEC/public voter-list workspace

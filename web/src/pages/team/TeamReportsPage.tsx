@@ -19,6 +19,11 @@ import {
   SearchCheck,
 } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
+import {
+  MEMBERSHIP_STATUS_OPTIONS,
+  SUPPORT_STATUS_OPTIONS,
+  VOLUNTEER_STATUS_OPTIONS,
+} from '../../lib/relationshipStatus';
 
 const reportIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   support_list: Users,
@@ -60,6 +65,9 @@ export default function TeamReportsPage() {
   const [selectedVillage, setSelectedVillage] = useState('');
   const [selectedPrecinct, setSelectedPrecinct] = useState('');
   const [registeredStatusFilter, setRegisteredStatusFilter] = useState('');
+  const [supportStatusFilter, setSupportStatusFilter] = useState('');
+  const [membershipStatusFilter, setMembershipStatusFilter] = useState('');
+  const [volunteerStatusFilter, setVolunteerStatusFilter] = useState('');
   const [supportNeedFilter, setSupportNeedFilter] = useState('');
   const [registrationFollowUpFilter, setRegistrationFollowUpFilter] = useState('');
   const [supportFollowUpFilter, setSupportFollowUpFilter] = useState('');
@@ -74,6 +82,9 @@ export default function TeamReportsPage() {
 
     if (SUPPORTER_REPORT_TYPES.has(reportType)) {
       if (registeredStatusFilter) params.registered_voter_status = registeredStatusFilter;
+      if (supportStatusFilter) params.support_status = supportStatusFilter;
+      if (membershipStatusFilter) params.membership_status = membershipStatusFilter;
+      if (volunteerStatusFilter) params.volunteer_status = volunteerStatusFilter;
       if (supportNeedFilter) params.support_need = supportNeedFilter;
       if (registrationFollowUpFilter) params.registration_outreach_status = registrationFollowUpFilter;
       if (supportFollowUpFilter) params.support_follow_up_status = supportFollowUpFilter;
@@ -91,7 +102,7 @@ export default function TeamReportsPage() {
     queryFn: () => getPrecincts(selectedVillage ? { village_id: selectedVillage } : undefined),
   });
   const { data: preview, isLoading: previewLoading } = useQuery({
-    queryKey: ['report-preview', selectedReport, selectedDistrict, selectedVillage, selectedPrecinct, registeredStatusFilter, supportNeedFilter, registrationFollowUpFilter, supportFollowUpFilter],
+    queryKey: ['report-preview', selectedReport, selectedDistrict, selectedVillage, selectedPrecinct, registeredStatusFilter, supportStatusFilter, membershipStatusFilter, volunteerStatusFilter, supportNeedFilter, registrationFollowUpFilter, supportFollowUpFilter],
     queryFn: () => getReportPreview(selectedReport, buildReportParams(selectedReport, true)),
     enabled: Boolean(selectedReport),
   });
@@ -106,6 +117,9 @@ export default function TeamReportsPage() {
         village_id: selectedVillage ? Number(selectedVillage) : undefined,
         precinct_id: selectedPrecinct ? Number(selectedPrecinct) : undefined,
         registered_voter_status: SUPPORTER_REPORT_TYPES.has(reportType) ? registeredStatusFilter || undefined : undefined,
+        support_status: SUPPORTER_REPORT_TYPES.has(reportType) ? supportStatusFilter || undefined : undefined,
+        membership_status: SUPPORTER_REPORT_TYPES.has(reportType) ? membershipStatusFilter || undefined : undefined,
+        volunteer_status: SUPPORTER_REPORT_TYPES.has(reportType) ? volunteerStatusFilter || undefined : undefined,
         support_need: SUPPORTER_REPORT_TYPES.has(reportType) ? supportNeedFilter || undefined : undefined,
         registration_outreach_status: SUPPORTER_REPORT_TYPES.has(reportType) ? registrationFollowUpFilter || undefined : undefined,
         support_follow_up_status: SUPPORTER_REPORT_TYPES.has(reportType) ? supportFollowUpFilter || undefined : undefined,
@@ -203,6 +217,36 @@ export default function TeamReportsPage() {
               <option value="yes">Self-reported yes</option>
               <option value="no">Self-reported no</option>
               <option value="not_sure">Self-reported not sure</option>
+            </select>
+            <select
+              value={supportStatusFilter}
+              onChange={e => setSupportStatusFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All support statuses</option>
+              {SUPPORT_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <select
+              value={membershipStatusFilter}
+              onChange={e => setMembershipStatusFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All membership statuses</option>
+              {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <select
+              value={volunteerStatusFilter}
+              onChange={e => setVolunteerStatusFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All volunteer statuses</option>
+              {VOLUNTEER_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
             <select
               value={supportNeedFilter}

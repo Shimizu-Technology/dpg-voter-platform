@@ -23,6 +23,18 @@ class GecImport < ApplicationRecord
     active_election_day.latest.first
   end
 
+  def completed?
+    status == "completed"
+  end
+
+  def failed?
+    status == "failed"
+  end
+
+  def queued?
+    %w[pending processing].include?(status)
+  end
+
   def activate_for_election!(actor_user:)
     raise ActiveRecord::RecordInvalid, self unless status == "completed"
 

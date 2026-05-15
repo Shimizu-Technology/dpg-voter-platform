@@ -108,12 +108,15 @@ module Api
           .limit(250)
           .to_a
 
+        latest_contact_attempts = LatestSupporterContactAttempts.call(contacts, include_recorded_by: true)
+
         render json: {
           households: build_households(
             voters,
             contacts,
             linked_contacts_by_voter: linked_contacts_by_voter,
-            possible_contacts_by_voter: possible_contacts_by_voter
+            possible_contacts_by_voter: possible_contacts_by_voter,
+            latest_contact_attempts: latest_contact_attempts
           ),
           voter_count: voters.length,
           contact_count: contacts.length
@@ -615,9 +618,9 @@ module Api
         uploaded = File.open(file.tempfile.path, "rb") do |io|
           S3Service.upload(s3_key, io, content_type: file.content_type.presence || "application/pdf")
         end
-        raise "Could not store PDF preview upload" unless uploaded
+        return { file_s3_key: s3_key } if uploaded
 
-        { file_s3_key: s3_key }
+        raise "S3 upload failed for GEC PDF preview #{preview_request_id}"
       end
 
       def pdf_import_upload_storage_attributes(file, import_id)
@@ -629,9 +632,9 @@ module Api
         uploaded = File.open(file.tempfile.path, "rb") do |io|
           S3Service.upload(s3_key, io, content_type: file.content_type.presence || "application/pdf")
         end
-        raise "Could not store PDF import upload" unless uploaded
+        return { file_s3_key: s3_key } if uploaded
 
-        { file_s3_key: s3_key }
+        raise "S3 upload failed for GEC import #{import_id}"
       end
 
       def pdf_preview_json(preview)
@@ -714,7 +717,7 @@ module Api
         end
       end
 
-      def build_households(voters, contacts, linked_contacts_by_voter: {}, possible_contacts_by_voter: {})
+      def build_households(voters, contacts, linked_contacts_by_voter: {}, possible_contacts_by_voter: {}, latest_contact_attempts: {})
         grouped = {}
 
         voters.each do |voter|
@@ -737,7 +740,7 @@ module Api
           next if key.blank?
 
           grouped[key] ||= household_json(contact.street_address, contact.village&.name)
-          grouped[key][:contacts] << supporter_json(contact)
+          grouped[key][:contacts] << supporter_json(contact, latest_contact_attempt: latest_contact_attempts[contact.id])
         end
 
         grouped.values.sort_by { |row| [ row[:village_name].to_s, row[:address].to_s ] }
@@ -1290,7 +1293,7 @@ module Api
         )
       end
 
-      def supporter_json(contact)
+      def supporter_json(contact, latest_contact_attempt: nil)
         {
           id: contact.id,
           first_name: contact.first_name,
@@ -1305,11 +1308,15 @@ module Api
           precinct_id: contact.precinct_id,
           precinct_number: contact.precinct&.number,
           contact_classification: contact.contact_classification,
+          support_status: contact.support_status,
+          membership_status: contact.membership_status,
+          volunteer_status: contact.volunteer_status,
           review_status: contact.review_status,
           verification_status: contact.verification_status,
           verification_reason: contact.verification_reason,
           current_gec_match: contact.gec_voter_id.present?,
-          gec_voter_id: contact.gec_voter_id
+          gec_voter_id: contact.gec_voter_id,
+          latest_contact_attempt: latest_contact_attempt && contact_attempt_summary_json(latest_contact_attempt)
         }
       end
     end

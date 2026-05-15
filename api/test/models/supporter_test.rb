@@ -159,6 +159,85 @@ class SupporterTest < ActiveSupport::TestCase
     assert_nil supporter.reload.precinct_id
   end
 
+  test "official supporters preserves legacy supporter member and volunteer count semantics" do
+    supporter = Supporter.create!(
+      first_name: "Known",
+      last_name: "Supporter",
+      contact_number: "6715552001",
+      village: @village_one,
+      source: "staff_entry",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      status: "active"
+    )
+    member = Supporter.create!(
+      first_name: "Known",
+      last_name: "Member",
+      contact_number: "6715552002",
+      village: @village_one,
+      source: "staff_entry",
+      contact_classification: "active_contact",
+      membership_status: "member",
+      status: "active"
+    )
+    volunteer = Supporter.create!(
+      first_name: "Known",
+      last_name: "Volunteer",
+      contact_number: "6715552003",
+      village: @village_one,
+      source: "staff_entry",
+      contact_classification: "active_contact",
+      volunteer_status: "active",
+      status: "active"
+    )
+    volunteer_interest = Supporter.create!(
+      first_name: "Interested",
+      last_name: "Volunteer",
+      contact_number: "6715552006",
+      village: @village_one,
+      source: "staff_entry",
+      contact_classification: "active_contact",
+      volunteer_status: "interested",
+      wants_to_volunteer: true,
+      status: "active"
+    )
+    undecided = Supporter.create!(
+      first_name: "Still",
+      last_name: "Undecided",
+      contact_number: "6715552004",
+      village: @village_one,
+      source: "staff_entry",
+      contact_classification: "active_contact",
+      support_status: "undecided",
+      status: "active"
+    )
+    pending_intake = Supporter.create!(
+      first_name: "Pending",
+      last_name: "Relationship",
+      contact_number: "6715552005",
+      village: @village_one,
+      source: "staff_entry",
+      contact_classification: "new_intake",
+      support_status: "supporter",
+      membership_status: "member",
+      volunteer_status: "interested",
+      review_status: "pending",
+      status: "active"
+    )
+
+    official_ids = Supporter.official_supporters.pluck(:id)
+
+    assert_includes official_ids, supporter.id
+    assert_includes official_ids, member.id
+    assert_includes official_ids, volunteer.id
+    refute_includes official_ids, volunteer_interest.id
+    refute_includes official_ids, undecided.id
+    refute_includes official_ids, pending_intake.id
+    refute_includes Supporter.classified_supporters.pluck(:id), pending_intake.id
+    refute_includes Supporter.members.pluck(:id), pending_intake.id
+    refute_includes Supporter.volunteers.pluck(:id), pending_intake.id
+  end
+
   test "household_members excludes self from preloaded household supporters" do
     household_group = HouseholdGroup.create!(village: @village_one)
     primary = Supporter.create!(
