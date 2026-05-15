@@ -38,6 +38,7 @@ export interface SessionResponse {
     can_import_supporters: boolean;
     can_access_duplicates: boolean;
     can_access_audit_logs: boolean;
+    can_access_qr: boolean;
     can_access_data_team: boolean;
     can_access_reports: boolean;
     can_upload_gec: boolean;

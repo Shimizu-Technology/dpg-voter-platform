@@ -39,6 +39,7 @@ Rails.application.routes.draw do
           post :resend_invite
         end
       end
+      resources :referral_codes, only: [ :index, :create, :update ]
       resources :precincts, only: [ :index, :update ]
       resources :audit_logs, only: [ :index ]
       resources :gec_voters, only: [ :index ] do

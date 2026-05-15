@@ -7,8 +7,21 @@ class ReferralCode < ApplicationRecord
 
   validates :code, presence: true, uniqueness: true
   validates :display_name, presence: true
+  validates :source_type, inclusion: { in: %w[village precinct canvasser outreach custom] }, allow_nil: true
 
   scope :active, -> { where(active: true) }
+
+  def source_type
+    metadata["source_type"].presence || "custom"
+  end
+
+  def precinct_id
+    metadata["precinct_id"].presence
+  end
+
+  def notes
+    metadata["notes"].presence
+  end
 
   def self.generate_unique_code(display_name:, village_name:)
     base_prefix = build_prefix(display_name)

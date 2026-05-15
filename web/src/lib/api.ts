@@ -38,6 +38,13 @@ export const updatePrecinct = (id: number, data: JsonRecord) =>
   api.patch(`/precincts/${id}`, { precinct: data }).then(r => r.data);
 export const getAuditLogs = (params?: QueryParams) => api.get('/audit_logs', { params }).then(r => r.data);
 
+// Signup links / QR attribution
+export const getReferralCodes = () => api.get('/referral_codes').then(r => r.data);
+export const createReferralCode = (data: JsonRecord) =>
+  api.post('/referral_codes', { referral_code: data }).then(r => r.data);
+export const updateReferralCode = (id: number, data: JsonRecord) =>
+  api.patch(`/referral_codes/${id}`, { referral_code: data }).then(r => r.data);
+
 // Supporters
 export const createSupporter = (
   data: JsonRecord,

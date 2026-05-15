@@ -23,6 +23,7 @@ import {
   Settings,
   Copy,
   Database,
+  QrCode,
 } from 'lucide-react';
 import WorkspaceBrandPanel from './WorkspaceBrandPanel';
 import { publicSiteConfig } from '../lib/publicSite';
@@ -70,6 +71,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       label: 'Data Entry',
       items: [
         ...(permissions?.can_create_staff_supporters ? [ { to: '/admin/supporters/new', label: 'New Entry', icon: ClipboardPlus } ] : []),
+        ...(permissions?.can_access_qr ? [ { to: '/admin/signup-links', label: 'Signup Links', icon: QrCode } ] : []),
         ...(permissions?.can_import_supporters ? [ { to: '/admin/import', label: 'Import Contacts', icon: Upload } ] : []),
       ],
     },

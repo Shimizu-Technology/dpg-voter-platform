@@ -39,8 +39,9 @@ module Api
         end
         normalized_leader_code = params[:leader_code].to_s.strip.presence
         referral_code = resolve_referral_code(normalized_leader_code)
-        source = create_source
-        attribution_method = create_attribution_method(normalized_leader_code)
+        effective_leader_code = referral_code&.code
+        source = create_source(effective_leader_code)
+        attribution_method = create_attribution_method(effective_leader_code)
         intake_status = create_intake_status(source)
         public_review_status = create_public_review_status(source)
         created_supporters = []
@@ -56,7 +57,7 @@ module Api
               attribution_method: attribution_method,
               intake_status: intake_status,
               public_review_status: public_review_status,
-              leader_code: normalized_leader_code,
+              leader_code: effective_leader_code,
               referral_code: referral_code,
               household_group: household_group,
               household_primary: household_group.present?,
@@ -74,7 +75,7 @@ module Api
                 attribution_method: attribution_method,
                 intake_status: intake_status,
                 public_review_status: public_review_status,
-                leader_code: normalized_leader_code,
+                leader_code: effective_leader_code,
                 referral_code: referral_code,
                 household_group: household_group,
                 household_primary: false,
@@ -1329,8 +1330,8 @@ module Api
         attributes
       end
 
-      def create_source
-        return "qr_signup" if params[:leader_code].to_s.strip.present?
+      def create_source(normalized_leader_code = params[:leader_code].to_s.strip.presence)
+        return "qr_signup" if normalized_leader_code.present?
         return "staff_entry" if staff_entry_mode?
 
         # Public signup without a leader/referral code.
@@ -1652,7 +1653,7 @@ module Api
         normalized = code.to_s.strip
         return nil if normalized.blank?
 
-        ReferralCode.find_by(code: normalized)
+        ReferralCode.active.find_by(code: normalized)
       end
 
       def supporter_edit_allowed?
