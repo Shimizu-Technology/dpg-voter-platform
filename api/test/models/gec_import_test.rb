@@ -38,6 +38,41 @@ class GecImportTest < ActiveSupport::TestCase
     assert_match "no active worker heartbeat", gec_import.metadata["error"]
   end
 
+  test "continues failing later stale imports when one stale import errors" do
+    first_import = GecImport.create!(
+      gec_list_date: Date.new(2026, 1, 25),
+      filename: "gec-voters-first.csv",
+      import_type: "full_list",
+      status: "pending",
+      metadata: { "stage" => "queued", "progress_percent" => 0 },
+      updated_at: 3.hours.ago
+    )
+    second_import = GecImport.create!(
+      gec_list_date: Date.new(2026, 1, 25),
+      filename: "gec-voters-second.csv",
+      import_type: "full_list",
+      status: "pending",
+      metadata: { "stage" => "queued", "progress_percent" => 0 },
+      updated_at: 3.hours.ago
+    )
+    original_fail_as_stale = GecImport.instance_method(:fail_as_stale!)
+
+    GecImport.define_method(:fail_as_stale!) do
+      if filename == "gec-voters-first.csv"
+        raise ActiveRecord::RecordInvalid, self
+      end
+
+      original_fail_as_stale.bind_call(self)
+    end
+
+    GecImport.fail_stale_queued!(stale_after: 2.hours)
+
+    assert_equal "pending", first_import.reload.status
+    assert_equal "failed", second_import.reload.status
+  ensure
+    GecImport.define_method(:fail_as_stale!, original_fail_as_stale) if original_fail_as_stale
+  end
+
   test "does not fail imports that are no longer queued" do
     gec_import = GecImport.create!(
       gec_list_date: Date.new(2026, 1, 25),

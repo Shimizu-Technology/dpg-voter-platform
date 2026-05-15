@@ -31,6 +31,8 @@ class GecImport < ApplicationRecord
       next if gec_import.live_heartbeat?(cutoff)
 
       gec_import.fail_as_stale!
+    rescue StandardError => e
+      Rails.logger.warn("GecImport.fail_stale_queued! skipping import ##{gec_import.id}: #{e.class}: #{e.message}")
     end
   end
 
