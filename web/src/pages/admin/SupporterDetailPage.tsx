@@ -472,6 +472,12 @@ function activityActionLabel(supporter: Pick<SupporterDetail, 'source' | 'attrib
   return 'Created';
 }
 
+function referralCodeStatusLabel(active?: boolean | null) {
+  if (active === true) return 'Active now';
+  if (active === false) return 'Inactive now';
+  return 'Link record unavailable';
+}
+
 function fullName(supporter: Pick<SupporterDetail, 'first_name' | 'middle_name' | 'last_name'>) {
   return [ supporter.first_name, supporter.middle_name, supporter.last_name ].filter(Boolean).join(' ');
 }
@@ -1192,7 +1198,7 @@ export default function SupporterDetailPage() {
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Link status</p>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                  {supporter.referral_code_active === false ? 'Inactive now' : 'Active when signup was recorded'}
+                  {referralCodeStatusLabel(supporter.referral_code_active)}
                 </p>
               </div>
             </div>
