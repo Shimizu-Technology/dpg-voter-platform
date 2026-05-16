@@ -42,8 +42,8 @@ module Api
         effective_leader_code = referral_code&.code
         source = create_source(effective_leader_code)
         attribution_method = create_attribution_method(effective_leader_code)
-        intake_status = create_intake_status(source)
-        public_review_status = create_public_review_status(source)
+        intake_status = create_intake_status
+        public_review_status = create_public_review_status
         created_supporters = []
         duplicate_warning = false
 
@@ -1330,7 +1330,7 @@ module Api
         attributes
       end
 
-      def create_source(normalized_leader_code = params[:leader_code].to_s.strip.presence)
+      def create_source(normalized_leader_code)
         return "qr_signup" if normalized_leader_code.present?
         return "staff_entry" if staff_entry_mode?
 
@@ -1345,11 +1345,11 @@ module Api
         "public_signup"
       end
 
-      def create_intake_status(source)
+      def create_intake_status
         "accepted"
       end
 
-      def create_public_review_status(source)
+      def create_public_review_status
         "not_applicable"
       end
 
