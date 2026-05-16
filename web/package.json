@@ -14,7 +14,7 @@
     "@posthog/react": "^1.8.0",
     "@rails/actioncable": "^8.1.200",
     "@tanstack/react-query": "^5.90.21",
-    "axios": "^1.13.5",
+    "axios": "^1.16.0",
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.563.0",
     "posthog-js": "^1.353.0",
