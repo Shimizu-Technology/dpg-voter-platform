@@ -85,11 +85,11 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 
 - Clerk-backed admin/staff access exists.
 - User management exists.
-- Current highest-level role is still stored as `campaign_admin` in the database, but the active UI now labels it as Main Admin.
-- Recommendation: create Auntie Stephanie as Main Admin (`campaign_admin`) for now.
+- Current highest-level role is still stored as `campaign_admin` in the database, but the active UI now labels it as Administrator.
+- Recommendation: create Auntie Stephanie as Administrator (`campaign_admin`) for now.
 - Auntie Stephanie provided the preferred admin email on May 11: `Sgflores@gmail.com`.
-- Users/roles, scoped permissions, and audit logs exist. Current DPG-facing labels are Main Admin, Data Manager, Field Organizer, Village Coordinator, and Canvasser. Poll Watcher remains future work.
-- Export is now limited to Main Admin/Data Manager. Bulk contact import is limited to Main Admin/Data Manager/Field Organizer. Canvassers and Village Coordinators can still work assigned-village contacts and log canvass/contact outcomes.
+- Users/roles, scoped permissions, and audit logs exist. Current DPG-facing labels are Administrator, Data Manager, Field Organizer, Village Coordinator, and Canvasser. Poll Watcher remains future work.
+- Export is now limited to Administrator/Data Manager. Bulk contact import is limited to Administrator/Data Manager/Field Organizer. Canvassers and Village Coordinators can still work assigned-village contacts and log canvass/contact outcomes.
 - Clerk sign-in reportedly still shows a development-mode label; acceptable for guided testing, but should be cleaned up before broad staff rollout.
 
 ### Contacts and Intake CRM

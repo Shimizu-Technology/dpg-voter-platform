@@ -126,6 +126,8 @@ Partially completed on `feature/intake-relationship-household-polish`:
 
 Still turn household search into a fuller field action:
 
+- Normalize address matching before adding manual household merges. Keep the raw entered address for display/audit, but group/search with a canonical key that handles casing, punctuation, common suffixes such as Ave/Avenue and St/Street, repeated village text, and PO Box variants.
+- Add admin-reviewed "possible same address" handling before any destructive merge. Bad household merges are harder to unwind than duplicate household cards, so auto-merge should be conservative.
 - "I am at this address" mode.
 - Show GEC voters and DPG contacts at the address.
 - Add follow-up needs from the household view.
@@ -149,7 +151,7 @@ Future polish can add print-ready downloads, event-specific templates, and DPG-a
 
 Current branch `codex/dpg-role-contact-workflow-polish` implements the first pass:
 
-- Main Admin
+- Administrator
 - Data Manager
 - Field Organizer
 - Village Coordinator
@@ -158,14 +160,15 @@ Current branch `codex/dpg-role-contact-workflow-polish` implements the first pas
 
 Tightened in this branch:
 
-- export permissions: Main Admin/Data Manager only
-- contact import permissions: Main Admin/Data Manager/Field Organizer only
+- export permissions: Administrator/Data Manager only
+- contact import permissions: Administrator/Data Manager/Field Organizer only
 - QR/signup-link access: field roles can create/use scoped links
 - household canvass logging: assigned field users can log method/outcome/note and update support/volunteer status in their scope
 - membership remains hidden from active manual workflows and reserved for future official roster/list handling
 
 Still future:
 
+- contact-attempt correction workflow for mistakes: likely Administrator/Data Manager only, with before/after audit logging and no silent deletes
 - delete/archive permission review
 - poll watcher role
 - precinct-specific Election Day access rules

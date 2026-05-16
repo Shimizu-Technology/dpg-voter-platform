@@ -1,5 +1,5 @@
 const ROLE_LABELS: Record<string, string> = {
-  campaign_admin: 'Main Admin',
+  campaign_admin: 'Administrator',
   data_team: 'Data Manager',
   district_coordinator: 'Field Organizer',
   village_chief: 'Village Coordinator',

@@ -65,7 +65,7 @@ const ROLE_GUIDE: RoleGuideRow[] = [
   {
     role: 'campaign_admin',
     level: 'Level 1',
-    who: 'Main Admin',
+    who: 'Administrator',
     can: 'Full system access across the DPG workspace, including setup, users, outreach, imports, and reports',
   },
   {
