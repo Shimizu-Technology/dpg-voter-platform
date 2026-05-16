@@ -100,6 +100,7 @@ export default function SignupLinksPage() {
     notes: '',
   });
   const [copied, setCopied] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const { data, isLoading } = useQuery<ReferralCodesResponse>({
     queryKey: ['referral-codes'],
@@ -137,14 +138,23 @@ export default function SignupLinksPage() {
   const toggleMutation = useMutation({
     mutationFn: ({ id, active }: { id: number; active: boolean }) => updateReferralCode(id, { active }),
     onSuccess: () => {
+      setNotice({ type: 'success', message: 'Signup link status updated.' });
       void queryClient.invalidateQueries({ queryKey: ['referral-codes'] });
+    },
+    onError: () => {
+      setNotice({ type: 'error', message: 'Could not update this signup link. Refresh and try again.' });
     },
   });
 
   const copyUrl = async (key: string, url: string) => {
-    await navigator.clipboard.writeText(url);
-    setCopied(key);
-    window.setTimeout(() => setCopied(null), 1800);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(key);
+      setNotice({ type: 'success', message: 'Signup link copied.' });
+      window.setTimeout(() => setCopied(null), 1800);
+    } catch {
+      setNotice({ type: 'error', message: 'Could not copy the link. Select and copy the URL manually.' });
+    }
   };
 
   const canCreate = draft.display_name.trim().length > 1 && draft.village_id && !createMutation.isPending;
@@ -265,6 +275,15 @@ export default function SignupLinksPage() {
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="text-base font-semibold text-slate-950">Attributed Signup Links</h2>
           <p className="mt-1 text-sm text-slate-600">Each link routes to the public signup form and stores the source code on created contacts.</p>
+          {notice && (
+            <p
+              className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+                notice.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+              }`}
+            >
+              {notice.message}
+            </p>
+          )}
         </div>
         {isLoading ? (
           <div className="p-8 text-sm text-slate-500">Loading signup links...</div>
@@ -303,10 +322,11 @@ export default function SignupLinksPage() {
                   <button
                     type="button"
                     className="app-btn-secondary inline-flex items-center justify-center gap-2"
+                    disabled={toggleMutation.isPending && toggleMutation.variables?.id === link.id}
                     onClick={() => toggleMutation.mutate({ id: link.id, active: !link.active })}
                   >
                     <Share2 className="h-4 w-4" />
-                    {link.active ? 'Deactivate' : 'Activate'}
+                    {toggleMutation.isPending && toggleMutation.variables?.id === link.id ? 'Updating...' : link.active ? 'Deactivate' : 'Activate'}
                   </button>
                 </div>
               </div>
