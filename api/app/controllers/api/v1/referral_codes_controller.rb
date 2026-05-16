@@ -99,11 +99,11 @@ module Api
       end
 
       def source_metadata(attrs)
-        {
-          "source_type" => attrs[:source_type].presence || "custom",
-          "precinct_id" => attrs[:precinct_id].presence,
-          "notes" => attrs[:notes].presence
-        }.compact
+        metadata = {}
+        metadata["source_type"] = attrs[:source_type].presence || "custom" if attrs.key?(:source_type)
+        metadata["precinct_id"] = attrs[:precinct_id].presence if attrs.key?(:precinct_id)
+        metadata["notes"] = attrs[:notes].presence if attrs.key?(:notes)
+        metadata.compact
       end
 
       def metadata_update?(attrs)

@@ -147,6 +147,35 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
     assert_equal "referral_code_not_found", payload.fetch("code")
   end
 
+  test "update preserves metadata fields that were not sent" do
+    referral = ReferralCode.create!(
+      display_name: "Village Link",
+      code: "VILLAGE-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: {
+        "source_type" => "village",
+        "precinct_id" => "P-001",
+        "notes" => "Initial note"
+      }
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          notes: "Updated note"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    referral.reload
+    assert_equal "village", referral.source_type
+    assert_equal "P-001", referral.precinct_id
+    assert_equal "Updated note", referral.notes
+  end
+
   test "update returns json error when signup link is outside user village scope" do
     other_village = Village.create!(name: "Yigo #{SecureRandom.hex(3)}")
     referral = ReferralCode.create!(
