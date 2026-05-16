@@ -596,6 +596,7 @@ export default function SupporterDetailPage() {
   const permissions: SupporterPermissions | undefined = data?.permissions;
   const auditLogs: AuditLogItem[] = data?.audit_logs || [];
   const contactAttempts: ContactAttemptItem[] = contactAttemptsData?.contact_attempts || [];
+  const latestContactAttempt = contactAttempts[0];
   const returnTo = searchParams.get('return_to') || '';
   const villages: VillageOption[] = useMemo(() => villagesData?.villages || [], [villagesData]);
   const villageNameById = useMemo(
@@ -1231,6 +1232,29 @@ export default function SupporterDetailPage() {
             <p className="text-sm text-[var(--text-secondary)]">
               {supporterStatusLabel(supporter)}. Support status tracks whether this person supports DPG. Party membership can be added later if DPG provides an official member roster.
             </p>
+            <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-bg)] px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Latest contact</p>
+              {latestContactAttempt ? (
+                <div className="mt-1 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-[var(--text-primary)]">
+                      {contactAttemptChannelLabel(latestContactAttempt.channel)}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${contactAttemptTone(latestContactAttempt.outcome)}`}>
+                      {contactAttemptOutcomeLabel(latestContactAttempt.outcome)}
+                    </span>
+                    <span className="text-sm text-[var(--text-secondary)]">
+                      {formatDateTime(latestContactAttempt.recorded_at)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Logged by {latestContactAttempt.recorded_by_name || latestContactAttempt.recorded_by_email || 'DPG staff'}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">Not contacted yet</p>
+              )}
+            </div>
           </div>
         </section>
 

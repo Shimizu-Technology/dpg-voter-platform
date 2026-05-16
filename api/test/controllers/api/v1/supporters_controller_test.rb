@@ -10,6 +10,30 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     )
   end
 
+  test "export is limited to data managers and admins" do
+    village = Village.find_or_create_by!(name: "Yona")
+    field_user = User.create!(
+      clerk_id: "clerk-field-export-#{SecureRandom.hex(4)}",
+      email: "field-export-#{SecureRandom.hex(4)}@example.com",
+      name: "Field Export",
+      role: "block_leader",
+      assigned_village_id: village.id
+    )
+    data_manager = User.create!(
+      clerk_id: "clerk-data-export-#{SecureRandom.hex(4)}",
+      email: "data-export-#{SecureRandom.hex(4)}@example.com",
+      name: "Data Export",
+      role: "data_team"
+    )
+
+    get "/api/v1/supporters/export", headers: auth_headers(field_user), as: :json
+    assert_response :forbidden
+    assert_equal "supporter_export_access_required", response.parsed_body["code"]
+
+    get "/api/v1/supporters/export", headers: auth_headers(data_manager)
+    assert_response :success
+  end
+
   test "manual GEC verification links official voter geography while preserving submitted contact details" do
     submitted_village = Village.find_or_create_by!(name: "Barrigada")
     gec_village = Village.find_or_create_by!(name: "Hagåtña")
@@ -398,6 +422,95 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal @admin.id, supporter.classified_by_user_id
     assert_equal "in_person", supporter.supporter_contact_attempts.last.channel
     assert_equal "household_canvass_logged", AuditLog.where(auditable: supporter).last.action
+  end
+
+  test "village-scoped canvasser can log household canvass but cannot export contacts" do
+    village = Village.find_or_create_by!(name: "Piti")
+    supporter = Supporter.create!(
+      first_name: "Village",
+      last_name: "Canvass",
+      contact_number: "+16715559990",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      classified_at: 1.day.ago,
+      classified_by_user: @admin,
+      review_status: "approved",
+      status: "active"
+    )
+    canvasser = User.create!(
+      clerk_id: "clerk-canvasser-log-#{SecureRandom.hex(4)}",
+      email: "canvasser-log-#{SecureRandom.hex(4)}@example.com",
+      name: "Village Canvasser",
+      role: "block_leader",
+      assigned_village_id: village.id
+    )
+
+    assert_difference -> { SupporterContactAttempt.count }, 1 do
+      patch "/api/v1/supporters/#{supporter.id}/canvass_update",
+        params: {
+          canvass_update: {
+            contact_classification: "active_contact",
+            support_status: "supporter",
+            volunteer_status: "not_interested",
+            contact_attempt: {
+              channel: "in_person",
+              outcome: "reached"
+            }
+          }
+        },
+        headers: auth_headers(canvasser),
+        as: :json
+    end
+
+    assert_response :success
+    supporter.reload
+    assert_equal "supporter", supporter.support_status
+    assert_equal "not_interested", supporter.volunteer_status
+
+    get "/api/v1/supporters/export", headers: auth_headers(canvasser), as: :json
+    assert_response :forbidden
+  end
+
+  test "supporters index includes latest contact attempt summary" do
+    village = Village.find_or_create_by!(name: "Sånta Rita-Sumai")
+    supporter = Supporter.create!(
+      first_name: "Latest",
+      last_name: "Attempt",
+      contact_number: "+16715559991",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "active"
+    )
+    supporter.supporter_contact_attempts.create!(
+      channel: "call",
+      outcome: "attempted",
+      recorded_at: 2.days.ago,
+      recorded_by_user: @admin
+    )
+    latest = supporter.supporter_contact_attempts.create!(
+      channel: "sms",
+      outcome: "reached",
+      note: "Confirmed support.",
+      recorded_at: 1.hour.ago,
+      recorded_by_user: @admin
+    )
+
+    get "/api/v1/supporters?search=Latest",
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    row = response.parsed_body["supporters"].find { |supporter_row| supporter_row["id"] == supporter.id }
+    assert_not_nil row
+    assert_equal supporter.id, row["id"]
+    assert_equal latest.id, row.dig("latest_contact_attempt", "id")
+    assert_equal "sms", row.dig("latest_contact_attempt", "channel")
+    assert_equal @admin.name, row.dig("latest_contact_attempt", "recorded_by_name")
   end
 
   test "canvass update cannot bypass intake review" do

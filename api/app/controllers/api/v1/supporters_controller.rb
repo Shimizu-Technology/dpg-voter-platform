@@ -13,7 +13,8 @@ module Api
       include Authenticatable
       include AuditLoggable
       before_action :authenticate_request, only: [ :index, :check_duplicate, :export, :show, :update, :verify, :review_intake, :canvass_update, :bulk_verify, :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :outreach, :outreach_status, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
-      before_action :require_supporter_access!, only: [ :index, :check_duplicate, :export, :show, :review_intake, :canvass_update, :outreach, :outreach_status ]
+      before_action :require_supporter_access!, only: [ :index, :check_duplicate, :show, :review_intake, :canvass_update, :outreach, :outreach_status ]
+      before_action :require_supporter_export_access!, only: [ :export ]
       before_action :require_data_ops_access!, only: [ :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
       before_action :require_chief_or_above!, only: [ :verify, :bulk_verify ]
 
@@ -257,7 +258,7 @@ module Api
 
       # PATCH /api/v1/supporters/:id/canvass_update
       def canvass_update
-        unless supporter_edit_allowed?
+        unless can_view_supporters?
           return render_api_error(
             message: "You do not have permission to update household canvassing records",
             status: :forbidden,
@@ -265,7 +266,15 @@ module Api
           )
         end
 
-        supporter = scope_supporters(Supporter.contacts).find(params[:id])
+        supporter = scope_supporters(Supporter.contacts).find_by(id: params[:id])
+        unless supporter
+          return render_api_error(
+            message: "Contact not found",
+            status: :not_found,
+            code: "supporter_not_found"
+          )
+        end
+
         unless household_canvassable?(supporter)
           return render_api_error(
             message: "Only active contact records can be updated from household canvassing",
@@ -295,7 +304,6 @@ module Api
             updates = {
               contact_classification: classification,
               support_status: canvass[:support_status].presence || supporter.support_status,
-              membership_status: canvass[:membership_status].presence || supporter.membership_status,
               volunteer_status: canvass[:volunteer_status].presence || supporter.volunteer_status
             }
             apply_contact_classification_metadata!(supporter, updates)
@@ -507,8 +515,10 @@ module Api
           ).payload || {}
         end
 
+        latest_contact_attempts = LatestSupporterContactAttempts.call(supporters, include_recorded_by: true)
+
         render json: {
-          supporters: supporters.map { |s| supporter_json(s, reason_payload: verification_reason_overrides[s.id]) },
+          supporters: supporters.map { |s| supporter_json(s, reason_payload: verification_reason_overrides[s.id], latest_contact_attempt: latest_contact_attempts[s.id]) },
           pagination: { page: page, per_page: per_page, total: total, pages: (total.to_f / per_page).ceil }
         }
       end
@@ -1169,7 +1179,6 @@ module Api
         params.require(:canvass_update).permit(
           :contact_classification,
           :support_status,
-          :membership_status,
           :volunteer_status,
           contact_attempt: [ :channel, :outcome, :note, :recorded_at ]
         )
@@ -1483,7 +1492,7 @@ module Api
         end
       end
 
-      def supporter_json(supporter, reason_payload: nil)
+      def supporter_json(supporter, reason_payload: nil, latest_contact_attempt: nil)
         reason_payload ||= SupporterVerificationReasonService.new(supporter).payload || {}
         current_gec_match = supporter.gec_voter_id.present?
 
@@ -1558,6 +1567,7 @@ module Api
           support_follow_up_status: supporter.support_follow_up_status,
           support_follow_up_notes: supporter.support_follow_up_notes,
           support_follow_up_date: supporter.support_follow_up_date&.iso8601,
+          latest_contact_attempt: latest_contact_attempt && contact_attempt_summary_json(latest_contact_attempt),
           created_at: supporter.created_at&.iso8601
         }
       end

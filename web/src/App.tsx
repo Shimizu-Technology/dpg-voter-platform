@@ -74,6 +74,7 @@ type PermissionKey =
   | 'can_view_supporters'
   | 'can_create_staff_supporters'
   | 'can_import_supporters'
+  | 'can_export_supporters'
   | 'can_upload_gec'
   | 'can_access_reports'
   | 'can_access_duplicates'

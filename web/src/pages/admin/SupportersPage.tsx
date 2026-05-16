@@ -6,7 +6,7 @@ import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle,
 import { motion, useReducedMotion } from 'framer-motion';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
-import { OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, getErrorMessage } from '../../lib/contactAttempt';
+import { OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, contactAttemptChannelLabel, contactAttemptOutcomeLabel, getErrorMessage } from '../../lib/contactAttempt';
 import { useSession } from '../../hooks/useSession';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import WorkspacePage from '../../components/WorkspacePage';
@@ -78,6 +78,14 @@ interface SupporterItem {
   household_member_count?: number;
   registration_outreach_status?: string | null;
   support_follow_up_status?: string | null;
+  latest_contact_attempt?: {
+    channel: string;
+    outcome: string;
+    note?: string | null;
+    recorded_at?: string | null;
+    recorded_by_name?: string | null;
+    recorded_by_email?: string | null;
+  } | null;
   status: string;
   created_at: string;
 }
@@ -101,7 +109,6 @@ type IntakeReviewDraft = {
   decision: 'approve' | 'reject';
   contact_classification: string;
   support_status: string;
-  membership_status: string;
   volunteer_status: string;
   note: string;
   contact_attempt_channel: string;
@@ -236,6 +243,24 @@ function supportFollowUpResultClass(supporter: Pick<SupporterItem, 'support_foll
   return 'bg-gray-100 text-gray-700';
 }
 
+function latestContactSummary(supporter: Pick<SupporterItem, 'latest_contact_attempt'>) {
+  const attempt = supporter.latest_contact_attempt;
+  if (!attempt) return 'Not contacted yet';
+
+  const method = contactAttemptChannelLabel(attempt.channel);
+  const outcome = contactAttemptOutcomeLabel(attempt.outcome);
+  const when = attempt.recorded_at ? formatDateTime(attempt.recorded_at) : null;
+  return [method, outcome, when].filter(Boolean).join(' · ');
+}
+
+function latestContactDetail(supporter: Pick<SupporterItem, 'latest_contact_attempt'>) {
+  const attempt = supporter.latest_contact_attempt;
+  if (!attempt) return 'No contact attempt has been logged for this person yet.';
+
+  const staff = attempt.recorded_by_name || attempt.recorded_by_email;
+  return staff ? `Logged by ${staff}` : 'Logged by DPG staff';
+}
+
 function hasAnyIntakeContactAttemptField(draft: IntakeReviewDraft) {
   return Boolean(
     draft.contact_attempt_channel ||
@@ -283,7 +308,6 @@ export default function SupportersPage() {
     decision: 'approve',
     contact_classification: 'active_contact',
     support_status: 'unknown',
-    membership_status: 'not_member',
     volunteer_status: 'unknown',
     note: '',
     contact_attempt_channel: '',
@@ -447,7 +471,6 @@ export default function SupportersPage() {
         decision: draft.decision,
         contact_classification: draft.contact_classification,
         support_status: draft.support_status,
-        membership_status: draft.membership_status,
         volunteer_status: draft.volunteer_status,
         note: draft.note.trim() || undefined,
         contact_attempt: hasContactAttempt ? {
@@ -479,7 +502,6 @@ export default function SupportersPage() {
       decision: isTerminalIntakeClassification(classification) ? 'reject' : 'approve',
       contact_classification: classification,
       support_status: supporter.support_status || 'unknown',
-      membership_status: supporter.membership_status || 'not_member',
       volunteer_status: supporter.volunteer_status || (supporter.wants_to_volunteer ? 'interested' : 'unknown'),
       note: '',
       contact_attempt_channel: '',
@@ -574,28 +596,30 @@ export default function SupportersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{isIntakeView ? 'Pending Intake' : 'All Contacts'}</h1>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => exportSupporters({
-                village_id: effectiveVillageFilter || undefined,
-                precinct_id: precinctFilter || undefined,
-                source: sourceFilter || undefined,
-                opt_in: optInFilter || undefined,
-                verification_status: verificationFilter || undefined,
-                contact_classification: contactClassificationParam,
-                exclude_contact_classification: excludeContactClassificationParam,
-                support_status: supportStatusFilter || undefined,
-                registered_voter_status: registeredStatusFilter || undefined,
-                support_need: supportNeedFilter || undefined,
-                status: lifecycleFilter || undefined,
-                unassigned_precinct: unassignedPrecinct ? 'true' : undefined,
-                search: debouncedSearch || undefined,
-                sort_by: sortBy || undefined,
-                sort_dir: sortDir || undefined,
-              })}
-              className="app-btn-secondary"
+            {sessionData?.permissions?.can_export_supporters && (
+              <button
+                onClick={() => exportSupporters({
+                  village_id: effectiveVillageFilter || undefined,
+                  precinct_id: precinctFilter || undefined,
+                  source: sourceFilter || undefined,
+                  opt_in: optInFilter || undefined,
+                  verification_status: verificationFilter || undefined,
+                  contact_classification: contactClassificationParam,
+                  exclude_contact_classification: excludeContactClassificationParam,
+                  support_status: supportStatusFilter || undefined,
+                  registered_voter_status: registeredStatusFilter || undefined,
+                  support_need: supportNeedFilter || undefined,
+                  status: lifecycleFilter || undefined,
+                  unassigned_precinct: unassignedPrecinct ? 'true' : undefined,
+                  search: debouncedSearch || undefined,
+                  sort_by: sortBy || undefined,
+                  sort_dir: sortDir || undefined,
+                })}
+                className="app-btn-secondary"
               >
                 <Download className="w-4 h-4" /> Excel
               </button>
+            )}
               {sessionData?.permissions?.can_create_staff_supporters && (
                 <Link to="/admin/supporters/new" className="app-btn-danger">
                   <ClipboardPlus className="w-4 h-4" /> New Entry
@@ -917,6 +941,10 @@ export default function SupportersPage() {
                     <span className="text-xs text-[var(--text-muted)]">No extra flags</span>
                   )}
                 </div>
+                <div className="rounded-lg bg-[var(--surface-bg)] px-3 py-2 text-xs">
+                  <div className="font-semibold text-[var(--text-primary)]">{latestContactSummary(s)}</div>
+                  <div className="mt-0.5 text-[var(--text-muted)]">{latestContactDetail(s)}</div>
+                </div>
                 <div className="flex justify-between">
                   <span className={gecMatchClass(s)}>{gecMatchLabel(s)}</span>
                   <span>{formatDateTime(s.created_at)}</span>
@@ -951,7 +979,7 @@ export default function SupportersPage() {
 
         {/* Desktop Table */}
         <div className={`hidden md:block app-card overflow-x-auto transition-opacity duration-200 ${isFetching ? 'opacity-80' : 'opacity-100'}`}>
-          <table className="w-full min-w-[1320px] text-sm">
+          <table className="w-full min-w-[1460px] text-sm">
             <thead>
               <tr className="border-b bg-[var(--surface-bg)]">
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">
@@ -978,6 +1006,7 @@ export default function SupportersPage() {
                   </button>
                 </th>
                   <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Status</th>
+                <th className="w-[230px] min-w-[230px] text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Latest Contact</th>
                 <th className="w-[320px] min-w-[320px] text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Voter Check</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Lifecycle</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">
@@ -1061,6 +1090,19 @@ export default function SupportersPage() {
                         )}
                       </div>
                     </td>
+                  <td className="w-[230px] min-w-[230px] px-4 py-3 align-top">
+                    <div className="space-y-1">
+                      <span className={`app-chip ${s.latest_contact_attempt ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {s.latest_contact_attempt ? 'Contacted' : 'Not contacted'}
+                      </span>
+                      <div className="text-xs leading-5 text-[var(--text-secondary)] whitespace-normal">
+                        {latestContactSummary(s)}
+                      </div>
+                      <div className="text-xs text-[var(--text-muted)] whitespace-normal">
+                        {latestContactDetail(s)}
+                      </div>
+                    </div>
+                  </td>
                   <td className="w-[320px] min-w-[320px] px-4 py-3 align-top">
                     <div className="space-y-2">
                       <span className={`app-chip ${

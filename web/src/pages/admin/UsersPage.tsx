@@ -65,32 +65,32 @@ const ROLE_GUIDE: RoleGuideRow[] = [
   {
     role: 'campaign_admin',
     level: 'Level 1',
-    who: 'DPG leadership / trusted admins',
+    who: 'Main Admin',
     can: 'Full system access across the DPG workspace, including setup, users, outreach, imports, and reports',
   },
   {
     role: 'data_team',
     level: 'Level 2',
-    who: 'Monthly voter-list and reporting staff',
-    can: 'Import GEC lists, manage contacts, resolve duplicates, audit changes, and generate reports island-wide',
+    who: 'Data Manager',
+    can: 'Manage contact data, import lists, export contacts, resolve duplicates, audit changes, and generate reports island-wide',
   },
   {
     role: 'district_coordinator',
     level: 'Level 3',
-    who: 'DPG district coordinators',
-    can: 'Manage supporter activity for villages in an approved DPG-defined district',
+    who: 'Field Organizer',
+    can: 'Coordinate field work for assigned villages, create source links, send outreach, review contacts, and manage field users',
   },
   {
     role: 'village_chief',
     level: 'Level 4',
-    who: 'Village coordinators',
-    can: 'View and coordinate village execution for their assigned village',
+    who: 'Village Coordinator',
+    can: 'View assigned-village contacts, create signup links, add new contacts, and log canvass outcomes',
   },
   {
     role: 'block_leader',
     level: 'Level 5',
-    who: 'Community organizers',
-    can: 'Submit and track supporter activity for their assigned area',
+    who: 'Canvasser',
+    can: 'Work assigned-village contacts, submit new contacts, use signup links, and log household canvass outcomes',
   },
 ];
 
@@ -104,6 +104,8 @@ type PermissionKey =
   | 'can_view_supporters'
   | 'can_create_staff_supporters'
   | 'can_import_supporters'
+  | 'can_export_supporters'
+  | 'can_access_qr'
   | 'can_access_duplicates'
   | 'can_access_audit_logs'
   | 'can_access_data_team'
@@ -122,6 +124,8 @@ const PERMISSION_KEYS: PermissionKey[] = [
   'can_view_supporters',
   'can_create_staff_supporters',
   'can_import_supporters',
+  'can_export_supporters',
+  'can_access_qr',
   'can_access_duplicates',
   'can_access_audit_logs',
   'can_access_data_team',
@@ -137,10 +141,12 @@ const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_manage_data_configuration: 'Manage data configuration',
   can_send_sms: 'Send SMS',
   can_send_email: 'Send email',
-  can_edit_supporters: 'Edit supporters',
-  can_view_supporters: 'View supporters',
-  can_create_staff_supporters: 'Create staff supporters',
-  can_import_supporters: 'Excel import supporters',
+  can_edit_supporters: 'Edit contact records',
+  can_view_supporters: 'View contacts',
+  can_create_staff_supporters: 'Create contacts',
+  can_import_supporters: 'Import contact lists',
+  can_export_supporters: 'Export contact lists',
+  can_access_qr: 'Signup links / QR tools',
   can_access_duplicates: 'Duplicates review',
   can_access_audit_logs: 'Activity log',
   can_access_data_team: 'Data management tools',
@@ -158,6 +164,8 @@ const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     'can_edit_supporters',
     'can_create_staff_supporters',
     'can_import_supporters',
+    'can_export_supporters',
+    'can_access_qr',
     'can_access_duplicates',
     'can_access_audit_logs',
     'can_access_data_team',
@@ -174,17 +182,18 @@ const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     'can_view_supporters',
     'can_create_staff_supporters',
     'can_import_supporters',
+    'can_access_qr',
     'can_access_reports',
             ],
   village_chief: [
     'can_view_supporters',
     'can_create_staff_supporters',
-    'can_import_supporters',
+    'can_access_qr',
           ],
   block_leader: [
     'can_view_supporters',
     'can_create_staff_supporters',
-    'can_import_supporters',
+    'can_access_qr',
         ],
 };
 

@@ -1,8 +1,8 @@
 # DPG Voter Platform - Current Project Status
 
 **Last updated:** May 16, 2026
-**Current branch:** `codex/dpg-signup-links`
-**Base commit:** PR #35 in review, DPG QR/signup-link attribution and membership UI simplification
+**Current branch:** `codex/dpg-role-contact-workflow-polish`
+**Base commit:** `main` after PR #35 merged, adding DPG QR/signup-link attribution and membership UI simplification
 
 ## One-line status
 
@@ -85,10 +85,11 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 
 - Clerk-backed admin/staff access exists.
 - User management exists.
-- Current highest-level role is still `campaign_admin`.
-- Recommendation: create Auntie Stephanie as `campaign_admin` for now, then rename/reshape roles into DPG language in the next permissions polish phase.
+- Current highest-level role is still stored as `campaign_admin` in the database, but the active UI now labels it as Main Admin.
+- Recommendation: create Auntie Stephanie as Main Admin (`campaign_admin`) for now.
 - Auntie Stephanie provided the preferred admin email on May 11: `Sgflores@gmail.com`.
-- Users/roles, scoped permissions, and audit logs exist, but DPG role labels and export/delete restrictions still need product polish.
+- Users/roles, scoped permissions, and audit logs exist. Current DPG-facing labels are Main Admin, Data Manager, Field Organizer, Village Coordinator, and Canvasser. Poll Watcher remains future work.
+- Export is now limited to Main Admin/Data Manager. Bulk contact import is limited to Main Admin/Data Manager/Field Organizer. Canvassers and Village Coordinators can still work assigned-village contacts and log canvass/contact outcomes.
 - Clerk sign-in reportedly still shows a development-mode label; acceptable for guided testing, but should be cleaned up before broad staff rollout.
 
 ### Contacts and Intake CRM
@@ -155,11 +156,11 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Contact-attempt logging is village-scoped through existing DPG contact permissions.
 - `/admin/households` searches addresses across GEC voters and DPG contacts.
 - Household lookup can now create/link contacts from household results.
-- Household DPG records can now show the latest contact attempt and log a canvassing update directly from the household view.
-- Household canvassing updates can set support/volunteer status and log method/outcome/note in one atomic action.
+- Household DPG records now show the latest contact attempt or a clear Not contacted yet state, and can log a canvassing update directly from the household view.
+- Household canvassing updates can set support/volunteer status and log method/outcome/note in one atomic action. Membership is intentionally not part of this manual canvass workflow.
 - `/admin/outreach` Follow-Up Queue shows latest contact attempt per card.
 - Staff can log call/SMS/in-person attempts from queue cards without leaving the queue.
-- Contact detail pages now include GEC check, follow-up workflow, contact history, audit history, record status, support status, QR attribution, and volunteer status.
+- Contact detail pages now include GEC check, follow-up workflow, latest-contact summary, contact history, audit history, record status, support status, QR attribution, and volunteer status.
 
 ### SMS/email outreach
 

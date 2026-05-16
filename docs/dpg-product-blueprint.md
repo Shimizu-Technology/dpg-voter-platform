@@ -176,10 +176,12 @@ Suggested roles:
 
 - Main Admin
 - Data Manager
-- Staff
 - Field Organizer
+- Village Coordinator
 - Canvasser
 - Poll Watcher later
+
+Implementation note: the database role values still use the original internal names for compatibility (`campaign_admin`, `data_team`, `district_coordinator`, `village_chief`, `block_leader`), while the UI presents the DPG labels above. Export is intentionally limited to Main Admin/Data Manager, bulk contact import to Main Admin/Data Manager/Field Organizer, and canvassing/contact logging remains available to scoped field users.
 
 ## Workflow design
 

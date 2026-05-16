@@ -4,18 +4,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Database, Home, Link as LinkIcon, MapPin, MessageSquare, Search, Users } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
 import { createContactFromGecVoter, getGecHouseholds, getSupporters, linkContactToGecVoter, updateSupporterCanvass } from '../../lib/api';
-import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, getErrorMessage } from '../../lib/contactAttempt';
+import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, contactAttemptChannelLabel, contactAttemptOutcomeLabel, getErrorMessage } from '../../lib/contactAttempt';
 import { formatDateTime } from '../../lib/datetime';
 import {
   contactClassificationChipClass,
   contactClassificationLabel,
 } from '../../lib/contactClassification';
 import {
-  MEMBERSHIP_STATUS_OPTIONS,
   SUPPORT_STATUS_OPTIONS,
   VOLUNTEER_STATUS_OPTIONS,
-  membershipStatusChipClass,
-  membershipStatusLabel,
   supportStatusChipClass,
   supportStatusLabel,
   volunteerStatusChipClass,
@@ -49,7 +46,6 @@ type HouseholdContact = {
   village_name?: string | null;
   contact_classification?: string | null;
   support_status?: string | null;
-  membership_status?: string | null;
   volunteer_status?: string | null;
   review_status?: string | null;
   verification_status?: string | null;
@@ -86,7 +82,6 @@ type ContactResult = {
 type CanvassDraft = {
   contact_classification: string;
   support_status: string;
-  membership_status: string;
   volunteer_status: string;
   channel: string;
   outcome: string;
@@ -97,7 +92,6 @@ function initialCanvassDraft(contact: HouseholdContact): CanvassDraft {
   return {
     contact_classification: 'active_contact',
     support_status: contact.support_status || 'unknown',
-    membership_status: contact.membership_status || 'not_member',
     volunteer_status: contact.volunteer_status || 'unknown',
     channel: 'in_person',
     outcome: '',
@@ -193,7 +187,6 @@ export default function HouseholdsPage() {
       updateSupporterCanvass(contact.id, {
         contact_classification: draft.contact_classification,
         support_status: draft.support_status,
-        membership_status: draft.membership_status,
         volunteer_status: draft.volunteer_status,
         contact_attempt: {
           channel: draft.channel,
@@ -542,11 +535,6 @@ export default function HouseholdsPage() {
                                 <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${supportStatusChipClass(contact.support_status)}`}>
                                   {supportStatusLabel(contact.support_status)}
                                 </span>
-                                {contact.membership_status === 'member' && (
-                                  <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${membershipStatusChipClass(contact.membership_status)}`}>
-                                    {membershipStatusLabel(contact.membership_status)}
-                                  </span>
-                                )}
                                 {contact.volunteer_status && contact.volunteer_status !== 'unknown' && (
                                   <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${volunteerStatusChipClass(contact.volunteer_status)}`}>
                                     {volunteerStatusLabel(contact.volunteer_status)}
@@ -558,11 +546,12 @@ export default function HouseholdsPage() {
                               <span>{contact.current_gec_match ? 'Linked to current GEC voter' : 'No current GEC link'}</span>
                               {contact.latest_contact_attempt ? (
                                 <span>
-                                  Last: {contact.latest_contact_attempt.channel.replaceAll('_', ' ')} / {contact.latest_contact_attempt.outcome.replaceAll('_', ' ')}
+                                  Last contact: {contactAttemptChannelLabel(contact.latest_contact_attempt.channel)} / {contactAttemptOutcomeLabel(contact.latest_contact_attempt.outcome)}
                                   {contact.latest_contact_attempt.recorded_at ? ` on ${formatDateTime(contact.latest_contact_attempt.recorded_at)}` : ''}
+                                  {contact.latest_contact_attempt.recorded_by_name ? ` by ${contact.latest_contact_attempt.recorded_by_name}` : ''}
                                 </span>
                               ) : (
-                                <span>No outreach logged yet</span>
+                                <span>Not contacted yet</span>
                               )}
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -589,7 +578,7 @@ export default function HouseholdsPage() {
                             </div>
                             {isExpanded && (
                               <div className="mt-3 rounded-lg bg-slate-50 p-3">
-                              <div className="grid gap-2 sm:grid-cols-3">
+                              <div className="grid gap-2 sm:grid-cols-2">
                                   <select
                                     value={draft.support_status}
                                     onChange={(event) => updateCanvassDraft(contact, { support_status: event.target.value })}
@@ -600,16 +589,6 @@ export default function HouseholdsPage() {
                                       <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                   </select>
-                                <select
-                                  value={draft.membership_status}
-                                  onChange={(event) => updateCanvassDraft(contact, { membership_status: event.target.value })}
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                                  aria-label="Membership status"
-                                >
-                                  {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                  ))}
-                                </select>
                                 <select
                                   value={draft.volunteer_status}
                                   onChange={(event) => updateCanvassDraft(contact, { volunteer_status: event.target.value })}

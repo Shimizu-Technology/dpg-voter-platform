@@ -55,6 +55,7 @@ module Api
             can_access_reports: can_access_reports?,
             can_access_qr: can_access_qr?,
             can_import_supporters: can_import_supporters?,
+            can_export_supporters: can_export_supporters?,
             can_upload_gec: can_upload_gec?,
             can_bulk_vet: can_bulk_vet?,
             can_review_public: can_review_public?,

@@ -147,21 +147,28 @@ Future polish can add print-ready downloads, event-specific templates, and DPG-a
 
 ### 5. Roles and permissions polish
 
-Rename and tune roles into DPG language:
+Current branch `codex/dpg-role-contact-workflow-polish` implements the first pass:
 
 - Main Admin
 - Data Manager
-- Staff
 - Field Organizer
+- Village Coordinator
 - Canvasser
 - Poll Watcher later
 
-Tighten:
+Tightened in this branch:
 
-- export permissions
-- delete/archive permissions
-- village/precinct scoping
-- user management access
+- export permissions: Main Admin/Data Manager only
+- contact import permissions: Main Admin/Data Manager/Field Organizer only
+- QR/signup-link access: field roles can create/use scoped links
+- household canvass logging: assigned field users can log method/outcome/note and update support/volunteer status in their scope
+- membership remains hidden from active manual workflows and reserved for future official roster/list handling
+
+Still future:
+
+- delete/archive permission review
+- poll watcher role
+- precinct-specific Election Day access rules
 
 ### 6. Election-day scope
 

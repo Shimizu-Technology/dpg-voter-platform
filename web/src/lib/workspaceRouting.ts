@@ -8,6 +8,7 @@ type PermissionKey =
   | 'can_view_supporters'
   | 'can_create_staff_supporters'
   | 'can_import_supporters'
+  | 'can_export_supporters'
   | 'can_access_duplicates'
   | 'can_send_sms'
   | 'can_send_email'
