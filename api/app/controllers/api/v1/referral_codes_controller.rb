@@ -28,7 +28,7 @@ module Api
 
       # POST /api/v1/referral_codes
       def create
-        attrs = referral_code_params
+        attrs = create_referral_code_params
         village = Village.find_by(id: attrs[:village_id])
         unless village
           return render_api_error(message: "Village not found", status: :not_found, code: "village_not_found")
@@ -64,11 +64,11 @@ module Api
         code = find_referral_code
         return unless code
 
-        attrs = referral_code_params
+        attrs = update_referral_code_params
         updates = {}
         updates[:display_name] = attrs[:display_name].to_s.strip if attrs.key?(:display_name)
         updates[:active] = ActiveModel::Type::Boolean.new.cast(attrs[:active]) if attrs.key?(:active)
-        updates[:metadata] = code.metadata.merge(source_metadata(attrs).compact) if metadata_update?(attrs)
+        updates[:metadata] = code.metadata.merge(source_metadata(attrs, compact_blank: false)) if metadata_update?(attrs)
 
         if code.update(updates)
           log_audit!(code, action: "signup_link_updated", changed_data: code.saved_changes.except("updated_at"), normalize: true)
@@ -94,16 +94,20 @@ module Api
         code
       end
 
-      def referral_code_params
+      def create_referral_code_params
         params.require(:referral_code).permit(:display_name, :village_id, :assigned_user_id, :source_type, :precinct_id, :notes, :active)
       end
 
-      def source_metadata(attrs)
+      def update_referral_code_params
+        params.require(:referral_code).permit(:display_name, :source_type, :precinct_id, :notes, :active)
+      end
+
+      def source_metadata(attrs, compact_blank: true)
         metadata = {}
         metadata["source_type"] = attrs[:source_type].presence || "custom" if attrs.key?(:source_type)
         metadata["precinct_id"] = attrs[:precinct_id].presence if attrs.key?(:precinct_id)
         metadata["notes"] = attrs[:notes].presence if attrs.key?(:notes)
-        metadata.compact
+        compact_blank ? metadata.compact : metadata
       end
 
       def metadata_update?(attrs)

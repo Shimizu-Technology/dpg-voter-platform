@@ -176,6 +176,36 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
     assert_equal "Updated note", referral.notes
   end
 
+  test "update can clear optional metadata fields" do
+    referral = ReferralCode.create!(
+      display_name: "Village Link",
+      code: "CLEAR-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: {
+        "source_type" => "village",
+        "precinct_id" => "P-001",
+        "notes" => "Initial note"
+      }
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          precinct_id: "",
+          notes: ""
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    referral.reload
+    assert_equal "village", referral.source_type
+    assert_nil referral.precinct_id
+    assert_nil referral.notes
+  end
+
   test "update returns json error when signup link is outside user village scope" do
     other_village = Village.create!(name: "Yigo #{SecureRandom.hex(3)}")
     referral = ReferralCode.create!(
