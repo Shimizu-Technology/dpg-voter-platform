@@ -1538,6 +1538,7 @@ module Api
           attribution_method: supporter.attribution_method,
           referral_code_id: supporter.referral_code_id,
           referral_display_name: supporter.referral_code&.display_name,
+          referral_code_active: supporter.referral_code&.active,
           referred_from_village_id: supporter.referred_from_village_id,
           referred_from_village_name: supporter.referred_from_village&.name,
           verification_reason: reason_payload[:verification_reason],

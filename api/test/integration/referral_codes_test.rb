@@ -64,6 +64,48 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
     assert_equal 1, row.fetch("signup_count")
   end
 
+  test "admin can page supporters attributed to a signup link" do
+    referral = ReferralCode.create!(
+      display_name: "Paged Link",
+      code: "PAGED-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: { "source_type" => "village" }
+    )
+    12.times do |index|
+      Supporter.create!(
+        first_name: "QR#{index}",
+        last_name: "Signup",
+        contact_number: "671555#{index.to_s.rjust(4, '0')}",
+        village: @village,
+        source: "qr_signup",
+        attribution_method: "qr_self_signup",
+        leader_code: referral.code,
+        referral_code: referral,
+        contact_classification: "new_intake",
+        support_status: "unknown",
+        membership_status: "not_member",
+        volunteer_status: "unknown",
+        registered_voter_status: "not_sure",
+        review_status: "pending",
+        public_review_status: "not_applicable",
+        intake_status: "accepted",
+        status: "active"
+      )
+    end
+
+    get "/api/v1/referral_codes/#{referral.id}/supporters?page=2&per_page=10",
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal 2, payload.fetch("supporters").size
+    assert_equal 12, payload.dig("pagination", "total")
+    assert_equal 2, payload.dig("pagination", "pages")
+    assert_equal "qr_signup", payload.fetch("supporters").first.fetch("source")
+  end
+
   test "inactive signup link is not applied to new public signup" do
     referral = ReferralCode.create!(
       display_name: "Inactive Link",

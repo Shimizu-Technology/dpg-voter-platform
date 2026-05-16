@@ -40,6 +40,8 @@ export const getAuditLogs = (params?: QueryParams) => api.get('/audit_logs', { p
 
 // Signup links / QR attribution
 export const getReferralCodes = () => api.get('/referral_codes').then(r => r.data);
+export const getReferralCodeSupporters = (id: number, params?: QueryParams) =>
+  api.get(`/referral_codes/${id}/supporters`, { params }).then(r => r.data);
 export const createReferralCode = (data: JsonRecord) =>
   api.post('/referral_codes', { referral_code: data }).then(r => r.data);
 export const updateReferralCode = (id: number, data: JsonRecord) =>

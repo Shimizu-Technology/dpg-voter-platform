@@ -78,6 +78,28 @@ module Api
         end
       end
 
+      # GET /api/v1/referral_codes/:id/supporters
+      def supporters
+        code = find_referral_code
+        return unless code
+
+        page = [ params[:page].to_i, 1 ].max
+        per_page = [ [ params[:per_page].to_i, 10 ].max, 50 ].min
+        supporters = code.supporters.includes(:village).order(created_at: :desc)
+        total = supporters.count
+        rows = supporters.offset((page - 1) * per_page).limit(per_page)
+
+        render json: {
+          supporters: rows.map { |supporter| referral_supporter_json(supporter) },
+          pagination: {
+            page: page,
+            per_page: per_page,
+            total: total,
+            pages: (total.to_f / per_page).ceil
+          }
+        }
+      end
+
       private
 
       def referral_code_scope
@@ -160,6 +182,18 @@ module Api
           signup_url: url,
           created_at: code.created_at&.iso8601,
           updated_at: code.updated_at&.iso8601
+        }
+      end
+
+      def referral_supporter_json(supporter)
+        {
+          id: supporter.id,
+          print_name: supporter.print_name,
+          contact_number: supporter.contact_number,
+          village_name: supporter.village&.name,
+          source: supporter.source,
+          contact_classification: supporter.contact_classification,
+          created_at: supporter.created_at&.iso8601
         }
       end
 

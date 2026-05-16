@@ -164,16 +164,18 @@ function verificationStatusDetail(supporter: Pick<SupporterItem, 'verification_r
 }
 
 function sourceLabel(supporter: Pick<SupporterItem, 'source' | 'attribution_method'>) {
-  if (supporter.source === 'qr_signup' || supporter.source === 'public_signup') {
-    return 'Public Signup';
-  }
+  if (supporter.source === 'qr_signup') return 'QR Signup';
+  if (supporter.source === 'public_signup') return 'Public Signup';
   if (supporter.attribution_method === 'staff_scan') return 'Staff Scan';
   if (supporter.source === 'bulk_import') return 'Excel Import';
   return 'Staff Entry';
 }
 
 function sourceChipClass(supporter: Pick<SupporterItem, 'source' | 'attribution_method'>) {
-  if (supporter.source === 'qr_signup' || supporter.source === 'public_signup') {
+  if (supporter.source === 'qr_signup') {
+    return 'bg-blue-100 text-blue-700';
+  }
+  if (supporter.source === 'public_signup') {
     return 'bg-sky-100 text-sky-700';
   }
   if (supporter.attribution_method === 'staff_scan') {

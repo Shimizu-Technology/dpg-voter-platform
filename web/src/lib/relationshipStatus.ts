@@ -1,5 +1,5 @@
 export const SUPPORT_STATUS_OPTIONS = [
-  { value: 'unknown', label: 'Unknown' },
+  { value: 'unknown', label: 'Support not reviewed' },
   { value: 'supporter', label: 'Supporter' },
   { value: 'undecided', label: 'Undecided' },
   { value: 'not_supporting', label: 'Not supporting' },
@@ -11,14 +11,14 @@ export const MEMBERSHIP_STATUS_OPTIONS = [
 ] as const;
 
 export const VOLUNTEER_STATUS_OPTIONS = [
-  { value: 'unknown', label: 'Unknown' },
+  { value: 'unknown', label: 'Volunteer interest not reviewed' },
   { value: 'interested', label: 'Interested' },
   { value: 'active', label: 'Active volunteer' },
   { value: 'not_interested', label: 'Not interested' },
 ] as const;
 
 export function supportStatusLabel(status?: string | null) {
-  return SUPPORT_STATUS_OPTIONS.find((option) => option.value === status)?.label || 'Unknown';
+  return SUPPORT_STATUS_OPTIONS.find((option) => option.value === status)?.label || 'Support not reviewed';
 }
 
 export function membershipStatusLabel(status?: string | null) {
@@ -26,7 +26,7 @@ export function membershipStatusLabel(status?: string | null) {
 }
 
 export function volunteerStatusLabel(status?: string | null) {
-  return VOLUNTEER_STATUS_OPTIONS.find((option) => option.value === status)?.label || 'Unknown';
+  return VOLUNTEER_STATUS_OPTIONS.find((option) => option.value === status)?.label || 'Volunteer interest not reviewed';
 }
 
 export function supportStatusChipClass(status?: string | null) {

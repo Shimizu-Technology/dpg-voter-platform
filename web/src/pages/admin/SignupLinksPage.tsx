@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
-import { Check, Copy, ExternalLink, Plus, QrCode, Share2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Plus, QrCode, Share2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import WorkspacePage from '../../components/WorkspacePage';
 import { useSession } from '../../hooks/useSession';
-import { createReferralCode, getReferralCodes, getUsers, getVillages, updateReferralCode } from '../../lib/api';
+import { createReferralCode, getReferralCodeSupporters, getReferralCodes, getUsers, getVillages, updateReferralCode } from '../../lib/api';
 
 interface VillageOption {
   id: number;
@@ -45,6 +46,26 @@ interface UsersResponse {
   users: UserOption[];
 }
 
+interface ReferralSignup {
+  id: number;
+  print_name: string;
+  contact_number: string | null;
+  village_name: string | null;
+  source: string;
+  contact_classification: string;
+  created_at: string;
+}
+
+interface ReferralSignupsResponse {
+  supporters: ReferralSignup[];
+  pagination: {
+    page: number;
+    per_page: number;
+    total: number;
+    pages: number;
+  };
+}
+
 interface DraftState {
   display_name: string;
   source_type: string;
@@ -65,7 +86,7 @@ function sourceLabel(value: string) {
   return sourceTypes.find((type) => type.value === value)?.label || 'Custom';
 }
 
-function QrPreview({ url, label }: { url: string; label: string }) {
+function QrPreview({ url, label, className = 'h-28 w-28' }: { url: string; label: string; className?: string }) {
   const [src, setSrc] = useState('');
 
   useEffect(() => {
@@ -83,10 +104,79 @@ function QrPreview({ url, label }: { url: string; label: string }) {
   }, [url]);
 
   if (!src) {
-    return <div className="h-28 w-28 animate-pulse rounded-lg bg-slate-100" aria-label={`QR loading for ${label}`} />;
+    return <div className={`${className} animate-pulse rounded-lg bg-slate-100`} aria-label={`QR loading for ${label}`} />;
   }
 
-  return <img src={src} alt={`QR code for ${label}`} className="h-28 w-28 rounded-lg border border-slate-200 bg-white p-2" />;
+  return <img src={src} alt={`QR code for ${label}`} className={`${className} rounded-xl border border-slate-200 bg-white p-2`} />;
+}
+
+function SignupLinkSupporters({ linkId }: { linkId: number }) {
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useQuery<ReferralSignupsResponse>({
+    queryKey: ['referral-code-supporters', linkId, page],
+    queryFn: () => getReferralCodeSupporters(linkId, { page, per_page: 10 }),
+  });
+  const supporters = data?.supporters ?? [];
+  const pagination = data?.pagination;
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-slate-900">People signed up from this link</h4>
+        {pagination && (
+          <span className="text-xs font-medium text-slate-500">
+            {pagination.total} total · page {pagination.page} of {Math.max(pagination.pages, 1)}
+          </span>
+        )}
+      </div>
+      {isLoading ? (
+        <p className="mt-3 text-sm text-slate-500">Loading signups...</p>
+      ) : supporters.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-500">No contacts have signed up from this link yet.</p>
+      ) : (
+        <>
+          <div className="mt-3 max-h-80 divide-y divide-slate-200 overflow-y-auto rounded-lg bg-white">
+            {supporters.map((supporter) => (
+              <div key={supporter.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-950">{supporter.print_name}</p>
+                  <p className="text-xs text-slate-500">
+                    {[supporter.village_name, supporter.contact_number].filter(Boolean).join(' · ') || 'No phone or village on file'}
+                  </p>
+                </div>
+                <Link to={`/admin/supporters/${supporter.id}`} className="app-btn-secondary inline-flex items-center gap-2 text-sm">
+                  <ExternalLink className="h-4 w-4" />
+                  View contact
+                </Link>
+              </div>
+            ))}
+          </div>
+          {pagination && pagination.pages > 1 && (
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                className="app-btn-secondary inline-flex items-center gap-1 text-sm"
+                disabled={page <= 1}
+                onClick={() => setPage((value) => Math.max(value - 1, 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </button>
+              <button
+                type="button"
+                className="app-btn-secondary inline-flex items-center gap-1 text-sm"
+                disabled={page >= pagination.pages}
+                onClick={() => setPage((value) => Math.min(value + 1, pagination.pages))}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function SignupLinksPage() {
@@ -101,6 +191,7 @@ export default function SignupLinksPage() {
   });
   const [copied, setCopied] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [expandedLinkId, setExpandedLinkId] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery<ReferralCodesResponse>({
     queryKey: ['referral-codes'],
@@ -176,8 +267,8 @@ export default function SignupLinksPage() {
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="app-card p-5">
-          <div className="flex items-start gap-4">
-            <QrPreview url={generalSignupUrl} label="general signup" />
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+            <QrPreview url={generalSignupUrl} label="general signup" className="h-52 w-52 sm:h-44 sm:w-44 lg:h-56 lg:w-56" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-semibold text-slate-950">General signup</h2>
@@ -292,43 +383,54 @@ export default function SignupLinksPage() {
         ) : (
           <div className="divide-y divide-slate-100">
             {signupLinks.map((link) => (
-              <div key={link.id} className={`grid gap-4 p-5 lg:grid-cols-[128px_minmax(0,1fr)_auto] ${link.active ? '' : 'bg-slate-50 opacity-75'}`}>
-                <QrPreview url={link.signup_url} label={link.display_name} />
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-semibold text-slate-950">{link.display_name}</h3>
-                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{sourceLabel(link.source_type)}</span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{link.village_name}</span>
-                    {!link.active && <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">Inactive</span>}
+              <div key={link.id} className={`p-5 ${link.active ? '' : 'bg-slate-50 opacity-75'}`}>
+                <div className="grid gap-4 lg:grid-cols-[168px_minmax(0,1fr)_auto]">
+                  <QrPreview url={link.signup_url} label={link.display_name} className="h-40 w-40 sm:h-36 sm:w-36 lg:h-40 lg:w-40" />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-semibold text-slate-950">{link.display_name}</h3>
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{sourceLabel(link.source_type)}</span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{link.village_name}</span>
+                      {!link.active && <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">Inactive</span>}
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {link.assigned_user_name ? `Assigned to ${link.assigned_user_name}. ` : ''}
+                      {link.notes || 'No notes.'}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <code className="max-w-full truncate rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-700">{link.signup_url}</code>
+                      <span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{link.signup_count} signup{link.signup_count === 1 ? '' : 's'}</span>
+                    </div>
                   </div>
-                  <p className="mt-2 text-sm text-slate-600">
-                    {link.assigned_user_name ? `Assigned to ${link.assigned_user_name}. ` : ''}
-                    {link.notes || 'No notes.'}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <code className="max-w-full truncate rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-700">{link.signup_url}</code>
-                    <span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{link.signup_count} signup{link.signup_count === 1 ? '' : 's'}</span>
+                  <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                    <button type="button" className="app-btn-secondary inline-flex items-center justify-center gap-2" onClick={() => copyUrl(link.code, link.signup_url)}>
+                      {copied === link.code ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copied === link.code ? 'Copied' : 'Copy'}
+                    </button>
+                    <a href={link.signup_url} target="_blank" rel="noreferrer" className="app-btn-secondary inline-flex items-center justify-center gap-2">
+                      <ExternalLink className="h-4 w-4" />
+                      Open
+                    </a>
+                    <button
+                      type="button"
+                      className="app-btn-secondary inline-flex items-center justify-center gap-2"
+                      onClick={() => setExpandedLinkId((value) => (value === link.id ? null : link.id))}
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${expandedLinkId === link.id ? 'rotate-180' : ''}`} />
+                      View signups
+                    </button>
+                    <button
+                      type="button"
+                      className="app-btn-secondary inline-flex items-center justify-center gap-2"
+                      disabled={toggleMutation.isPending && toggleMutation.variables?.id === link.id}
+                      onClick={() => toggleMutation.mutate({ id: link.id, active: !link.active })}
+                    >
+                      <Share2 className="h-4 w-4" />
+                      {toggleMutation.isPending && toggleMutation.variables?.id === link.id ? 'Updating...' : link.active ? 'Deactivate' : 'Activate'}
+                    </button>
                   </div>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-                  <button type="button" className="app-btn-secondary inline-flex items-center justify-center gap-2" onClick={() => copyUrl(link.code, link.signup_url)}>
-                    {copied === link.code ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copied === link.code ? 'Copied' : 'Copy'}
-                  </button>
-                  <a href={link.signup_url} target="_blank" rel="noreferrer" className="app-btn-secondary inline-flex items-center justify-center gap-2">
-                    <ExternalLink className="h-4 w-4" />
-                    Open
-                  </a>
-                  <button
-                    type="button"
-                    className="app-btn-secondary inline-flex items-center justify-center gap-2"
-                    disabled={toggleMutation.isPending && toggleMutation.variables?.id === link.id}
-                    onClick={() => toggleMutation.mutate({ id: link.id, active: !link.active })}
-                  >
-                    <Share2 className="h-4 w-4" />
-                    {toggleMutation.isPending && toggleMutation.variables?.id === link.id ? 'Updating...' : link.active ? 'Deactivate' : 'Activate'}
-                  </button>
-                </div>
+                {expandedLinkId === link.id && <SignupLinkSupporters linkId={link.id} />}
               </div>
             ))}
           </div>

@@ -287,7 +287,7 @@ export default function SignupPage() {
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_8%_0%,rgba(131,200,232,0.18),transparent_32%),linear-gradient(180deg,#eef6fb_0%,#f7fbfc_42%,#ffffff_100%)]" />
         {leaderCode && (
           <div className="mb-5 rounded-2xl border border-[#b9dff1] bg-[#eef9fe] px-4 py-3 text-center text-sm font-bold text-[#123d70]">
-            You were invited by an organizer.
+            You're using a shared DPG signup link. If this link is active, your signup will be credited to that outreach source.
           </div>
         )}
 
