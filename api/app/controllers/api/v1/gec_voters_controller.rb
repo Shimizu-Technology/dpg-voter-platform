@@ -754,10 +754,7 @@ module Api
       end
 
       def household_key(address, village_name)
-        normalized_address = address.to_s.downcase.gsub(/[^a-z0-9]+/, " ").squish
-        return nil if normalized_address.blank?
-
-        "#{village_name.to_s.downcase.strip}|#{normalized_address}"
+        AddressNormalizer.canonical_key(address, village_name: village_name)
       end
 
       def household_json(address, village_name)

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ChevronLeft, Loader2, Mail, MapPin, MessageSquare, Pencil, Phone, Plus, Save, StickyNote, UserRound, X } from 'lucide-react';
-import { createSupporterContactAttempt, getSupporter, getSupporterContactAttempts, getVillages, updateSupporter, verifySupporter, updateOutreachStatus } from '../../lib/api';
+import { createSupporterContactAttempt, getSupporter, getSupporterContactAttempts, getVillages, updateSupporter, updateSupporterContactAttempt, verifySupporter, updateOutreachStatus } from '../../lib/api';
 import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, CONTACT_ATTEMPT_OUTCOME_OPTIONS } from '../../lib/contactAttempt';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
@@ -134,6 +134,7 @@ interface ContactAttemptItem {
 
 interface SupporterPermissions {
   can_edit: boolean;
+  can_edit_contact_attempts?: boolean;
 }
 
 const AUDIT_FIELD_LABELS: Record<string, string> = {
@@ -160,6 +161,10 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   verification_status: 'Verification status',
   attribution_method: 'Entry method',
   referral_code_id: 'Referrer',
+  channel: 'Contact channel',
+  outcome: 'Contact outcome',
+  note: 'Contact note',
+  recorded_at: 'Contact date',
   self_reported_registered_voter: 'Self-reported registered voter',
   registered_voter_status: 'Self-reported voter status',
   registered_voter_location_note: 'Votes elsewhere note',
@@ -265,6 +270,10 @@ const PRIMARY_AUDIT_FIELD_ORDER = [
   'status',
   'attribution_method',
   'source',
+  'channel',
+  'outcome',
+  'recorded_at',
+  'note',
   'village_id',
   'precinct_id',
   'first_name',
@@ -348,6 +357,10 @@ function humanizeAuditValue(value: unknown, field?: string) {
 }
 
 function auditDiffParts(diff: unknown): { from: unknown; to: unknown } {
+  if (Array.isArray(diff) && diff.length === 2) {
+    return { from: diff[0], to: diff[1] };
+  }
+
   if (diff && typeof diff === 'object' && !Array.isArray(diff) && ('from' in diff || 'to' in diff)) {
     const record = diff as { from?: unknown; to?: unknown };
     return { from: record.from, to: record.to };
@@ -616,9 +629,18 @@ export default function SupporterDetailPage() {
     note: '',
     recorded_at: localDateTimeInputValue(),
   });
+  const [editingAttemptId, setEditingAttemptId] = useState<number | null>(null);
+  const [editingAttemptDraft, setEditingAttemptDraft] = useState({
+    channel: 'in_person',
+    outcome: 'reached',
+    note: '',
+    recorded_at: localDateTimeInputValue(),
+  });
   const [attemptError, setAttemptError] = useState<string | null>(null);
+  const [attemptEditError, setAttemptEditError] = useState<string | null>(null);
   const canEdit = permissions?.can_edit ?? false;
   const canLogContactAttempt = canEdit;
+  const canEditContactAttempts = permissions?.can_edit_contact_attempts ?? false;
   const canMarkVerifiedVoter = supporter ? !isNoGecMatch(supporter) : false;
   const supporterDetailPath = (targetId: number) => {
     const basePath = '/admin/supporters';
@@ -709,6 +731,34 @@ export default function SupporterDetailPage() {
     },
   });
 
+  const contactAttemptEditMutation = useMutation({
+    mutationFn: () => {
+      if (!editingAttemptId) throw new Error('No contact attempt selected.');
+      return updateSupporterContactAttempt(supporterId, editingAttemptId, {
+        channel: editingAttemptDraft.channel,
+        outcome: editingAttemptDraft.outcome,
+        note: editingAttemptDraft.note.trim(),
+        recorded_at: editingAttemptDraft.recorded_at,
+      });
+    },
+    onSuccess: () => {
+      setAttemptEditError(null);
+      setEditingAttemptId(null);
+      queryClient.invalidateQueries({ queryKey: ['supporter-contact-attempts', supporterId] });
+      queryClient.invalidateQueries({ queryKey: ['supporter', supporterId] });
+      queryClient.invalidateQueries({ queryKey: ['supporters'] });
+      queryClient.invalidateQueries({ queryKey: ['outreach'] });
+    },
+    onError: (error: unknown) => {
+      if (typeof error === 'object' && error && 'response' in error) {
+        const response = (error as { response?: { data?: { error?: string } } }).response;
+        setAttemptEditError(response?.data?.error || 'Could not save this contact history edit.');
+      } else {
+        setAttemptEditError('Could not save this contact history edit.');
+      }
+    },
+  });
+
 
   useEffect(() => {
     if (!isEditing || !isDirty) return;
@@ -730,6 +780,18 @@ export default function SupporterDetailPage() {
     if (!baseForm) return;
     setDraft(baseForm);
     setIsEditing(true);
+  };
+
+  const startAttemptEdit = (attempt: ContactAttemptItem) => {
+    if (!canEditContactAttempts) return;
+    setAttemptEditError(null);
+    setEditingAttemptId(attempt.id);
+    setEditingAttemptDraft({
+      channel: attempt.channel,
+      outcome: attempt.outcome,
+      note: attempt.note || '',
+      recorded_at: localDateTimeInputValue(new Date(attempt.recorded_at)),
+    });
   };
 
   const cancelEdit = () => {
@@ -1671,26 +1733,121 @@ export default function SupporterDetailPage() {
               </div>
             ) : contactAttempts.map((attempt) => {
               const ChannelIcon = CONTACT_ATTEMPT_CHANNELS.find((option) => option.value === attempt.channel)?.icon || StickyNote;
+              const isEditingAttempt = editingAttemptId === attempt.id;
               return (
                 <div key={attempt.id} className="rounded-xl border border-[var(--border-soft)] px-4 py-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ChannelIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-                        <span className="font-semibold text-[var(--text-primary)]">{contactAttemptChannelLabel(attempt.channel)}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${contactAttemptTone(attempt.outcome)}`}>
-                          {contactAttemptOutcomeLabel(attempt.outcome)}
-                        </span>
+                  {isEditingAttempt ? (
+                    <form
+                      className="space-y-3"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        contactAttemptEditMutation.mutate();
+                      }}
+                    >
+                      <div className="grid gap-3 md:grid-cols-[160px_160px_190px_minmax(0,1fr)]">
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Channel</span>
+                          <select
+                            value={editingAttemptDraft.channel}
+                            onChange={(event) => setEditingAttemptDraft((prev) => ({ ...prev, channel: event.target.value }))}
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                          >
+                            {CONTACT_ATTEMPT_CHANNELS.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Outcome</span>
+                          <select
+                            value={editingAttemptDraft.outcome}
+                            onChange={(event) => setEditingAttemptDraft((prev) => ({ ...prev, outcome: event.target.value }))}
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                          >
+                            {CONTACT_ATTEMPT_OUTCOMES.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">When</span>
+                          <input
+                            type="datetime-local"
+                            value={editingAttemptDraft.recorded_at}
+                            onChange={(event) => setEditingAttemptDraft((prev) => ({ ...prev, recorded_at: event.target.value }))}
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Note</span>
+                          <input
+                            value={editingAttemptDraft.note}
+                            onChange={(event) => setEditingAttemptDraft((prev) => ({ ...prev, note: event.target.value }))}
+                            placeholder="What happened?"
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                          />
+                        </label>
                       </div>
-                      {attempt.note && (
-                        <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-primary)]">{attempt.note}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={contactAttemptEditMutation.isPending}
+                          className="app-btn-primary min-h-9 justify-center"
+                        >
+                          {contactAttemptEditMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          Save edit
+                        </button>
+                        <button
+                          type="button"
+                          className="app-btn-secondary min-h-9 justify-center"
+                          onClick={() => {
+                            setEditingAttemptId(null);
+                            setAttemptEditError(null);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                          Cancel
+                        </button>
+                        <span className="text-xs text-[var(--text-muted)]">Edits are recorded in Audit History.</span>
+                      </div>
+                      {attemptEditError && (
+                        <div className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                          {attemptEditError}
+                        </div>
                       )}
+                    </form>
+                  ) : (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ChannelIcon className="h-4 w-4 text-[var(--text-secondary)]" />
+                          <span className="font-semibold text-[var(--text-primary)]">{contactAttemptChannelLabel(attempt.channel)}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${contactAttemptTone(attempt.outcome)}`}>
+                            {contactAttemptOutcomeLabel(attempt.outcome)}
+                          </span>
+                        </div>
+                        {attempt.note && (
+                          <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-primary)]">{attempt.note}</p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 flex-col items-start gap-2 text-xs text-[var(--text-muted)] sm:items-end sm:text-right">
+                        <div>
+                          <div>{formatDateTime(attempt.recorded_at)}</div>
+                          <div>{attempt.recorded_by_name || attempt.recorded_by_email || 'DPG staff'}</div>
+                        </div>
+                        {canEditContactAttempts && (
+                          <button
+                            type="button"
+                            onClick={() => startAttemptEdit(attempt)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-soft)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:border-primary hover:text-primary"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="shrink-0 text-left text-xs text-[var(--text-muted)] sm:text-right">
-                      <div>{formatDateTime(attempt.recorded_at)}</div>
-                      <div>{attempt.recorded_by_name || attempt.recorded_by_email || 'DPG staff'}</div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               );
             })}

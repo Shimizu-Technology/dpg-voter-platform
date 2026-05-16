@@ -87,6 +87,8 @@ export const getSupporterContactAttempts = (supporterId: number) =>
   api.get(`/supporters/${supporterId}/contact_attempts`).then(r => r.data);
 export const createSupporterContactAttempt = (supporterId: number, data: JsonRecord) =>
   api.post(`/supporters/${supporterId}/contact_attempts`, { contact_attempt: data }).then(r => r.data);
+export const updateSupporterContactAttempt = (supporterId: number, attemptId: number, data: JsonRecord) =>
+  api.patch(`/supporters/${supporterId}/contact_attempts/${attemptId}`, { contact_attempt: data }).then(r => r.data);
 
 // SMS/email outreach
 export const getSmsStatus = () => api.get('/sms/status').then(r => r.data);

@@ -123,10 +123,10 @@ Partially completed on `feature/intake-relationship-household-polish`:
 - Household search shows latest contact attempt for DPG records.
 - Staff can log a canvassing/contact outcome directly from household results.
 - Staff can update support/volunteer status from the household view.
+- Current PR adds conservative address normalization for household grouping so common variants like Ave/Avenue, St/Street, punctuation, PO Box variants, and trailing village/locality text group together without changing the raw stored address.
 
 Still turn household search into a fuller field action:
 
-- Normalize address matching before adding manual household merges. Keep the raw entered address for display/audit, but group/search with a canonical key that handles casing, punctuation, common suffixes such as Ave/Avenue and St/Street, repeated village text, and PO Box variants.
 - Add admin-reviewed "possible same address" handling before any destructive merge. Bad household merges are harder to unwind than duplicate household cards, so auto-merge should be conservative.
 - "I am at this address" mode.
 - Show GEC voters and DPG contacts at the address.
@@ -165,10 +165,11 @@ Tightened in this branch:
 - QR/signup-link access: field roles can create/use scoped links
 - household canvass logging: assigned field users can log method/outcome/note and update support/volunteer status in their scope
 - membership remains hidden from active manual workflows and reserved for future official roster/list handling
+- contact-attempt correction workflow: Administrator/Data Manager can edit an existing attempt, and every correction writes before/after values into Audit History
 
 Still future:
 
-- contact-attempt correction workflow for mistakes: likely Administrator/Data Manager only, with before/after audit logging and no silent deletes
+- optional contact-attempt void/cancel workflow if DPG needs to mark an entry invalid without deleting the audit trail
 - delete/archive permission review
 - poll watcher role
 - precinct-specific Election Day access rules

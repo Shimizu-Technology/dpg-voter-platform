@@ -101,6 +101,7 @@ type PermissionKey =
   | 'can_send_sms'
   | 'can_send_email'
   | 'can_edit_supporters'
+  | 'can_edit_contact_attempts'
   | 'can_view_supporters'
   | 'can_create_staff_supporters'
   | 'can_import_supporters'
@@ -121,6 +122,7 @@ const PERMISSION_KEYS: PermissionKey[] = [
   'can_send_sms',
   'can_send_email',
   'can_edit_supporters',
+  'can_edit_contact_attempts',
   'can_view_supporters',
   'can_create_staff_supporters',
   'can_import_supporters',
@@ -142,6 +144,7 @@ const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_send_sms: 'Send SMS',
   can_send_email: 'Send email',
   can_edit_supporters: 'Edit contact records',
+  can_edit_contact_attempts: 'Correct contact history',
   can_view_supporters: 'View contacts',
   can_create_staff_supporters: 'Create contacts',
   can_import_supporters: 'Import contact lists',
@@ -162,6 +165,7 @@ const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
   data_team: [
     'can_view_supporters',
     'can_edit_supporters',
+    'can_edit_contact_attempts',
     'can_create_staff_supporters',
     'can_import_supporters',
     'can_export_supporters',

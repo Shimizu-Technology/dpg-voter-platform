@@ -532,7 +532,8 @@ module Api
         render json: {
           supporter: supporter_detail_json(supporter),
           permissions: {
-            can_edit: supporter_edit_allowed?
+            can_edit: supporter_edit_allowed?,
+            can_edit_contact_attempts: can_edit_contact_attempts?
           },
           audit_logs: audit_logs.map do |log|
             {

@@ -253,6 +253,10 @@ module Authenticatable
     current_user&.admin? || current_user&.data_team? || current_user&.coordinator?
   end
 
+  def can_edit_contact_attempts?
+    current_user&.admin? || current_user&.data_team?
+  end
+
   def can_view_supporters?
     current_user&.admin? || current_user&.data_team? || current_user&.coordinator? || current_user&.chief? || current_user&.leader?
   end

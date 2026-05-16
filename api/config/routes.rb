@@ -17,7 +17,7 @@ Rails.application.routes.draw do
         end
       end
       resources :supporters, only: [ :create, :index, :show, :update ] do
-        resources :contact_attempts, only: [ :index, :create ], controller: "supporter_contact_attempts"
+        resources :contact_attempts, only: [ :index, :create, :update ], controller: "supporter_contact_attempts"
         member do
           patch :verify
           patch :review_intake

@@ -10,6 +10,12 @@ class Api::V1::SupporterContactAttemptsControllerTest < ActionDispatch::Integrat
       name: "Contact Admin",
       role: "campaign_admin"
     )
+    @data_manager = User.create!(
+      clerk_id: "clerk-contact-data-#{SecureRandom.hex(4)}",
+      email: "contact-data-#{SecureRandom.hex(4)}@example.com",
+      name: "Contact Data",
+      role: "data_team"
+    )
     @leader = User.create!(
       clerk_id: "clerk-contact-leader-#{SecureRandom.hex(4)}",
       email: "contact-leader-#{SecureRandom.hex(4)}@example.com",
@@ -91,5 +97,75 @@ class Api::V1::SupporterContactAttemptsControllerTest < ActionDispatch::Integrat
     assert_response :unprocessable_entity
     payload = JSON.parse(response.body)
     assert_equal "contact_attempt_create_failed", payload["code"]
+  end
+
+  test "admin can edit contact attempts and audit before after values" do
+    attempt = @supporter.supporter_contact_attempts.create!(
+      recorded_by_user: @leader,
+      channel: "call",
+      outcome: "attempted",
+      note: "Left voicemail.",
+      recorded_at: Time.zone.parse("2026-05-12T09:30:00+10:00")
+    )
+
+    patch "/api/v1/supporters/#{@supporter.id}/contact_attempts/#{attempt.id}",
+      params: {
+        contact_attempt: {
+          channel: "in_person",
+          outcome: "reached",
+          note: "Corrected after reviewing notes.",
+          recorded_at: "2026-05-12T10:45:00+10:00"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal "in_person", payload.dig("contact_attempt", "channel")
+    assert_equal "reached", payload.dig("contact_attempt", "outcome")
+    assert_equal "Contact Leader", payload.dig("contact_attempt", "recorded_by_name")
+
+    audit_log = AuditLog.where(auditable: @supporter, action: "contact_attempt_updated").last
+    assert_equal [ "call", "in_person" ], audit_log.changed_data["channel"]
+    assert_equal [ "attempted", "reached" ], audit_log.changed_data["outcome"]
+    assert_equal [ "Left voicemail.", "Corrected after reviewing notes." ], audit_log.changed_data["note"]
+    assert_equal @admin.id, audit_log.actor_user_id
+  end
+
+  test "data manager can edit contact attempts" do
+    attempt = @supporter.supporter_contact_attempts.create!(
+      recorded_by_user: @leader,
+      channel: "sms",
+      outcome: "attempted",
+      recorded_at: Time.current
+    )
+
+    patch "/api/v1/supporters/#{@supporter.id}/contact_attempts/#{attempt.id}",
+      params: { contact_attempt: { channel: "sms", outcome: "reached", note: "They replied yes.", recorded_at: Time.current.iso8601 } },
+      headers: auth_headers(@data_manager),
+      as: :json
+
+    assert_response :success
+    assert_equal "reached", attempt.reload.outcome
+  end
+
+  test "field users cannot edit contact attempts" do
+    attempt = @supporter.supporter_contact_attempts.create!(
+      recorded_by_user: @leader,
+      channel: "call",
+      outcome: "attempted",
+      recorded_at: Time.current
+    )
+
+    patch "/api/v1/supporters/#{@supporter.id}/contact_attempts/#{attempt.id}",
+      params: { contact_attempt: { channel: "call", outcome: "reached", recorded_at: Time.current.iso8601 } },
+      headers: auth_headers(@leader),
+      as: :json
+
+    assert_response :forbidden
+    payload = JSON.parse(response.body)
+    assert_equal "contact_attempt_edit_access_required", payload["code"]
+    assert_equal "attempted", attempt.reload.outcome
   end
 end

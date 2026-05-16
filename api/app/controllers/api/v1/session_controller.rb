@@ -47,6 +47,7 @@ module Api
             can_send_sms: can_send_sms?,
             can_send_email: can_send_email?,
             can_edit_supporters: can_edit_supporters?,
+            can_edit_contact_attempts: can_edit_contact_attempts?,
             can_view_supporters: can_view_supporters?,
             can_create_staff_supporters: can_create_staff_supporters?,
             can_access_duplicates: can_access_duplicates?,
