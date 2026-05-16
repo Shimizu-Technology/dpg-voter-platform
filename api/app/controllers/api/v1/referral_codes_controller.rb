@@ -41,13 +41,16 @@ module Api
         assigned_user = resolve_assigned_user(attrs[:assigned_user_id])
         return if performed?
 
+        metadata = source_metadata(attrs)
+        return unless validate_source_metadata(metadata, village)
+
         code = ReferralCode.new(
           display_name: attrs[:display_name].to_s.strip,
           village: village,
           assigned_user: assigned_user,
           created_by_user: current_user,
           active: true,
-          metadata: source_metadata(attrs)
+          metadata: metadata
         )
         code.code = ReferralCode.generate_unique_code(display_name: code.display_name, village_name: village.name)
 
@@ -68,7 +71,12 @@ module Api
         updates = {}
         updates[:display_name] = attrs[:display_name].to_s.strip if attrs.key?(:display_name)
         updates[:active] = ActiveModel::Type::Boolean.new.cast(attrs[:active]) if attrs.key?(:active)
-        updates[:metadata] = code.metadata.merge(source_metadata(attrs, compact_blank: false)) if metadata_update?(attrs)
+        if metadata_update?(attrs)
+          metadata = code.metadata.merge(source_metadata(attrs, compact_blank: false))
+          return unless validate_source_metadata(metadata, code.village)
+
+          updates[:metadata] = metadata
+        end
 
         if code.update(updates)
           log_audit!(code, action: "signup_link_updated", changed_data: code.saved_changes.except("updated_at"), normalize: true)
@@ -134,6 +142,23 @@ module Api
 
       def metadata_update?(attrs)
         attrs.key?(:source_type) || attrs.key?(:precinct_id) || attrs.key?(:notes)
+      end
+
+      def validate_source_metadata(metadata, village)
+        return true unless metadata["source_type"].presence == "precinct"
+
+        precinct_id = metadata["precinct_id"].presence
+        unless precinct_id
+          render_api_error(message: "Precinct is required for precinct signup links", status: :unprocessable_entity, code: "precinct_required")
+          return false
+        end
+
+        unless village.precincts.exists?(id: precinct_id)
+          render_api_error(message: "Precinct not found for village", status: :unprocessable_entity, code: "precinct_not_found")
+          return false
+        end
+
+        true
       end
 
       def resolve_assigned_user(user_id)

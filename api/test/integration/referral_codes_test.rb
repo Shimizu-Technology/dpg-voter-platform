@@ -173,6 +173,67 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
     assert_equal "user_not_found", payload.fetch("code")
   end
 
+  test "create stores precinct metadata when precinct source has village precinct" do
+    precinct = Precinct.create!(village: @village, number: "17D", alpha_range: "Sam-Z")
+
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Tamuning Precinct 17D",
+          source_type: "precinct",
+          village_id: @village.id,
+          precinct_id: precinct.id
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :created
+    payload = JSON.parse(response.body)
+    assert_equal "precinct", payload.dig("referral_code", "source_type")
+    assert_equal precinct.id, payload.dig("referral_code", "precinct_id")
+  end
+
+  test "create returns json error when precinct source is missing precinct" do
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Tamuning Precinct",
+          source_type: "precinct",
+          village_id: @village.id
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "Precinct is required for precinct signup links", payload.fetch("error")
+    assert_equal "precinct_required", payload.fetch("code")
+  end
+
+  test "create returns json error when precinct is outside link village" do
+    other_village = Village.create!(name: "Yona #{SecureRandom.hex(3)}")
+    precinct = Precinct.create!(village: other_village, number: "10A")
+
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Wrong Village Precinct",
+          source_type: "precinct",
+          village_id: @village.id,
+          precinct_id: precinct.id
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "Precinct not found for village", payload.fetch("error")
+    assert_equal "precinct_not_found", payload.fetch("code")
+  end
+
   test "update returns json error when signup link does not exist" do
     patch "/api/v1/referral_codes/#{ReferralCode.maximum(:id).to_i + 10_000}",
       params: {
@@ -187,6 +248,31 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body)
     assert_equal "Signup link not found", payload.fetch("error")
     assert_equal "referral_code_not_found", payload.fetch("code")
+  end
+
+  test "update returns json error when switching to precinct source without precinct" do
+    referral = ReferralCode.create!(
+      display_name: "Village Link",
+      code: "MISSING-PRECINCT-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: { "source_type" => "village" }
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          source_type: "precinct"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "Precinct is required for precinct signup links", payload.fetch("error")
+    assert_equal "precinct_required", payload.fetch("code")
+    assert_equal "village", referral.reload.source_type
   end
 
   test "update preserves metadata fields that were not sent" do
