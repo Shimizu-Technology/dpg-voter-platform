@@ -194,6 +194,20 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
     assert_equal precinct.id, payload.dig("referral_code", "precinct_id")
   end
 
+  test "model accessors tolerate nil metadata" do
+    referral = ReferralCode.new(
+      display_name: "Nil Metadata",
+      code: "NIL-META-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      metadata: nil
+    )
+
+    assert_equal "custom", referral.source_type
+    assert_nil referral.precinct_id
+    assert_nil referral.notes
+    assert referral.valid?
+  end
+
   test "create returns json error when precinct source is missing precinct" do
     post "/api/v1/referral_codes",
       params: {
@@ -275,15 +289,46 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
     assert_equal "village", referral.reload.source_type
   end
 
-  test "update preserves metadata fields that were not sent" do
+  test "update clears stale precinct metadata when source changes away from precinct" do
+    precinct = Precinct.create!(village: @village, number: "17D", alpha_range: "Sam-Z")
     referral = ReferralCode.create!(
-      display_name: "Village Link",
+      display_name: "Precinct Link",
+      code: "PRECINCT-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: {
+        "source_type" => "precinct",
+        "precinct_id" => precinct.id.to_s,
+        "notes" => "Initial note"
+      }
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          source_type: "village"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    referral.reload
+    assert_equal "village", referral.source_type
+    assert_nil referral.precinct_id
+    assert_nil JSON.parse(response.body).dig("referral_code", "precinct_id")
+  end
+
+  test "update preserves metadata fields that were not sent" do
+    precinct = Precinct.create!(village: @village, number: "17D", alpha_range: "Sam-Z")
+    referral = ReferralCode.create!(
+      display_name: "Precinct Link",
       code: "VILLAGE-#{SecureRandom.hex(2).upcase}",
       village: @village,
       active: true,
       metadata: {
-        "source_type" => "village",
-        "precinct_id" => "P-001",
+        "source_type" => "precinct",
+        "precinct_id" => precinct.id.to_s,
         "notes" => "Initial note"
       }
     )
@@ -299,8 +344,8 @@ class ReferralCodesTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     referral.reload
-    assert_equal "village", referral.source_type
-    assert_equal "P-001", referral.precinct_id
+    assert_equal "precinct", referral.source_type
+    assert_equal precinct.id.to_s, referral.precinct_id
     assert_equal "Updated note", referral.notes
   end
 

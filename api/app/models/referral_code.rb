@@ -12,15 +12,15 @@ class ReferralCode < ApplicationRecord
   scope :active, -> { where(active: true) }
 
   def source_type
-    metadata["source_type"].presence || "custom"
+    metadata_hash["source_type"].presence || "custom"
   end
 
   def precinct_id
-    metadata["precinct_id"].presence
+    metadata_hash["precinct_id"].presence
   end
 
   def notes
-    metadata["notes"].presence
+    metadata_hash["notes"].presence
   end
 
   def self.generate_unique_code(display_name:, village_name:)
@@ -49,4 +49,10 @@ class ReferralCode < ApplicationRecord
     prefix.present? ? prefix : "LEAD"
   end
   private_class_method :build_prefix
+
+  private
+
+  def metadata_hash
+    metadata || {}
+  end
 end

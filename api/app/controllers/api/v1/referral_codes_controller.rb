@@ -41,7 +41,7 @@ module Api
         assigned_user = resolve_assigned_user(attrs[:assigned_user_id])
         return if performed?
 
-        metadata = source_metadata(attrs)
+        metadata = normalize_source_metadata(source_metadata(attrs))
         return unless validate_source_metadata(metadata, village)
 
         code = ReferralCode.new(
@@ -72,7 +72,7 @@ module Api
         updates[:display_name] = attrs[:display_name].to_s.strip if attrs.key?(:display_name)
         updates[:active] = ActiveModel::Type::Boolean.new.cast(attrs[:active]) if attrs.key?(:active)
         if metadata_update?(attrs)
-          metadata = code.metadata.merge(source_metadata(attrs, compact_blank: false))
+          metadata = normalize_source_metadata(code.metadata.merge(source_metadata(attrs, compact_blank: false)))
           return unless validate_source_metadata(metadata, code.village)
 
           updates[:metadata] = metadata
@@ -138,6 +138,11 @@ module Api
         metadata["precinct_id"] = attrs[:precinct_id].presence if attrs.key?(:precinct_id)
         metadata["notes"] = attrs[:notes].presence if attrs.key?(:notes)
         compact_blank ? metadata.compact : metadata
+      end
+
+      def normalize_source_metadata(metadata)
+        metadata["precinct_id"] = nil unless metadata["source_type"].presence == "precinct"
+        metadata
       end
 
       def metadata_update?(attrs)
