@@ -77,7 +77,7 @@ The app is much cleaner, but the source still contains inherited internals that 
 - DPG-branded public landing/signup/thank-you flow.
 - Staff/admin login.
 - Supporter/contact registry.
-- Import DPG-owned supporter/member lists.
+- Import DPG-owned supporter/contact lists and future official member rosters.
 - Search/filter by village/precinct; district only after DPG defines/approves its own district grouping.
 - Basic contact logging and follow-up status.
 - Duplicate detection/review.
@@ -87,7 +87,7 @@ The app is much cleaner, but the source still contains inherited internals that 
 ### Next phase after Monday
 
 - GEC voter list import/search/cross-reference.
-- DPG membership list cross-reference against voter file.
+- Official DPG member-roster cross-reference against voter file.
 - Household/address lookup.
 - Canvassing contact attempts and status history.
 - Mass SMS/email reminders after sender/legal/opt-in details are approved.

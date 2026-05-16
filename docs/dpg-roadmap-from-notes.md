@@ -19,7 +19,7 @@ The DPG platform is now a deployed voter-engagement foundation, not just a renam
 - DPG-branded public pages.
 - Unified `/admin` workspace with legacy `/data` and `/team` redirects.
 - Contacts, Intake, classification, manual entry, search/filtering, reports, users, districts, precincts, and audit logs.
-- Public signups and staff-entered records appear immediately as visible DPG contacts with `new_intake` classification, without inflating official supporter/member counts.
+- Public signups and staff-entered records appear immediately as visible DPG contacts with `new_intake` classification, without inflating supporter counts until reviewed.
 - CSV/Excel-style DPG contact import preview and confirm flow.
 - Duplicate detection/review foundation.
 - Staff users and role/scoped access foundation.
@@ -54,19 +54,20 @@ The deployed site is online, but these admin workflows still need hands-on brows
 
 - Explicit import/list types for:
   - DPG contacts/supporters
-  - DPG members
+  - official DPG member rosters
   - registered Democrat list
   - other custom lists
-- DPG membership/supporter/registered-Democrat cross-reference reports against the GEC voter file.
+- DPG supporter, official member-roster, and registered-Democrat cross-reference reports against the GEC voter file.
+- Membership is intentionally not an active manual classification right now. The legacy `membership_status` field remains in the backend for future official member-roster import/cross-reference work once DPG defines that workflow.
 - Clearer DPG-specific role names and permission descriptions.
-- QR download/share workflow for field signup attribution.
+- QR/share workflow for field signup attribution is implemented in PR #35; print-ready/downloadable QR assets can be polished after DPG tests the workflow.
 - Support/need tracking beyond the current classification/contact-history foundation:
   - registration help
   - absentee ballot help
   - homebound voting help
   - ride to polls
   - volunteer follow-up
-  - membership follow-up
+  - official member-roster follow-up, once DPG defines that workflow
   - donation interest/follow-up if DPG wants it
 - DPG-owned election-day module:
   - poll watcher workflow
@@ -103,12 +104,12 @@ The deployed site is online, but these admin workflows still need hands-on brows
 4. Send a small tester handoff after QA, making clear that the site is ready for familiarization while we keep customizing it around DPG's workflow.
 5. Build explicit list-type imports and cross-reference reports:
    - DPG contacts/supporters
-   - DPG members
+   - official DPG member rosters
    - registered Democrat list
    - GEC match/unmatched reports
-   - member/supporter registration status reports
+   - supporter and future member-roster registration status reports
 6. Polish DPG roles and permissions so non-technical staff understand what each role can do.
-7. Add QR field signup attribution and downloadable QR assets.
+7. Polish QR/share attribution and add downloadable/print-ready QR assets after DPG tests the workflow.
 8. Expand support/need tracking and follow-up queues after DPG confirms the labels and workflow they want.
 9. Scope the election-day module with DPG: poll watcher roles, voted/not-voted workflow, turnout dashboard, and war-room reporting.
 10. Evaluate maps/heatmaps, autodialer integration, ID/photo intake, and OCR as separate add-ons after the core platform is trusted.

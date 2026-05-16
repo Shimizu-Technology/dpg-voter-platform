@@ -28,7 +28,7 @@ This app should become a DPG-owned platform centered on:
 - role-scoped party operations
 - later Election Day operations
 
-The Phase 1 DPG workflow reset is now implemented. Public signups, staff entries, and contact imports are visible immediately as DPG contacts and default into Intake for review; they do not count as official supporters or members until DPG marks their separate support and membership statuses.
+The Phase 1 DPG workflow reset is now implemented. Public signups, staff entries, and contact imports are visible immediately as DPG contacts and default into Intake for review. The active staff workflow focuses on whether DPG has contacted the person, what happened, and whether the person supports DPG. A legacy `membership_status` field still exists in the database/model for future official member-roster import or cross-reference work, but membership is intentionally hidden from the manual UI until DPG defines that roster workflow.
 
 ## Starter functionality
 
@@ -50,7 +50,7 @@ The Phase 1 DPG workflow reset is now implemented. Public signups, staff entries
 1. Restore/build the GEC voter-list workspace as public voter-file infrastructure.
 2. Add GEC voter search by name, address, village, and precinct.
 3. Add structured contact history and household/address canvassing workflows.
-4. Add list-type-specific imports for GEC voter list, DPG contacts, DPG members, and registered Democrat lists.
+4. Add list-type-specific imports for GEC voter list, DPG contacts/supporters, official DPG member rosters, and registered Democrat lists.
 5. Continue refining labels, reports, roles, and workflows with DPG office feedback.
 
 ## Boundary

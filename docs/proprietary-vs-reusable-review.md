@@ -146,7 +146,7 @@ These may be valuable platform features but need genericization or DPG-specific 
 ### Next phase
 
 - GEC voter list import/search/cross-reference
-- DPG membership/supporter list cross-reference against GEC voter file
+- DPG supporter and future official member-roster cross-reference against GEC voter file
 - household/address lookup
 - canvassing contact attempts and status history
 - mass SMS/email reminders after opt-in/sender/legal details are approved

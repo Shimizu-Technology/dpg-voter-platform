@@ -1,6 +1,6 @@
 # DPG Product Blueprint
 
-**Last updated:** May 12, 2026  
+**Last updated:** May 16, 2026  
 **Purpose:** Source-of-truth plan for turning the current DPG fork into the Democratic Party of Guam voter engagement and election operations platform.
 
 ## Product goal
@@ -8,7 +8,7 @@
 Build a DPG-owned platform for:
 
 - importing and searching the public GEC voter list
-- managing DPG contacts, members, supporters, volunteers, and prospects
+- managing DPG contacts, supporters, volunteers, prospects, and future official member-roster cross-references
 - matching DPG records against public voter-file data
 - organizing outreach by address, household, village, precinct, and eventually district
 - tracking every contact attempt across SMS, email, phone, phone bank, and in-person visits
@@ -32,7 +32,7 @@ The code has been reviewed and covered by focused backend/frontend checks, but t
 
 1. **GEC voter data is core public infrastructure.** It is not Josh/Tina proprietary. DPG needs import, search, address lookup, and matching against the GEC list.
 2. **If a status exists, there must be a DPG workflow for it.** Hidden inherited queues create broken experiences.
-3. **Public signups must be visible immediately, but should not inflate official supporter/member counts.**
+3. **Public signups must be visible immediately, but should not inflate supporter counts until reviewed.**
 4. **Use one internal workspace first.** Admin/Data Ops split is likely inherited complexity. Roles should control permissions inside one DPG workspace.
 5. **Contact history is central.** DPG needs to know who contacted a person, when, by what method, what happened, and what should happen next.
 6. **Election Day tools come later.** Poll watcher, voted/not-voted tracking, and war-room dashboards should be designed with DPG instead of copied from another campaign's operating model.
@@ -61,11 +61,12 @@ Sources:
 - public signup
 - QR signup
 - staff manual entry
-- imported DPG member/supporter list
+- imported DPG contact/supporter list
+- future imported official DPG member roster
 - imported registered Democrat list
 - canvassing/contact from a GEC voter record
 
-This should be the default visible record type. A contact is not automatically an official supporter or member.
+This should be the default visible record type. A contact is not automatically a supporter.
 
 ### Intake
 
@@ -86,20 +87,16 @@ Intake must have a visible DPG screen. It should not be a hidden inherited publi
 
 A DPG contact can be classified independently from their voter-file status.
 
-Possible relationship statuses:
+The active staff workflow should stay focused on the distinctions DPG can act on now:
 
-- new intake
-- active contact
-- supporter
-- member
-- volunteer
-- undecided/unknown
-- not supporting
-- duplicate
-- invalid/spam
-- archived
+- record lifecycle: new intake, active contact, duplicate, invalid/spam, archived
+- support status: not reviewed, supporter, undecided, not supporting
+- volunteer interest: not reviewed, interested, active volunteer, not interested
+- contacted status: derived from contact-attempt history, including who contacted the person, when, how, outcome, notes, and follow-up
 
 This is different from GEC match status.
+
+DPG did discuss member lists/party membership rosters in the meetings, so the app still keeps the legacy `membership_status` field in the database/model for compatibility and future work. Membership should stay hidden from the manual UI until DPG defines an official member-roster import or cross-reference workflow. When it returns, it should be treated as a roster/list signal, not as a second staff dropdown that duplicates support status.
 
 ### GEC Match Status
 
@@ -153,7 +150,7 @@ DPG needs work queues for:
 - homebound voting help
 - ride to polls
 - volunteer follow-up
-- membership follow-up
+- official member-roster follow-up, once DPG defines that workflow
 - donation interest/follow-up if DPG wants it
 
 ## Recommended internal workspace
@@ -191,10 +188,10 @@ Suggested roles:
 1. Person submits public/QR signup.
 2. System creates visible DPG Contact.
 3. Contact appears in Intake as new public signup.
-4. Contact does **not** count as official supporter/member until classified.
+4. Contact does **not** count as a supporter until reviewed/classified.
 5. Staff can match to GEC voter, dedupe, classify, and assign follow-up.
 
-Current Phase 1 implementation note: public signups, staff entries, and contact imports create visible DPG contacts with `new_intake` classification by default. They appear in Contacts and Intake immediately, but they do not count as official supporters/members until DPG classifies them.
+Current Phase 1 implementation note: public signups, staff entries, and contact imports create visible DPG contacts with `new_intake` classification by default. They appear in Contacts and Intake immediately, but they do not count as supporters until DPG classifies them. The legacy `membership_status` field remains in the backend for future official member-roster work, but it is intentionally hidden from the active manual workflow.
 
 ### Staff/manual entry workflow
 
@@ -217,7 +214,7 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 1. User chooses list type:
    - GEC voter list
    - DPG contacts/supporters
-   - DPG members
+   - official DPG member roster
    - registered Democrat list
    - other custom list
 2. Upload file.
@@ -236,7 +233,6 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 - Audit inherited states/scopes/routes:
   - public review
   - supporter review
-  - official supporter
   - working supporter
   - Data Ops vs Admin split
   - Josh/Tina-specific leftover model fields
@@ -250,7 +246,7 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
   - new intake
   - matched GEC voters
   - supporters
-  - members
+  - future official member-roster matches
   - needs follow-up
 - Simplify to one internal DPG workspace. **Implemented May 11, 2026; legacy `/data` and `/team` routes redirect into `/admin`.**
 - Rename UI copy away from inherited campaign language where confusing. **Implemented across the main workspace surfaces; inactive legacy components still exist in source for redirect/backward compatibility.**
@@ -279,7 +275,7 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
   - support needs **Not fully implemented; should be designed with DPG labels and workflows.**
 - Build Contact Attempt logging. **Implemented on contact detail, Follow-Up Queue cards, and SMS/email blast jobs.**
 - Build Household/Address workspace. **Implemented as `/admin/households`.**
-- Build Outreach queues for registration, absentee, homebound, ride, volunteer, membership follow-up. **Partially implemented through the Follow-Up Queue, classification filters, latest-attempt summaries, and inline attempt logging; richer DPG-specific queue labels and support-need workflows remain.**
+- Build Outreach queues for registration, absentee, homebound, ride, volunteer, and future official member-roster follow-up if DPG defines it. **Partially implemented through the Follow-Up Queue, classification filters, latest-attempt summaries, and inline attempt logging; richer DPG-specific queue labels and support-need workflows remain.**
 - Surface latest contact attempts in the Follow-Up Queue and let staff log call/SMS/in-person touches from each queue card. **Implemented in the outreach queue so queue work updates the shared contact-history timeline.**
 
 ### Phase 4: Imports and List Types
@@ -287,13 +283,13 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 - Support list-type-specific imports:
   - GEC voter list **Implemented.**
   - DPG contacts/supporters **Partially implemented through the existing contact import flow; explicit list type selection still needed.**
-  - DPG members **Not implemented as a first-class list type yet.**
+  - official DPG member rosters **Not implemented as a first-class list type yet; membership remains reserved until DPG defines this roster workflow.**
   - registered Democrat list **Not implemented as a first-class list type yet.**
 - Track source/list type on records. **Partially implemented through existing source/origin fields; needs explicit DPG list-type modeling.**
 - Add cross-reference reports:
   - DPG contacts not matched to GEC
-  - GEC voters marked supporter/member
-  - members needing registration help
+  - GEC voters marked as supporters
+  - official member-roster records needing registration help, once that list type exists
   - address/village mismatch
   - **Not fully implemented yet; this is the next core product phase.**
 
@@ -334,10 +330,10 @@ Recommended order:
 3. Hand off to a small DPG tester group for familiarization and workflow feedback.
 4. Build Phase 4 explicit list types and cross-reference reports:
    - DPG contacts/supporters
-   - DPG members
+   - official DPG member rosters
    - registered Democrat list
    - GEC matched/unmatched reports
-   - supporter/member registration status reports
+   - supporter and future member-roster registration status reports
 5. Polish DPG role labels and permission descriptions.
-6. Add QR signup attribution.
+6. Polish QR signup attribution based on DPG testing; the first QR/share-link attribution slice is implemented on PR #35.
 7. Scope richer support-need queues and election-day operations with DPG after they have used the deployed foundation.

@@ -1,8 +1,8 @@
 # DPG Voter Platform - Current Project Status
 
-**Last updated:** May 14, 2026
-**Current branch:** `feature/intake-relationship-household-polish`
-**Base commit:** `f8f3d97` - merged PR #32, DPG list intelligence reports + household actions
+**Last updated:** May 16, 2026
+**Current branch:** `codex/dpg-signup-links`
+**Base commit:** PR #35 in review, DPG QR/signup-link attribution and membership UI simplification
 
 ## One-line status
 
@@ -15,11 +15,11 @@ The important caveat is that most admin-side workflows have been verified throug
 DPG needs a party-wide voter engagement platform centered on:
 
 - public GEC voter-file import/search
-- DPG contacts, intake, members, supporters, volunteers, and prospects
+- DPG contacts, intake, supporters, volunteers, prospects, and future official member-roster cross-references
 - household/address canvassing
 - contact history across SMS, email, calls, and in-person touches
 - scoped roles for admins, staff, field users, and eventually poll watchers
-- list cross-reference between GEC voters, DPG member rosters, registered Democrat lists, and supporter/contact data
+- list cross-reference between GEC voters, future official DPG member rosters, registered Democrat lists, and supporter/contact data
 - later Election Day turnout and war-room workflows designed with DPG
 
 The app should keep using Shimizu Technology's reusable platform foundation, but the workflows should be shaped around DPG's needs instead of Josh/Tina-specific operating methods.
@@ -36,7 +36,7 @@ The app should keep using Shimizu Technology's reusable platform foundation, but
 The April 2 and April 27 DPG notes/transcripts point to these needs:
 
 - voter/supporter CRM
-- DPG/member/supporter list import
+- DPG contact/supporter import and future official member-roster import
 - GEC/public voter-list search and cross-reference
 - village/precinct/location organization
 - address/household search for canvassing
@@ -70,7 +70,7 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Public signup creates visible DPG contact records.
 - Public signup, staff entry, and imported contacts default to `new_intake`.
 - New records appear in Contacts and Intake immediately.
-- New records do not count as official supporters/members until reviewed and marked with support/member status by staff.
+- New records do not count as supporters until reviewed and marked with support status by staff.
 - Local browser smoke testing previously covered landing, signup, village selection, submit, and thank-you redirect.
 - Deployed public signup still needs a fresh staging smoke test after the latest merged phases.
 
@@ -97,9 +97,8 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Pending Intake now has a structured reviewer workflow on this branch:
   - approve or reject intake
   - set record status as active contact, duplicate, invalid, or archived
-  - separately set support status as unknown, supporter, undecided, or not supporting
-  - separately set membership status as not a member or member
-  - separately set volunteer status as unknown, interested, active, or not interested
+  - separately set support status as not reviewed, supporter, undecided, or not supporting
+  - separately set volunteer status as not reviewed, interested, active, or not interested
   - add reviewer note
   - optionally log the first outreach/contact outcome during review
   - audit the review decision
@@ -110,11 +109,12 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
   - invalid
   - archived
 - DPG relationship tracking is now split into separate fields:
-  - support status: unknown, supporter, undecided, not supporting
-  - membership status: not a member, member
-  - volunteer status: unknown, interested, active, not interested
+  - support status: not reviewed, supporter, undecided, not supporting
+  - volunteer status: not reviewed, interested, active, not interested
   - outreach/contacted status: derived from contact-attempt history, not from the relationship fields
+- The legacy `membership_status` field still exists in the database/model and API contract for compatibility and future official member-roster work, but it is intentionally hidden from the active manual UI until DPG defines that roster workflow.
 - Manual staff entry exists.
+- QR/signup-link attribution exists on PR #35: admins can create village/canvasser/outreach/custom signup links, copy/open them, scan generated QR codes, toggle active/inactive state, and view paginated signups per link.
 - Search/filter basics exist, including name, phone, email, village, precinct, origin, opt-in, voter-check, record status, support status, and address-style lookup.
 - Village/precinct fields exist.
 - Voter-help/support fields exist:
@@ -156,10 +156,10 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - `/admin/households` searches addresses across GEC voters and DPG contacts.
 - Household lookup can now create/link contacts from household results.
 - Household DPG records can now show the latest contact attempt and log a canvassing update directly from the household view.
-- Household canvassing updates can set support/member/volunteer status and log method/outcome/note in one atomic action.
+- Household canvassing updates can set support/volunteer status and log method/outcome/note in one atomic action.
 - `/admin/outreach` Follow-Up Queue shows latest contact attempt per card.
 - Staff can log call/SMS/in-person attempts from queue cards without leaving the queue.
-- Contact detail pages now include GEC check, follow-up workflow, contact history, audit history, record status, support status, membership status, and volunteer status.
+- Contact detail pages now include GEC check, follow-up workflow, contact history, audit history, record status, support status, QR attribution, and volunteer status.
 
 ### SMS/email outreach
 
@@ -191,8 +191,8 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
   - mapping issues
   - purge list
 - DPG/GEC contact cross-reference exports now include latest contact method, outcome, date, and note.
-- Cross-reference exports and previews now include separate record status, support status, membership status, and volunteer status columns.
-- Explicit list-type imports are still needed so these reports can distinguish DPG members, registered Democrats, supporters/contacts, and custom lists cleanly.
+- Cross-reference exports and previews now include separate record status, support status, and volunteer status columns. Membership should return here as an official member-roster signal once DPG defines that list workflow.
+- Explicit list-type imports are still needed so these reports can distinguish official DPG member rosters, registered Democrats, supporters/contacts, and custom lists cleanly.
 
 ### Tests/checks
 
@@ -249,10 +249,10 @@ These are important, but should be implemented deliberately:
 - explicit list types:
   - GEC voter list
   - DPG contacts/supporters
-  - DPG members
+  - official DPG member rosters
   - registered Democrat list
   - other/custom
-- DPG membership roster vs GEC automation
+- official DPG member roster vs GEC automation
 - registered Democrat list import/cross-reference
 - richer list-lineage-aware report filtering after explicit list types exist
 - support/lean/donation tracking
@@ -260,7 +260,7 @@ These are important, but should be implemented deliberately:
 - role rename and permissions polish
 - stronger export/delete restrictions for non-admin users
 - richer canvassing route/assignment tooling beyond address search
-- DPG-branded QR downloads/share links and attribution
+- print-ready/downloadable QR assets beyond the current in-browser QR/share-link workflow
 - poll watcher workflow
 - real-time voted/not-voted tracking
 - war-room/turnout dashboard
@@ -282,16 +282,16 @@ Because the app is already deployed, the next move should be guided QA plus one 
    Tell DPG what to click first, what is safe to test, what not to live-send yet, and what feedback to send.
 
 4. **Next product PR: Intake Review + Relationship Classification polish**
-   Make Intake a true reviewer workflow: approve, reject, mark duplicate/invalid, classify as active contact/supporter/member/volunteer/undecided/not supporting, confirm/link GEC match, and optionally log an initial note/outreach outcome.
+   Make Intake a true reviewer workflow: approve, reject, mark duplicate/invalid, classify support status, capture volunteer interest, confirm/link GEC match, and optionally log an initial note/outreach outcome. Keep membership out of the manual workflow until DPG defines official member-roster handling.
 
 5. **Next product phase: list types + list-lineage reporting**
-   Build explicit DPG member/supporter/registered-Democrat/custom list imports and refine reports so list origin and relationship type are clear.
+   Build explicit DPG supporter/contact, official member-roster, registered-Democrat, and custom list imports and refine reports so list origin and relationship type are clear.
 
 6. **Permissions polish**
    Rename roles into DPG language and tighten export/delete/scope behavior for non-admin staff.
 
 7. **Field workflow phase**
-   Evolve household lookup into canvassing workflow, add QR/signup attribution, and scope election-day tools with DPG.
+   Evolve household lookup into canvassing workflow, polish QR/signup attribution based on DPG feedback, and scope election-day tools with DPG.
 
 ## Related docs
 

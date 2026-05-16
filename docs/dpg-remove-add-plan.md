@@ -204,7 +204,7 @@ Add or verify:
 Add from DPG requirements:
 
 - GEC voter-list import/search/cross-reference
-- DPG membership list cross-reference against GEC voter file
+- official DPG member-roster cross-reference against GEC voter file
 - household/address lookup
 - canvassing contact attempts/history
 - QR signup improvements

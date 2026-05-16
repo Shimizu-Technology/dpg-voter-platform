@@ -68,7 +68,7 @@ Local repo note:
 - [ ] Thank-you page renders with DPG copy.
 - [ ] Submitted public signup appears in Contacts.
 - [ ] Submitted public signup appears in Intake / `new_intake`.
-- [ ] Submitted public signup does not count as official supporter/member until classified.
+- [ ] Submitted public signup does not count as a supporter until classified.
 
 ## Deployed admin smoke test
 
@@ -158,10 +158,11 @@ These are the highest priority because the admin side has not yet been thoroughl
 
 ## Known deferred modules
 
-- Explicit DPG list types: DPG members, registered Democrat list, contacts/supporters, other/custom.
-- DPG membership/supporter roster vs GEC cross-reference reports.
+- Explicit DPG list types: official DPG member rosters, registered Democrat list, contacts/supporters, other/custom.
+- DPG supporter and member-roster vs GEC cross-reference reports.
+- Membership stays hidden from the active manual UI until DPG defines the official member-roster workflow; the backend field is reserved for that future work.
 - DPG role-name cleanup and stricter export/delete permission rules.
-- QR download/share/attribution workflow.
+- Print-ready/downloadable QR assets beyond the current in-browser QR/share-link attribution workflow.
 - Support/lean/donation tracking.
 - DPG-defined district grouping.
 - Advanced canvassing route/assignment tooling.
