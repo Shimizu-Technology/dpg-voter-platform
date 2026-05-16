@@ -408,7 +408,7 @@ export default function OutreachPage() {
         <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
           <ClipboardCheck className="w-5 h-5 text-primary" /> Follow-Up Queue
         </h1>
-        <p className="text-gray-500 text-sm mt-1">One queue for approved supporters who still need registration follow-up, voter-help follow-up, or both.</p>
+        <p className="text-gray-500 text-sm mt-1">One queue for contacts who need registration outreach, voter-help follow-up, or volunteer follow-up. Possible GEC match review stays in Voter Check.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">

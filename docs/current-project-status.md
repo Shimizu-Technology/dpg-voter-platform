@@ -160,6 +160,7 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Household canvassing updates can set support/volunteer status and log method/outcome/note in one atomic action. Membership is intentionally not part of this manual canvass workflow.
 - `/admin/outreach` Follow-Up Queue shows latest contact attempt per card.
 - Staff can log call/SMS/in-person attempts from queue cards without leaving the queue.
+- The Follow-Up Queue is for outreach work: registration outreach, voter-help requests, and volunteer follow-up. Possible GEC match review is intentionally handled through Intake/GEC Voters/Contact Detail voter-check workflows instead of this queue.
 - Contact detail pages now include GEC check, follow-up workflow, latest-contact summary, contact history, audit history, record status, support status, QR attribution, and volunteer status.
 
 ### SMS/email outreach

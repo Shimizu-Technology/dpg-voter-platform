@@ -1490,7 +1490,7 @@ export default function SupporterDetailPage() {
                 {gecMatchLabel(supporter)}
               </span>
               {!supporter.current_gec_match && supporter.registered_voter && (
-                <span className={`text-sm ${gecMatchClass(supporter)}`}>Review still needed before this supporter is treated as linked to the election-day voter list.</span>
+                <span className={`text-sm ${gecMatchClass(supporter)}`}>Voter-list review still needed before this contact is treated as matched to the current GEC file. Handle this in Voter Check above, not the outreach follow-up queue.</span>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">

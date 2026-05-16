@@ -456,7 +456,7 @@ export default function SignupPage() {
                   value={form.street_address}
                   onChange={(e) => updateField('street_address', e.target.value)}
                   className="w-full rounded-2xl border border-gray-300 px-3 py-3 text-lg focus:border-transparent focus:ring-2 focus:ring-primary"
-                  placeholder="221 Lirio Ave"
+                  placeholder="123 Example St"
                 />
                 <p className="mt-1 text-xs text-slate-500">Street only is best. Choose the village above instead of typing it here.</p>
               </div>

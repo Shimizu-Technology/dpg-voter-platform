@@ -278,6 +278,7 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 - Build Contact Attempt logging. **Implemented on contact detail, Follow-Up Queue cards, and SMS/email blast jobs.**
 - Build Household/Address workspace. **Implemented as `/admin/households`.**
 - Build Outreach queues for registration, absentee, homebound, ride, volunteer, and future official member-roster follow-up if DPG defines it. **Partially implemented through the Follow-Up Queue, classification filters, latest-attempt summaries, and inline attempt logging; richer DPG-specific queue labels and support-need workflows remain.**
+- Keep GEC possible-match review separate from outreach follow-up. Possible matches are voter-check/data-review work handled through Intake, GEC Voters, and Contact Detail, while the Follow-Up Queue is for contacting people about registration, voter help, and volunteer/support needs.
 - Surface latest contact attempts in the Follow-Up Queue and let staff log call/SMS/in-person touches from each queue card. **Implemented in the outreach queue so queue work updates the shared contact-history timeline.**
 
 ### Phase 4: Imports and List Types
