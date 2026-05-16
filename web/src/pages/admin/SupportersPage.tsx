@@ -17,11 +17,8 @@ import {
   contactClassificationLabel,
 } from '../../lib/contactClassification';
 import {
-  MEMBERSHIP_STATUS_OPTIONS,
   SUPPORT_STATUS_OPTIONS,
   VOLUNTEER_STATUS_OPTIONS,
-  membershipStatusChipClass,
-  membershipStatusLabel,
   supportStatusChipClass,
   supportStatusLabel,
   volunteerStatusChipClass,
@@ -164,16 +161,18 @@ function verificationStatusDetail(supporter: Pick<SupporterItem, 'verification_r
 }
 
 function sourceLabel(supporter: Pick<SupporterItem, 'source' | 'attribution_method'>) {
-  if (supporter.source === 'qr_signup' || supporter.source === 'public_signup') {
-    return 'Public Signup';
-  }
+  if (supporter.source === 'qr_signup') return 'QR Signup';
+  if (supporter.source === 'public_signup') return 'Public Signup';
   if (supporter.attribution_method === 'staff_scan') return 'Staff Scan';
   if (supporter.source === 'bulk_import') return 'Excel Import';
   return 'Staff Entry';
 }
 
 function sourceChipClass(supporter: Pick<SupporterItem, 'source' | 'attribution_method'>) {
-  if (supporter.source === 'qr_signup' || supporter.source === 'public_signup') {
+  if (supporter.source === 'qr_signup') {
+    return 'bg-blue-100 text-blue-700';
+  }
+  if (supporter.source === 'public_signup') {
     return 'bg-sky-100 text-sky-700';
   }
   if (supporter.attribution_method === 'staff_scan') {
@@ -874,11 +873,6 @@ export default function SupportersPage() {
                 <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
                   {supportStatusLabel(s.support_status)}
                 </span>
-                {s.membership_status === 'member' && (
-                  <span className={`app-chip ${membershipStatusChipClass(s.membership_status)}`}>
-                    {membershipStatusLabel(s.membership_status)}
-                  </span>
-                )}
                 {s.volunteer_status && s.volunteer_status !== 'unknown' && (
                   <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
                     {volunteerStatusLabel(s.volunteer_status)}
@@ -1060,11 +1054,6 @@ export default function SupportersPage() {
                         <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
                           {supportStatusLabel(s.support_status)}
                         </span>
-                        {s.membership_status === 'member' && (
-                          <span className={`app-chip ${membershipStatusChipClass(s.membership_status)}`}>
-                            {membershipStatusLabel(s.membership_status)}
-                          </span>
-                        )}
                         {s.volunteer_status && s.volunteer_status !== 'unknown' && (
                           <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
                             {volunteerStatusLabel(s.volunteer_status)}
@@ -1223,7 +1212,7 @@ export default function SupportersPage() {
                     </select>
                     </label>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <label className="space-y-1.5">
                       <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Support status</span>
                       <select
@@ -1232,18 +1221,6 @@ export default function SupportersPage() {
                         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
                       >
                         {SUPPORT_STATUS_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="space-y-1.5">
-                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Membership</span>
-                      <select
-                        value={reviewDraft.membership_status}
-                        onChange={(event) => setReviewDraft((draft) => ({ ...draft, membership_status: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                      >
-                        {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>

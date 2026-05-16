@@ -20,17 +20,17 @@ Core requirement:
 - create/edit contact
 - basic search/filter
 - record lifecycle/status: new intake, active contact, duplicate, invalid, archived
-- support status: unknown, supporter, undecided, not supporting
-- membership status: not a member, member
-- volunteer status: unknown, interested, active, not interested
+- support status: not reviewed, supporter, undecided, not supporting
+- volunteer status: not reviewed, interested, active, not interested
 - contacted/not-contacted status from contact/follow-up history
 - contact/follow-up history
 - export basics
 
 Important distinction:
 
-- A DPG contact is not automatically an official supporter or member.
-- Public signups and staff entries should be visible immediately, but should go through Intake/classification before they inflate supporter/member counts.
+- A DPG contact is not automatically a supporter.
+- Public signups and staff entries should be visible immediately, but should go through Intake/classification before they inflate supporter counts.
+- DPG discussed member lists/party membership rosters, but the meetings did not define membership as a separate manual staff classification. The legacy `membership_status` field remains in the database/model for future official member-roster import or cross-reference work and is intentionally hidden from the active UI until that workflow is defined.
 
 ### 2. DPG Intake queue
 
@@ -41,7 +41,7 @@ Core requirement:
 - public signups appear in Intake
 - staff/manual entries can appear in Intake when unclassified/incomplete
 - imported DPG rows can appear in Intake when they need cleanup/dedupe/matching
-- staff can approve/reject intake, mark duplicate/invalid/archived, and separately set support, membership, and volunteer status
+- staff can approve/reject intake, mark duplicate/invalid/archived, and separately set support and volunteer status
 - staff can link a contact to a GEC voter or mark possible/no match
 
 ### 3. GEC/public voter-list workspace
@@ -62,21 +62,21 @@ This is a priority build item, not a distant optional feature.
 
 ### 4. DPG-owned data import
 
-DPG discussed voter lists, registered Democrat lists, and a separate supporter/membership roster.
+DPG discussed voter lists, registered Democrat lists, supporter/contact data, and a separate official membership roster.
 
 Core requirement:
 
 - explicit list type selection:
   - GEC voter list
   - DPG contacts/supporters
-  - DPG members
+  - official DPG member roster
   - registered Democrat list
   - other/custom
 - preview/mapping step if already available
 - confirm import
 - duplicate detection/review
-- richer membership-vs-voter cross-reference
-- multiple list types: GEC voter list, registered Democrat list, DPG support/membership roster
+- richer member-roster-vs-voter cross-reference, once DPG provides and defines the roster
+- multiple list types: GEC voter list, registered Democrat list, DPG contacts/supporters, official DPG member roster
 
 ### 5. Village/precinct/address organization
 
@@ -156,13 +156,13 @@ DPG discussed QR signup/canvassing links.
 
 Starter/foundation:
 
-- public signup link must work
-- QR generation is useful if generic and stable, but not required for first smoke test
+- public signup link works
+- QR generation and signup-link attribution are implemented on PR #35 for general signup plus village/canvasser/outreach/custom source links
 
 Core build:
 
-- DPG-branded QR downloads/share links
-- village/precinct attribution if DPG wants it
+- print-ready/downloadable QR assets after DPG tests the workflow
+- additional village/precinct/event attribution labels if DPG wants them
 
 ### 11. Poll watcher / election-day operations
 
@@ -216,9 +216,9 @@ Core build:
 
 - one internal workspace
 - visible Intake queue
-- contacts visible immediately but not automatically official supporters/members
+- contacts visible immediately but not automatically supporters
 - honest dashboard counts
-- clean labels: contacts, intake, GEC voters, supporters, members, outreach
+- clean labels: contacts, intake, GEC voters, supporters, volunteers, outreach, and future official member-roster reporting
 - remove/hide inherited queues that do not have a DPG workflow
 
 ## Phase 2: GEC voter list

@@ -29,7 +29,7 @@ It does **not** need to include every advanced item by Monday.
 - GIS/heatmaps
 - OCR/photo/ID scan
 - live SMS/email blast governance/templates/recipient approval
-- DPG membership-vs-GEC automation if not ready
+- official DPG member-roster-vs-GEC automation if not ready
 - household/address grouping if not ready
 - DPG-defined district mapping until DPG confirms it
 

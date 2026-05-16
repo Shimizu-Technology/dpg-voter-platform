@@ -14,11 +14,8 @@ import {
   contactClassificationLabel,
 } from '../../lib/contactClassification';
 import {
-  MEMBERSHIP_STATUS_OPTIONS,
   SUPPORT_STATUS_OPTIONS,
   VOLUNTEER_STATUS_OPTIONS,
-  membershipStatusChipClass,
-  membershipStatusLabel,
   supportStatusChipClass,
   supportStatusLabel,
   volunteerStatusChipClass,
@@ -97,6 +94,7 @@ interface SupporterDetail {
   leader_code?: string | null;
   referral_code_id?: number | null;
   referral_display_name?: string | null;
+  referral_code_active?: boolean | null;
   created_at: string;
   household_group_id?: number | null;
   household_primary?: boolean;
@@ -153,7 +151,6 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   source: 'Source',
   contact_classification: 'Record status',
   support_status: 'Support status',
-  membership_status: 'Membership',
   volunteer_status: 'Volunteer status',
   intake_status: 'Supporter status',
   review_status: 'Review status',
@@ -460,7 +457,8 @@ function supporterStatusLabel(supporter: Pick<SupporterDetail, 'source' | 'revie
 }
 
 function activitySourceLabel(supporter: Pick<SupporterDetail, 'source' | 'attribution_method'>) {
-  if (supporter.source === 'public_signup' || supporter.source === 'qr_signup') return 'Public signup';
+  if (supporter.source === 'qr_signup') return 'QR signup';
+  if (supporter.source === 'public_signup') return 'Public signup';
   if (supporter.attribution_method === 'staff_scan') return 'Staff scan';
   if (supporter.source === 'staff_entry') return 'Staff entry';
   if (supporter.source === 'bulk_import') return 'Excel import';
@@ -472,6 +470,12 @@ function activityActionLabel(supporter: Pick<SupporterDetail, 'source' | 'attrib
   if (supporter.attribution_method === 'staff_scan' || supporter.source === 'staff_entry') return 'Entered';
   if (supporter.source === 'bulk_import') return 'Imported';
   return 'Created';
+}
+
+function referralCodeStatusLabel(active?: boolean | null) {
+  if (active === true) return 'Active now';
+  if (active === false) return 'Inactive now';
+  return 'Link record unavailable';
 }
 
 function fullName(supporter: Pick<SupporterDetail, 'first_name' | 'middle_name' | 'last_name'>) {
@@ -767,11 +771,6 @@ export default function SupporterDetailPage() {
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${supportStatusChipClass(supporter.support_status)}`}>
             {supportStatusLabel(supporter.support_status)}
           </span>
-          {supporter.membership_status === 'member' && (
-            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${membershipStatusChipClass(supporter.membership_status)}`}>
-              {membershipStatusLabel(supporter.membership_status)}
-            </span>
-          )}
           {supporter.volunteer_status && supporter.volunteer_status !== 'unknown' && (
             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${volunteerStatusChipClass(supporter.volunteer_status)}`}>
               {volunteerStatusLabel(supporter.volunteer_status)}
@@ -969,18 +968,6 @@ export default function SupporterDetailPage() {
                 disabled={!isEditing}
               >
                 {SUPPORT_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </DetailField>
-            <DetailField label="Membership">
-              <select
-                value={String(currentForm.membership_status || 'not_member')}
-                onChange={(e) => updateDraft({ membership_status: e.target.value })}
-                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-                disabled={!isEditing}
-              >
-                {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
@@ -1184,26 +1171,65 @@ export default function SupporterDetailPage() {
           )}
         </section>
 
+        {supporter.source === 'qr_signup' && (
+          <section className="app-card border-blue-100 bg-blue-50/40 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-semibold text-[var(--text-primary)]">QR Signup Attribution</h2>
+              <span className="inline-block rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                QR signup
+              </span>
+              {supporter.referral_code_active === false && (
+                <span className="inline-block rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                  Source link now inactive
+                </span>
+              )}
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Signup source</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                  {supporter.referral_display_name || 'QR signup link'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Referral code</p>
+                <p className="mt-1 font-mono text-sm text-[var(--text-primary)]">{supporter.leader_code || 'Not stored'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Link status</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                  {referralCodeStatusLabel(supporter.referral_code_active)}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="app-card p-4">
           <h2 className="font-semibold text-[var(--text-primary)] mb-2">Contact Relationship</h2>
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-[var(--text-secondary)]">Current status:</span>
-              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${contactClassificationChipClass(supporter.contact_classification)}`}>
-                {contactClassificationLabel(supporter.contact_classification)}
-              </span>
-              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${supportStatusChipClass(supporter.support_status)}`}>
-                {supportStatusLabel(supporter.support_status)}
-              </span>
-              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${membershipStatusChipClass(supporter.membership_status)}`}>
-                {membershipStatusLabel(supporter.membership_status)}
-              </span>
-              <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${volunteerStatusChipClass(supporter.volunteer_status)}`}>
-                {volunteerStatusLabel(supporter.volunteer_status)}
-              </span>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Record status</p>
+                <span className={`mt-1 inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${contactClassificationChipClass(supporter.contact_classification)}`}>
+                  {contactClassificationLabel(supporter.contact_classification)}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Support status</p>
+                <span className={`mt-1 inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${supportStatusChipClass(supporter.support_status)}`}>
+                  {supportStatusLabel(supporter.support_status)}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Volunteer interest</p>
+                <span className={`mt-1 inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${volunteerStatusChipClass(supporter.volunteer_status)}`}>
+                  {volunteerStatusLabel(supporter.volunteer_status)}
+                </span>
+              </div>
             </div>
             <p className="text-sm text-[var(--text-secondary)]">
-              {supporterStatusLabel(supporter)}. Contact record status, support, membership, volunteer interest, and outreach history are tracked separately.
+              {supporterStatusLabel(supporter)}. Support status tracks whether this person supports DPG. Party membership can be added later if DPG provides an official member roster.
             </p>
           </div>
         </section>

@@ -48,21 +48,21 @@ The immediate goal is to turn the working foundation into a workflow DPG can con
 
 ### Intake Review + Relationship Status Polish
 
-This was the most important next implementation step because it clarifies how a person moves from raw intake into DPG's working contact/member/supporter universe.
+This was the most important next implementation step because it clarifies how a person moves from raw intake into DPG's working contact/supporter universe.
 
 Built on `feature/intake-relationship-household-polish`:
 
 - A clear Intake reviewer flow.
 - Approve/reject actions.
 - Mark record lifecycle as active contact, duplicate, invalid, or archived.
-- Track support status separately as unknown, supporter, undecided, or not supporting.
-- Track membership separately as not a member or member.
-- Track volunteer status separately as unknown, interested, active, or not interested.
+- Track support status separately as not reviewed, supporter, undecided, or not supporting.
+- Track volunteer status separately as not reviewed, interested, active, or not interested.
 - Keep contacted/not-contacted status derived from contact-attempt history.
+- Keep the legacy `membership_status` backend field reserved for future official member-roster imports/cross-reference, but hide it from the active manual UI until DPG defines that workflow.
 - Link out to the full GEC match review context from the intake review dialog.
 - Surface current/possible GEC match status in the review context.
 - Add optional initial note/contact outcome during review.
-- Make official supporter/member/volunteer counts depend on relationship fields, not just record existence.
+- Make official supporter/volunteer counts depend on relationship fields, not just record existence.
 - Ensure audit logs capture review decisions.
 
 Implemented acceptance criteria:
@@ -71,7 +71,7 @@ Implemented acceptance criteria:
 - Reviewer can classify it without leaving the review workflow.
 - Reviewer can open the full record to confirm/link GEC match.
 - Rejected/invalid/duplicate records stop appearing as normal working contacts.
-- Supporter/member/volunteer counts only include records marked with those relationship statuses.
+- Supporter/volunteer counts only include records marked with those relationship statuses.
 - DPG terminology is clear to non-technical staff.
 
 Still worth polishing later:
@@ -86,7 +86,7 @@ Still worth polishing later:
 Build first-class import types:
 
 - DPG contacts/supporters
-- DPG members
+- official DPG member rosters
 - registered Democrat list
 - other/custom lists
 
@@ -98,7 +98,7 @@ Track:
 - imported by
 - import date
 - GEC match state
-- whether the imported person became a contact, member, supporter, volunteer, or intake record
+- whether the imported person became a contact, supporter, volunteer, intake record, or future official member-roster match
 
 ### 2. Cross-reference reporting polish
 
@@ -108,12 +108,12 @@ Partially completed on `feature/intake-relationship-household-polish`:
 
 Still refine reports around DPG list types:
 
-- DPG members not found on GEC list
+- official DPG member-roster records not found on GEC list
 - registered Democrats not in DPG contacts
 - DPG contacts not linked to GEC
 - GEC voters with linked DPG contact
 - possible GEC matches needing review
-- members/supporters needing registration help
+- supporters and future official member-roster records needing registration help
 - address/village mismatches
 
 ### 3. Household canvassing workflow
@@ -122,7 +122,7 @@ Partially completed on `feature/intake-relationship-household-polish`:
 
 - Household search shows latest contact attempt for DPG records.
 - Staff can log a canvassing/contact outcome directly from household results.
-- Staff can update support/member/volunteer status from the household view.
+- Staff can update support/volunteer status from the household view.
 
 Still turn household search into a fuller field action:
 
@@ -133,15 +133,17 @@ Still turn household search into a fuller field action:
 
 ### 4. QR and attribution
 
-Build DPG-branded QR/share links for:
+Implemented on PR #35 as the first usable slice:
 
 - public signup
-- events
-- canvassers
-- villages/precincts
-- outreach pushes
+- village/canvasser/outreach/custom source links
+- in-browser QR generation
+- copy/open controls
+- active/inactive toggles
+- paginated signup lists per link
+- contact detail/list attribution so staff can see QR-origin signups clearly
 
-Track source attribution on contacts.
+Future polish can add print-ready downloads, event-specific templates, and DPG-approved naming conventions after they test it.
 
 ### 5. Roles and permissions polish
 

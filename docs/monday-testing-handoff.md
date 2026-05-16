@@ -157,15 +157,15 @@ Ask testers to send:
 - anything that uses the wrong DPG language
 - places where the workflow does not match how staff actually work
 - reports they wish they had
-- fields/statuses they need for members, supporters, registered Democrats, or voter outreach
+- fields/statuses they need for supporters, official member-roster cross-reference, registered Democrats, or voter outreach
 - what role/access levels they expect for office staff, field organizers, canvassers, and later poll watchers
 
 ## Known deferred modules
 
-- Explicit list types for DPG members, registered Democrats, supporters/contacts, and other custom lists.
+- Explicit list types for official DPG member rosters, registered Democrats, supporters/contacts, and other custom lists.
 - DPG/GEC cross-reference reports.
 - Support/lean/donation tracking.
-- QR download/share/attribution workflow.
+- Print-ready/downloadable QR assets beyond the current QR/share-link attribution workflow.
 - DPG role-name cleanup and permission polish.
 - Advanced canvassing route/assignment tooling.
 - Election Day command center.

@@ -1,0 +1,414 @@
+# frozen_string_literal: true
+
+require "test_helper"
+require "cgi"
+
+class ReferralCodesTest < ActionDispatch::IntegrationTest
+  def setup
+    super
+    @campaign = Campaign.create!(name: "Democratic Party of Guam", election_year: 2026, status: "active")
+    @village = Village.create!(name: "Tamuning #{SecureRandom.hex(3)}")
+    @admin = User.create!(
+      clerk_id: "clerk-admin-#{SecureRandom.hex(4)}",
+      email: "admin-#{SecureRandom.hex(4)}@example.com",
+      name: "Admin User",
+      role: "campaign_admin"
+    )
+  end
+
+  test "admin creates signup link and public signup stores attribution" do
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Tamuning Canvass",
+          source_type: "village",
+          village_id: @village.id,
+          notes: "Saturday outreach"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :created
+    payload = JSON.parse(response.body)
+    code = payload.dig("referral_code", "code")
+    assert code.present?
+    assert_match %r{/signup/#{Regexp.escape(code)}\z}, payload.dig("referral_code", "signup_url")
+
+    assert_difference -> { Supporter.where(source: "qr_signup").count }, 1 do
+      post "/api/v1/supporters?leader_code=#{CGI.escape(code)}",
+        params: {
+          supporter: {
+            first_name: "Source",
+            last_name: "Signup",
+            contact_number: "6715550101",
+            email: "source-signup@example.com",
+            street_address: "1 Source Lane",
+            village_id: @village.id,
+            registered_voter_status: "not_sure"
+          }
+        },
+        as: :json
+    end
+
+    assert_response :created
+    supporter_payload = JSON.parse(response.body).fetch("supporter")
+    assert_equal "qr_signup", supporter_payload.fetch("source")
+    assert_equal "qr_self_signup", supporter_payload.fetch("attribution_method")
+    assert_equal code, supporter_payload.fetch("leader_code")
+    assert_equal "Tamuning Canvass", supporter_payload.fetch("referral_display_name")
+
+    get "/api/v1/referral_codes", headers: auth_headers(@admin)
+    assert_response :success
+    row = JSON.parse(response.body).fetch("referral_codes").find { |item| item["code"] == code }
+    assert_equal 1, row.fetch("signup_count")
+  end
+
+  test "admin can page supporters attributed to a signup link" do
+    referral = ReferralCode.create!(
+      display_name: "Paged Link",
+      code: "PAGED-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: { "source_type" => "village" }
+    )
+    12.times do |index|
+      Supporter.create!(
+        first_name: "QR#{index}",
+        last_name: "Signup",
+        contact_number: "671555#{index.to_s.rjust(4, '0')}",
+        village: @village,
+        source: "qr_signup",
+        attribution_method: "qr_self_signup",
+        leader_code: referral.code,
+        referral_code: referral,
+        contact_classification: "new_intake",
+        support_status: "unknown",
+        membership_status: "not_member",
+        volunteer_status: "unknown",
+        registered_voter_status: "not_sure",
+        review_status: "pending",
+        public_review_status: "not_applicable",
+        intake_status: "accepted",
+        status: "active"
+      )
+    end
+
+    get "/api/v1/referral_codes/#{referral.id}/supporters?page=2&per_page=10",
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal 2, payload.fetch("supporters").size
+    assert_equal 12, payload.dig("pagination", "total")
+    assert_equal 2, payload.dig("pagination", "pages")
+    assert_equal "qr_signup", payload.fetch("supporters").first.fetch("source")
+  end
+
+  test "inactive signup link is not applied to new public signup" do
+    referral = ReferralCode.create!(
+      display_name: "Inactive Link",
+      code: "INACTIVE-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: false,
+      metadata: { "source_type" => "custom" }
+    )
+
+    post "/api/v1/supporters?leader_code=#{CGI.escape(referral.code)}",
+      params: {
+        supporter: {
+          first_name: "Plain",
+          last_name: "Signup",
+          contact_number: "6715550202",
+          email: "plain-signup@example.com",
+          street_address: "2 Source Lane",
+          village_id: @village.id,
+          registered_voter_status: "not_sure"
+        }
+      },
+      as: :json
+
+    assert_response :created
+    supporter_payload = JSON.parse(response.body).fetch("supporter")
+    assert_equal "public_signup", supporter_payload.fetch("source")
+    assert_nil supporter_payload.fetch("leader_code")
+    assert_nil supporter_payload.fetch("referral_code_id")
+  end
+
+  test "create returns json error when village does not exist" do
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Unknown Village Link",
+          source_type: "village",
+          village_id: Village.maximum(:id).to_i + 10_000
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :not_found
+    payload = JSON.parse(response.body)
+    assert_equal "Village not found", payload.fetch("error")
+    assert_equal "village_not_found", payload.fetch("code")
+  end
+
+  test "create returns json error when assigned user does not exist" do
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Unknown User Link",
+          source_type: "canvasser",
+          village_id: @village.id,
+          assigned_user_id: User.maximum(:id).to_i + 10_000
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :not_found
+    payload = JSON.parse(response.body)
+    assert_equal "Assigned user not found", payload.fetch("error")
+    assert_equal "user_not_found", payload.fetch("code")
+  end
+
+  test "create stores precinct metadata when precinct source has village precinct" do
+    precinct = Precinct.create!(village: @village, number: "17D", alpha_range: "Sam-Z")
+
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Tamuning Precinct 17D",
+          source_type: "precinct",
+          village_id: @village.id,
+          precinct_id: precinct.id
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :created
+    payload = JSON.parse(response.body)
+    assert_equal "precinct", payload.dig("referral_code", "source_type")
+    assert_equal precinct.id, payload.dig("referral_code", "precinct_id")
+  end
+
+  test "model accessors tolerate nil metadata" do
+    referral = ReferralCode.new(
+      display_name: "Nil Metadata",
+      code: "NIL-META-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      metadata: nil
+    )
+
+    assert_equal "custom", referral.source_type
+    assert_nil referral.precinct_id
+    assert_nil referral.notes
+    assert referral.valid?
+  end
+
+  test "create returns json error when precinct source is missing precinct" do
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Tamuning Precinct",
+          source_type: "precinct",
+          village_id: @village.id
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "Precinct is required for precinct signup links", payload.fetch("error")
+    assert_equal "precinct_required", payload.fetch("code")
+  end
+
+  test "create returns json error when precinct is outside link village" do
+    other_village = Village.create!(name: "Yona #{SecureRandom.hex(3)}")
+    precinct = Precinct.create!(village: other_village, number: "10A")
+
+    post "/api/v1/referral_codes",
+      params: {
+        referral_code: {
+          display_name: "Wrong Village Precinct",
+          source_type: "precinct",
+          village_id: @village.id,
+          precinct_id: precinct.id
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "Precinct not found for village", payload.fetch("error")
+    assert_equal "precinct_not_found", payload.fetch("code")
+  end
+
+  test "update returns json error when signup link does not exist" do
+    patch "/api/v1/referral_codes/#{ReferralCode.maximum(:id).to_i + 10_000}",
+      params: {
+        referral_code: {
+          active: false
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :not_found
+    payload = JSON.parse(response.body)
+    assert_equal "Signup link not found", payload.fetch("error")
+    assert_equal "referral_code_not_found", payload.fetch("code")
+  end
+
+  test "update returns json error when switching to precinct source without precinct" do
+    referral = ReferralCode.create!(
+      display_name: "Village Link",
+      code: "MISSING-PRECINCT-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: { "source_type" => "village" }
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          source_type: "precinct"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "Precinct is required for precinct signup links", payload.fetch("error")
+    assert_equal "precinct_required", payload.fetch("code")
+    assert_equal "village", referral.reload.source_type
+  end
+
+  test "update clears stale precinct metadata when source changes away from precinct" do
+    precinct = Precinct.create!(village: @village, number: "17D", alpha_range: "Sam-Z")
+    referral = ReferralCode.create!(
+      display_name: "Precinct Link",
+      code: "PRECINCT-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: {
+        "source_type" => "precinct",
+        "precinct_id" => precinct.id.to_s,
+        "notes" => "Initial note"
+      }
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          source_type: "village"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    referral.reload
+    assert_equal "village", referral.source_type
+    assert_nil referral.precinct_id
+    assert_nil JSON.parse(response.body).dig("referral_code", "precinct_id")
+  end
+
+  test "update preserves metadata fields that were not sent" do
+    precinct = Precinct.create!(village: @village, number: "17D", alpha_range: "Sam-Z")
+    referral = ReferralCode.create!(
+      display_name: "Precinct Link",
+      code: "VILLAGE-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: {
+        "source_type" => "precinct",
+        "precinct_id" => precinct.id.to_s,
+        "notes" => "Initial note"
+      }
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          notes: "Updated note"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    referral.reload
+    assert_equal "precinct", referral.source_type
+    assert_equal precinct.id.to_s, referral.precinct_id
+    assert_equal "Updated note", referral.notes
+  end
+
+  test "update can clear optional metadata fields" do
+    referral = ReferralCode.create!(
+      display_name: "Village Link",
+      code: "CLEAR-#{SecureRandom.hex(2).upcase}",
+      village: @village,
+      active: true,
+      metadata: {
+        "source_type" => "village",
+        "precinct_id" => "P-001",
+        "notes" => "Initial note"
+      }
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          precinct_id: "",
+          notes: ""
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    referral.reload
+    assert_equal "village", referral.source_type
+    assert_nil referral.precinct_id
+    assert_nil referral.notes
+  end
+
+  test "update returns json error when signup link is outside user village scope" do
+    other_village = Village.create!(name: "Yigo #{SecureRandom.hex(3)}")
+    referral = ReferralCode.create!(
+      display_name: "Other Village Link",
+      code: "OTHER-#{SecureRandom.hex(2).upcase}",
+      village: other_village,
+      active: true,
+      metadata: { "source_type" => "custom" }
+    )
+    leader = User.create!(
+      clerk_id: "clerk-leader-#{SecureRandom.hex(4)}",
+      email: "leader-#{SecureRandom.hex(4)}@example.com",
+      name: "Village Leader",
+      role: "block_leader",
+      assigned_village_id: @village.id
+    )
+
+    patch "/api/v1/referral_codes/#{referral.id}",
+      params: {
+        referral_code: {
+          active: false
+        }
+      },
+      headers: auth_headers(leader),
+      as: :json
+
+    assert_response :not_found
+    payload = JSON.parse(response.body)
+    assert_equal "Signup link not found", payload.fetch("error")
+    assert_equal "referral_code_not_found", payload.fetch("code")
+    assert referral.reload.active?
+  end
+end
