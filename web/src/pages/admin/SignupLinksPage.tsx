@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Plus, QrCode, Share2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Plus, QrCode, Share2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import WorkspacePage from '../../components/WorkspacePage';
 import { useSession } from '../../hooks/useSession';
@@ -208,6 +208,12 @@ export default function SignupLinksPage() {
     enabled: Boolean(sessionData?.permissions?.can_manage_users),
   });
 
+  useEffect(() => {
+    if (notice?.type !== 'success') return undefined;
+    const timer = window.setTimeout(() => setNotice(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   const villages = useMemo(() => villagesData?.villages ?? [], [villagesData]);
   const users = useMemo(() => usersData?.users ?? [], [usersData]);
   const signupLinks = data?.referral_codes ?? [];
@@ -388,13 +394,17 @@ export default function SignupLinksPage() {
           <h2 className="text-base font-semibold text-slate-950">Attributed Signup Links</h2>
           <p className="mt-1 text-sm text-slate-600">Each link routes to the public signup form and stores the source code on created contacts.</p>
           {notice && (
-            <p
-              className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+            <div
+              className={`mt-3 flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm ${
                 notice.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
               }`}
+              role={notice.type === 'error' ? 'alert' : 'status'}
             >
-              {notice.message}
-            </p>
+              <span>{notice.message}</span>
+              <button type="button" className="rounded p-1 hover:bg-white/70" onClick={() => setNotice(null)} aria-label="Dismiss notice">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           )}
         </div>
         {isLoading ? (

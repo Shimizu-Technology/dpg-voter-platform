@@ -7,7 +7,7 @@ class ReferralCode < ApplicationRecord
 
   validates :code, presence: true, uniqueness: true
   validates :display_name, presence: true
-  validates :source_type, inclusion: { in: %w[village precinct canvasser outreach custom] }, allow_nil: true
+  validates :source_type, inclusion: { in: %w[village precinct canvasser outreach custom] }
 
   scope :active, -> { where(active: true) }
 
