@@ -14,11 +14,8 @@ import {
   contactClassificationLabel,
 } from '../../lib/contactClassification';
 import {
-  MEMBERSHIP_STATUS_OPTIONS,
   SUPPORT_STATUS_OPTIONS,
   VOLUNTEER_STATUS_OPTIONS,
-  membershipStatusChipClass,
-  membershipStatusLabel,
   supportStatusChipClass,
   supportStatusLabel,
   volunteerStatusChipClass,
@@ -154,7 +151,6 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   source: 'Source',
   contact_classification: 'Record status',
   support_status: 'Support status',
-  membership_status: 'Party membership',
   volunteer_status: 'Volunteer status',
   intake_status: 'Supporter status',
   review_status: 'Review status',
@@ -769,11 +765,6 @@ export default function SupporterDetailPage() {
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${supportStatusChipClass(supporter.support_status)}`}>
             {supportStatusLabel(supporter.support_status)}
           </span>
-          {supporter.membership_status === 'member' && (
-            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${membershipStatusChipClass(supporter.membership_status)}`}>
-              {membershipStatusLabel(supporter.membership_status)}
-            </span>
-          )}
           {supporter.volunteer_status && supporter.volunteer_status !== 'unknown' && (
             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${volunteerStatusChipClass(supporter.volunteer_status)}`}>
               {volunteerStatusLabel(supporter.volunteer_status)}
@@ -971,18 +962,6 @@ export default function SupporterDetailPage() {
                 disabled={!isEditing}
               >
                 {SUPPORT_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </DetailField>
-            <DetailField label="Party membership">
-              <select
-                value={String(currentForm.membership_status || 'not_member')}
-                onChange={(e) => updateDraft({ membership_status: e.target.value })}
-                className="w-full border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] disabled:bg-[var(--surface-bg)] disabled:text-[var(--text-primary)]"
-                disabled={!isEditing}
-              >
-                {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
@@ -1223,7 +1202,7 @@ export default function SupporterDetailPage() {
         <section className="app-card p-4">
           <h2 className="font-semibold text-[var(--text-primary)] mb-2">Contact Relationship</h2>
           <div className="space-y-3">
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Record status</p>
                 <span className={`mt-1 inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${contactClassificationChipClass(supporter.contact_classification)}`}>
@@ -1237,12 +1216,6 @@ export default function SupporterDetailPage() {
                 </span>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Party membership</p>
-                <span className={`mt-1 inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${membershipStatusChipClass(supporter.membership_status)}`}>
-                  {membershipStatusLabel(supporter.membership_status)}
-                </span>
-              </div>
-              <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Volunteer interest</p>
                 <span className={`mt-1 inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${volunteerStatusChipClass(supporter.volunteer_status)}`}>
                   {volunteerStatusLabel(supporter.volunteer_status)}
@@ -1250,7 +1223,7 @@ export default function SupporterDetailPage() {
               </div>
             </div>
             <p className="text-sm text-[var(--text-secondary)]">
-              {supporterStatusLabel(supporter)}. Support status tracks whether this person supports DPG; party membership tracks whether they are on DPG's member roster.
+              {supporterStatusLabel(supporter)}. Support status tracks whether this person supports DPG. Party membership can be added later if DPG provides an official member roster.
             </p>
           </div>
         </section>
