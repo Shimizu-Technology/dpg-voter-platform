@@ -258,14 +258,6 @@ module Api
 
       # PATCH /api/v1/supporters/:id/canvass_update
       def canvass_update
-        unless can_view_supporters?
-          return render_api_error(
-            message: "You do not have permission to update household canvassing records",
-            status: :forbidden,
-            code: "supporter_edit_access_required"
-          )
-        end
-
         supporter = scope_supporters(Supporter.contacts).find_by(id: params[:id])
         unless supporter
           return render_api_error(
@@ -294,7 +286,7 @@ module Api
         end
 
         old_classification = supporter.contact_classification
-        old_relationship_state = supporter.slice("support_status", "membership_status", "volunteer_status")
+        old_relationship_state = supporter.slice("support_status", "volunteer_status")
         attempt = nil
 
         begin
@@ -312,9 +304,9 @@ module Api
             attempt = create_required_canvass_contact_attempt!(supporter, canvass[:contact_attempt])
             log_audit!(supporter, action: "household_canvass_logged", changed_data: {
               "contact_classification" => old_classification == supporter.contact_classification ? nil : [ old_classification, supporter.contact_classification ],
-              "relationship" => old_relationship_state == supporter.slice("support_status", "membership_status", "volunteer_status") ? nil : {
+              "relationship" => old_relationship_state == supporter.slice("support_status", "volunteer_status") ? nil : {
                 "before" => old_relationship_state,
-                "after" => supporter.slice("support_status", "membership_status", "volunteer_status")
+                "after" => supporter.slice("support_status", "volunteer_status")
               },
               "contact_attempt_id" => attempt.id,
               "channel" => attempt.channel,
