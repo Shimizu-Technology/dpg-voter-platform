@@ -91,7 +91,7 @@ function QrPreview({ url, label, className = 'h-28 w-28' }: { url: string; label
 
   useEffect(() => {
     let cancelled = false;
-    QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: '#0f2a5b', light: '#ffffff' } })
+    QRCode.toDataURL(url, { margin: 1, width: 720, color: { dark: '#0f2a5b', light: '#ffffff' } })
       .then((dataUrl) => {
         if (!cancelled) setSrc(dataUrl);
       })
@@ -192,6 +192,7 @@ export default function SignupLinksPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [expandedLinkId, setExpandedLinkId] = useState<number | null>(null);
+  const [createFormOpen, setCreateFormOpen] = useState(false);
 
   const { data, isLoading } = useQuery<ReferralCodesResponse>({
     queryKey: ['referral-codes'],
@@ -267,8 +268,8 @@ export default function SignupLinksPage() {
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="app-card p-5">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-            <QrPreview url={generalSignupUrl} label="general signup" className="h-52 w-52 sm:h-44 sm:w-44 lg:h-56 lg:w-56" />
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
+            <QrPreview url={generalSignupUrl} label="general signup" className="h-72 w-72 max-w-full sm:h-80 sm:w-80 lg:h-96 lg:w-96" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-semibold text-slate-950">General signup</h2>
@@ -287,78 +288,98 @@ export default function SignupLinksPage() {
         </div>
 
         <form
-          className="app-card space-y-4 p-5"
+          className="app-card p-5"
           onSubmit={(event) => {
             event.preventDefault();
             if (canCreate) createMutation.mutate();
           }}
         >
-          <div className="flex items-center gap-2">
-            <Plus className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-semibold text-slate-950">Create Source Link</h2>
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              className="flex min-h-[44px] flex-1 items-center gap-2 text-left lg:pointer-events-none lg:min-h-0"
+              onClick={() => setCreateFormOpen((value) => !value)}
+            >
+              <Plus className="h-5 w-5 text-primary" />
+              <h2 className="text-base font-semibold text-slate-950">Create Source Link</h2>
+            </button>
+            <button
+              type="button"
+              className="app-btn-secondary inline-flex items-center gap-2 lg:hidden"
+              onClick={() => setCreateFormOpen((value) => !value)}
+              aria-expanded={createFormOpen}
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${createFormOpen ? 'rotate-180' : ''}`} />
+              {createFormOpen ? 'Hide' : 'Show'}
+            </button>
           </div>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Label</span>
-            <input
-              value={draft.display_name}
-              onChange={(event) => setDraft((value) => ({ ...value, display_name: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              placeholder="Tamuning canvass team"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Source type</span>
-            <select
-              value={draft.source_type}
-              onChange={(event) => setDraft((value) => ({ ...value, source_type: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            >
-              {sourceTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Village</span>
-            <select
-              value={draft.village_id}
-              onChange={(event) => setDraft((value) => ({ ...value, village_id: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            >
-              <option value="">Choose village</option>
-              {villages.map((village) => <option key={village.id} value={village.id}>{village.name}</option>)}
-            </select>
-          </label>
-          {sessionData?.permissions?.can_manage_users && (
+          {!createFormOpen && (
+            <p className="mt-2 text-sm text-slate-500 lg:hidden">Open this when you need a new QR link for a village, canvasser, or outreach push.</p>
+          )}
+          <div className={`${createFormOpen ? 'block' : 'hidden'} space-y-4 lg:block`}>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700">Assigned staff</span>
+              <span className="font-medium text-slate-700">Label</span>
+              <input
+                value={draft.display_name}
+                onChange={(event) => setDraft((value) => ({ ...value, display_name: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="Tamuning canvass team"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">Source type</span>
               <select
-                value={draft.assigned_user_id}
-                onChange={(event) => setDraft((value) => ({ ...value, assigned_user_id: event.target.value }))}
+                value={draft.source_type}
+                onChange={(event) => setDraft((value) => ({ ...value, source_type: event.target.value }))}
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               >
-                <option value="">No staff assignment</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>{user.name || user.email}</option>
-                ))}
+                {sourceTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
               </select>
             </label>
-          )}
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Notes</span>
-            <textarea
-              value={draft.notes}
-              onChange={(event) => setDraft((value) => ({ ...value, notes: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              rows={3}
-              placeholder="Optional context for staff"
-            />
-          </label>
-          <button type="submit" className="app-btn-primary inline-flex w-full items-center justify-center gap-2" disabled={!canCreate}>
-            <QrCode className="h-4 w-4" />
-            {createMutation.isPending ? 'Creating...' : 'Create Link'}
-          </button>
-          {createMutation.isError && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Could not create this link. Check the fields and try again.</p>
-          )}
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">Village</span>
+              <select
+                value={draft.village_id}
+                onChange={(event) => setDraft((value) => ({ ...value, village_id: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="">Choose village</option>
+                {villages.map((village) => <option key={village.id} value={village.id}>{village.name}</option>)}
+              </select>
+            </label>
+            {sessionData?.permissions?.can_manage_users && (
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Assigned staff</span>
+                <select
+                  value={draft.assigned_user_id}
+                  onChange={(event) => setDraft((value) => ({ ...value, assigned_user_id: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                >
+                  <option value="">No staff assignment</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>{user.name || user.email}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">Notes</span>
+              <textarea
+                value={draft.notes}
+                onChange={(event) => setDraft((value) => ({ ...value, notes: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                placeholder="Optional context for staff"
+              />
+            </label>
+            <button type="submit" className="app-btn-primary inline-flex w-full items-center justify-center gap-2" disabled={!canCreate}>
+              <QrCode className="h-4 w-4" />
+              {createMutation.isPending ? 'Creating...' : 'Create Link'}
+            </button>
+            {createMutation.isError && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Could not create this link. Check the fields and try again.</p>
+            )}
+          </div>
         </form>
       </section>
 
@@ -384,8 +405,8 @@ export default function SignupLinksPage() {
           <div className="divide-y divide-slate-100">
             {signupLinks.map((link) => (
               <div key={link.id} className={`p-5 ${link.active ? '' : 'bg-slate-50 opacity-75'}`}>
-                <div className="grid gap-4 lg:grid-cols-[168px_minmax(0,1fr)_auto]">
-                  <QrPreview url={link.signup_url} label={link.display_name} className="h-40 w-40 sm:h-36 sm:w-36 lg:h-40 lg:w-40" />
+                <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)_auto]">
+                  <QrPreview url={link.signup_url} label={link.display_name} className="h-52 w-52 max-w-full sm:h-56 sm:w-56 lg:h-56 lg:w-56" />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-base font-semibold text-slate-950">{link.display_name}</h3>

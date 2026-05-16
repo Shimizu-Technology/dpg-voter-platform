@@ -1239,7 +1239,7 @@ export default function SupportersPage() {
                       </select>
                     </label>
                     <label className="space-y-1.5">
-                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Membership</span>
+                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Party membership</span>
                       <select
                         value={reviewDraft.membership_status}
                         onChange={(event) => setReviewDraft((draft) => ({ ...draft, membership_status: event.target.value }))}

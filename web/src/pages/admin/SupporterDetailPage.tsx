@@ -154,7 +154,7 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   source: 'Source',
   contact_classification: 'Record status',
   support_status: 'Support status',
-  membership_status: 'Membership',
+  membership_status: 'Party membership',
   volunteer_status: 'Volunteer status',
   intake_status: 'Supporter status',
   review_status: 'Review status',
@@ -975,7 +975,7 @@ export default function SupporterDetailPage() {
                 ))}
               </select>
             </DetailField>
-            <DetailField label="Membership">
+            <DetailField label="Party membership">
               <select
                 value={String(currentForm.membership_status || 'not_member')}
                 onChange={(e) => updateDraft({ membership_status: e.target.value })}
@@ -1237,7 +1237,7 @@ export default function SupporterDetailPage() {
                 </span>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Membership</p>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Party membership</p>
                 <span className={`mt-1 inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${membershipStatusChipClass(supporter.membership_status)}`}>
                   {membershipStatusLabel(supporter.membership_status)}
                 </span>
@@ -1250,7 +1250,7 @@ export default function SupporterDetailPage() {
               </div>
             </div>
             <p className="text-sm text-[var(--text-secondary)]">
-              {supporterStatusLabel(supporter)}. Contact record status, support, membership, volunteer interest, and outreach history are tracked separately.
+              {supporterStatusLabel(supporter)}. Support status tracks whether this person supports DPG; party membership tracks whether they are on DPG's member roster.
             </p>
           </div>
         </section>
