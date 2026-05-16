@@ -10,6 +10,7 @@ import { createReferralCode, getReferralCodeSupporters, getReferralCodes, getUse
 interface VillageOption {
   id: number;
   name: string;
+  precincts?: Array<{ id: number; number: string; alpha_range?: string | null }>;
 }
 
 interface UserOption {
@@ -70,6 +71,7 @@ interface DraftState {
   display_name: string;
   source_type: string;
   village_id: string;
+  precinct_id: string;
   assigned_user_id: string;
   notes: string;
 }
@@ -186,6 +188,7 @@ export default function SignupLinksPage() {
     display_name: '',
     source_type: 'village',
     village_id: '',
+    precinct_id: '',
     assigned_user_id: '',
     notes: '',
   });
@@ -216,6 +219,10 @@ export default function SignupLinksPage() {
 
   const villages = useMemo(() => villagesData?.villages ?? [], [villagesData]);
   const users = useMemo(() => usersData?.users ?? [], [usersData]);
+  const selectedVillage = useMemo(
+    () => villages.find((village) => String(village.id) === draft.village_id),
+    [villages, draft.village_id]
+  );
   const signupLinks = data?.referral_codes ?? [];
   const generalSignupUrl = `${(data?.signup_base_url || window.location.origin).replace(/\/$/, '')}/signup`;
 
@@ -224,11 +231,14 @@ export default function SignupLinksPage() {
       display_name: draft.display_name,
       source_type: draft.source_type,
       village_id: Number(draft.village_id),
+      precinct_id: draft.source_type === 'precinct' && draft.precinct_id ? draft.precinct_id : undefined,
       assigned_user_id: draft.assigned_user_id ? Number(draft.assigned_user_id) : undefined,
       notes: draft.notes || undefined,
     }),
     onSuccess: () => {
-      setDraft({ display_name: '', source_type: 'village', village_id: '', assigned_user_id: '', notes: '' });
+      setDraft({ display_name: '', source_type: 'village', village_id: '', precinct_id: '', assigned_user_id: '', notes: '' });
+      setNotice({ type: 'success', message: 'Signup link created.' });
+      setCreateFormOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['referral-codes'] });
     },
   });
@@ -255,7 +265,10 @@ export default function SignupLinksPage() {
     }
   };
 
-  const canCreate = draft.display_name.trim().length > 1 && draft.village_id && !createMutation.isPending;
+  const canCreate = draft.display_name.trim().length > 1 &&
+    draft.village_id &&
+    (draft.source_type !== 'precinct' || draft.precinct_id) &&
+    !createMutation.isPending;
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -336,7 +349,11 @@ export default function SignupLinksPage() {
               <span className="font-medium text-slate-700">Source type</span>
               <select
                 value={draft.source_type}
-                onChange={(event) => setDraft((value) => ({ ...value, source_type: event.target.value }))}
+                onChange={(event) => setDraft((value) => ({
+                  ...value,
+                  source_type: event.target.value,
+                  precinct_id: event.target.value === 'precinct' ? value.precinct_id : '',
+                }))}
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               >
                 {sourceTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
@@ -346,13 +363,31 @@ export default function SignupLinksPage() {
               <span className="font-medium text-slate-700">Village</span>
               <select
                 value={draft.village_id}
-                onChange={(event) => setDraft((value) => ({ ...value, village_id: event.target.value }))}
+                onChange={(event) => setDraft((value) => ({ ...value, village_id: event.target.value, precinct_id: '' }))}
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               >
                 <option value="">Choose village</option>
                 {villages.map((village) => <option key={village.id} value={village.id}>{village.name}</option>)}
               </select>
             </label>
+            {draft.source_type === 'precinct' && (
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Precinct</span>
+                <select
+                  value={draft.precinct_id}
+                  onChange={(event) => setDraft((value) => ({ ...value, precinct_id: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  disabled={!draft.village_id}
+                >
+                  <option value="">{draft.village_id ? 'Choose precinct' : 'Choose a village first'}</option>
+                  {(selectedVillage?.precincts ?? []).map((precinct) => (
+                    <option key={precinct.id} value={precinct.id}>
+                      {precinct.number}{precinct.alpha_range ? ` (${precinct.alpha_range})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {sessionData?.permissions?.can_manage_users && (
               <label className="block text-sm">
                 <span className="font-medium text-slate-700">Assigned staff</span>
