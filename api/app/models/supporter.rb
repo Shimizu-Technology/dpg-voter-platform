@@ -138,7 +138,8 @@ class Supporter < ApplicationRecord
   scope :needs_campaign_help, -> {
     where(
       wants_to_volunteer: true
-    ).or(where(needs_absentee_ballot_help: true))
+    ).or(where(volunteer_status: "interested"))
+      .or(where(needs_absentee_ballot_help: true))
       .or(where(needs_homebound_voting_help: true))
       .or(where(needs_voter_registration_help: true))
       .or(where(needs_election_day_ride: true))
@@ -147,6 +148,7 @@ class Supporter < ApplicationRecord
   # registration and support queues remain independent.
   scope :needs_support_services, -> {
     where(wants_to_volunteer: true)
+      .or(where(volunteer_status: "interested"))
       .or(where(needs_absentee_ballot_help: true))
       .or(where(needs_homebound_voting_help: true))
       .or(where(needs_election_day_ride: true))

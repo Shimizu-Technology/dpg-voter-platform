@@ -513,6 +513,35 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal @admin.name, row.dig("latest_contact_attempt", "recorded_by_name")
   end
 
+  test "supporters index search matches first last and last first contact names" do
+    village = Village.find_or_create_by!(name: "Barrigada")
+    supporter = Supporter.create!(
+      first_name: "Kameren",
+      last_name: "Cruz",
+      contact_number: "+16715550001",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "active"
+    )
+
+    get "/api/v1/supporters?search=Kameren%20Cruz",
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    assert_includes response.parsed_body["supporters"].map { |row| row["id"] }, supporter.id
+
+    get "/api/v1/supporters?search=Cruz,%20Kameren",
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    assert_includes response.parsed_body["supporters"].map { |row| row["id"] }, supporter.id
+  end
+
   test "canvass update cannot bypass intake review" do
     village = Village.find_or_create_by!(name: "Hågat")
     supporter = Supporter.create!(

@@ -578,49 +578,64 @@ export default function HouseholdsPage() {
                             </div>
                             {isExpanded && (
                               <div className="mt-3 rounded-lg bg-slate-50 p-3">
-                              <div className="grid gap-2 sm:grid-cols-2">
+                                <p className="mb-3 text-xs leading-5 text-slate-600">
+                                  Use support status for whether this person supports DPG, volunteer interest for whether they want to help, and contact method/outcome for what happened during this canvass touch.
+                                </p>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Support status
                                   <select
                                     value={draft.support_status}
                                     onChange={(event) => updateCanvassDraft(contact, { support_status: event.target.value })}
-                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900"
                                     aria-label="Support status"
                                   >
                                   {SUPPORT_STATUS_OPTIONS.map((option) => (
                                       <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                   </select>
+                                </label>
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Volunteer interest
                                 <select
                                   value={draft.volunteer_status}
                                   onChange={(event) => updateCanvassDraft(contact, { volunteer_status: event.target.value })}
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900"
                                   aria-label="Volunteer status"
                                 >
                                   {VOLUNTEER_STATUS_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                   ))}
                                 </select>
+                                </label>
                               </div>
-                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Contact method
                                   <select
                                     value={draft.channel}
                                     onChange={(event) => updateCanvassDraft(contact, { channel: event.target.value })}
-                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900"
                                     aria-label="Contact method"
                                   >
                                     {CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) => (
                                       <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                   </select>
+                                </label>
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Contact outcome
                                   <select
                                     value={draft.outcome}
                                     onChange={(event) => updateCanvassDraft(contact, { outcome: event.target.value })}
-                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900"
                                     aria-label="Contact outcome"
                                   >
                                     {OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS.map((option) => (
                                       <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                   </select>
+                                </label>
                                 </div>
                                 <textarea
                                   value={draft.note}

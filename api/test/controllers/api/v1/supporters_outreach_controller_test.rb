@@ -76,4 +76,30 @@ class Api::V1::SupportersControllerOutreachTest < ActionDispatch::IntegrationTes
     assert supporter, "Expected outreach response to include supporter #{@supporter.id}"
     assert_nil supporter["latest_contact_attempt"]
   end
+
+  test "outreach queue treats canvass volunteer interest as support follow-up" do
+    volunteer = Supporter.create!(
+      first_name: "Volunteer",
+      last_name: "Interest",
+      contact_number: "671-555-2020",
+      village: @village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      volunteer_status: "interested",
+      registered_voter: true,
+      registered_voter_status: "yes",
+      status: "active"
+    )
+
+    get "/api/v1/supporters/outreach", headers: auth_headers(@leader)
+
+    assert_response :success
+    row = response.parsed_body["supporters"].find { |supporter| supporter["id"] == volunteer.id }
+    assert_not_nil row
+    assert_equal true, row["needs_support_follow_up"]
+    assert_equal true, row["support_follow_up_open"]
+    assert_includes row["follow_up_reasons"], "Volunteer interest"
+  end
 end

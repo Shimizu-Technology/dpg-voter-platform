@@ -1455,6 +1455,9 @@ module Api
         phone_digits = raw.gsub(/\D/, "")
         conditions = [
           "LOWER(supporters.print_name) LIKE :text_query",
+          "LOWER(CONCAT_WS(' ', supporters.first_name, supporters.middle_name, supporters.last_name)) LIKE :text_query",
+          "LOWER(CONCAT_WS(' ', supporters.first_name, supporters.last_name)) LIKE :text_query",
+          "LOWER(CONCAT_WS(', ', supporters.last_name, supporters.first_name)) LIKE :text_query",
           "LOWER(supporters.first_name) LIKE :text_query",
           "LOWER(supporters.middle_name) LIKE :text_query",
           "LOWER(supporters.last_name) LIKE :text_query",
@@ -1752,7 +1755,7 @@ module Api
         when "ride"
           scope.where(needs_election_day_ride: true)
         when "volunteer"
-          scope.where(wants_to_volunteer: true)
+          scope.where(wants_to_volunteer: true).or(scope.where(volunteer_status: "interested"))
         when "any"
           scope.needs_campaign_help
         else
@@ -1816,6 +1819,7 @@ module Api
               supporters.needs_election_day_ride = TRUE
             ) THEN 8
             WHEN supporters.support_follow_up_status IS NULL AND supporters.wants_to_volunteer = TRUE THEN 7
+            WHEN supporters.support_follow_up_status IS NULL AND supporters.volunteer_status = 'interested' THEN 7
             WHEN supporters.registration_outreach_status = 'contacted' THEN 6
             WHEN supporters.support_follow_up_status = 'in_progress' THEN 5
             WHEN supporters.registration_outreach_status = 'registered' THEN 2
@@ -1859,7 +1863,7 @@ module Api
         reasons << "Absentee help" if supporter.needs_absentee_ballot_help
         reasons << "Homebound help" if supporter.needs_homebound_voting_help
         reasons << "Ride to polls" if supporter.needs_election_day_ride
-        reasons << "Volunteer interest" if supporter.wants_to_volunteer
+        reasons << "Volunteer interest" if supporter.wants_to_volunteer || supporter.volunteer_status == "interested"
         reasons
       end
 

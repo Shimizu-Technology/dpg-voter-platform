@@ -504,18 +504,18 @@ function selfReportedRegisteredStatusLabel(status?: string | null, fallback?: bo
   return 'Not sure';
 }
 
-function supportRequestBadges(supporter: Pick<SupporterDetail, 'needs_voter_registration_help' | 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer'>) {
+function supportRequestBadges(supporter: Pick<SupporterDetail, 'needs_voter_registration_help' | 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer' | 'volunteer_status'>) {
   const badges: string[] = [];
   if (supporter.needs_voter_registration_help) badges.push('Registration Help');
   if (supporter.needs_absentee_ballot_help) badges.push('Absentee Help');
   if (supporter.needs_homebound_voting_help) badges.push('Homebound Help');
   if (supporter.needs_election_day_ride) badges.push('Ride To Polls');
-  if (supporter.wants_to_volunteer) badges.push('Volunteer');
+  if (supporter.wants_to_volunteer || supporter.volunteer_status === 'interested') badges.push('Volunteer');
   return badges;
 }
 
-function hasSupportServiceFollowUp(supporter: Pick<SupporterDetail, 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer'>) {
-  return supporter.needs_absentee_ballot_help || supporter.needs_homebound_voting_help || supporter.needs_election_day_ride || supporter.wants_to_volunteer;
+function hasSupportServiceFollowUp(supporter: Pick<SupporterDetail, 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer' | 'volunteer_status'>) {
+  return supporter.needs_absentee_ballot_help || supporter.needs_homebound_voting_help || supporter.needs_election_day_ride || supporter.wants_to_volunteer || supporter.volunteer_status === 'interested';
 }
 
 function registrationFollowUpStatusLabel(status?: string | null) {
@@ -1452,7 +1452,10 @@ export default function SupporterDetailPage() {
         </section>
 
         <section className="app-card p-4">
-          <h2 className="font-semibold text-[var(--text-primary)] mb-2">Follow-Up Workflow</h2>
+          <h2 className="font-semibold text-[var(--text-primary)] mb-1">Registration & Support Follow-Up</h2>
+          <p className="mb-3 text-sm text-[var(--text-secondary)]">
+            Use this for outreach tasks like registration help, voter-help requests, and volunteer interest. GEC match review stays in Voter Check above.
+          </p>
           <div className="space-y-3">
             {supporter.registration_outreach_status === 'registered' && (
               <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
