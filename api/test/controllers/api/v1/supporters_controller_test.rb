@@ -1,4 +1,5 @@
 require "test_helper"
+require "csv"
 
 class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
   setup do
@@ -32,6 +33,57 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
 
     get "/api/v1/supporters/export", headers: auth_headers(data_manager)
     assert_response :success
+  end
+
+  test "export labels DPG village separately from linked GEC village" do
+    dpg_village = Village.find_or_create_by!(name: "Barrigada")
+    gec_village = Village.find_or_create_by!(name: "Hagåtña")
+    gec_voter = GecVoter.create!(
+      first_name: "Leon",
+      middle_name: "A.",
+      last_name: "Shimizu",
+      dob: Date.new(1999, 7, 20),
+      birth_year: 1999,
+      address: "PO BOX 761",
+      village: gec_village,
+      village_name: gec_village.name,
+      precinct_number: "1",
+      voter_registration_number: "78246",
+      gec_list_date: Date.new(2026, 5, 13),
+      imported_at: Time.current
+    )
+    supporter = Supporter.create!(
+      first_name: "Leon",
+      last_name: "Shimizu",
+      contact_number: "+16714830219",
+      dob: Date.new(1999, 7, 20),
+      street_address: "123 Example Street",
+      village: dpg_village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      review_status: "approved",
+      status: "active",
+      verification_status: "verified",
+      gec_voter: gec_voter
+    )
+    supporter.update_columns(gec_voter_id: gec_voter.id, verification_status: "verified", verification_reason: "matched_current_gec")
+
+    get "/api/v1/supporters/export",
+      params: { format_type: "csv", search: supporter.last_name },
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    csv = CSV.parse(response.body, headers: true)
+    row = csv.find { |values| values["Phone"] == supporter.contact_number }
+
+    assert_includes csv.headers, "DPG Village"
+    assert_includes csv.headers, "GEC Village"
+    assert_equal dpg_village.name, row["DPG Village"]
+    assert_equal gec_village.name, row["GEC Village"]
+    assert_equal "78246", row["GEC Voter Reg #"]
+    assert_equal "PO BOX 761", row["GEC Address"]
   end
 
   test "manual GEC verification links official voter geography while preserving submitted contact details" do

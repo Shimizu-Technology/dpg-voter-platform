@@ -569,7 +569,7 @@ module Api
 
       # GET /api/v1/supporters/export
       def export
-        supporters = apply_export_filters(scope_supporters(Supporter.includes(:village, :precinct).contacts.order(created_at: :desc)))
+        supporters = apply_export_filters(scope_supporters(Supporter.includes(:village, :precinct, :gec_voter).contacts.order(created_at: :desc)))
         total = supporters.count
 
         if total > MAX_EXPORT_ROWS
@@ -581,17 +581,23 @@ module Api
           )
         end
 
-        headers = [ "First Name", "Last Name", "Phone", "Village", "Precinct", "Street Address", "Email", "DOB",
+        headers = [ "First Name", "Last Name", "Phone", "DPG Village", "DPG Precinct", "Street Address", "Email", "DOB",
+                    "GEC Voter Reg #", "GEC Village", "GEC Precinct", "GEC Address",
                     "Self-Reported Voter Status", "Votes Elsewhere Note", "Needs Registration Help", "Needs Absentee Help",
                     "Needs Homebound Help", "Needs Ride", "Wants To Volunteer", "Referred By", "Household Group",
-"Opt-In Email", "Opt-In Text",
+                    "Opt-In Email", "Opt-In Text",
                     "Verification Status", "Source", "Date Signed Up" ]
 
         rows = []
         supporters.find_each do |s|
+          gec_voter = s.gec_voter
           rows << [
             s.first_name, s.last_name, s.contact_number, s.village&.name, s.precinct&.number,
             s.street_address, s.email, s.dob&.strftime("%m/%d/%Y"),
+            gec_voter&.voter_registration_number,
+            gec_voter&.village_name,
+            gec_voter&.precinct_number,
+            gec_voter&.address,
             s.registered_voter_status&.humanize,
             s.registered_voter_location_note,
             s.needs_voter_registration_help ? "Yes" : "No",

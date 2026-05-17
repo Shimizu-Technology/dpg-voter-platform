@@ -204,7 +204,7 @@ class ReportGenerator
   end
 
   def support_list_scope
-    scope = Supporter.official_supporters.includes(:village, :precinct, :entered_by)
+    scope = Supporter.official_supporters.includes(:village, :precinct, :entered_by, :gec_voter)
     scope = apply_supporter_geography_filters(scope)
     apply_supporter_report_filters(scope)
   end
@@ -286,6 +286,10 @@ class ReportGenerator
     gec_lookup[[ supporter.first_name.downcase.strip, supporter.last_name.downcase.strip, supporter.dob ]]
   end
 
+  def gec_voter_for_report(gec_lookup, supporter)
+    supporter.gec_voter || lookup_gec_voter(gec_lookup, supporter)
+  end
+
   # ── Support List ──────────────────────────────────────────────
   # All approved official supporters, grouped by village
   def generate_support_list
@@ -299,7 +303,7 @@ class ReportGenerator
     wb = package.workbook
     headers = supporter_report_headers([
       "Last Name", "First Name", "DOB", "Phone", "Street Address",
-      "Village", "Precinct", "Voter Reg #", "Date Submitted",
+      "DPG Village", "DPG Precinct", "GEC Voter Reg #", "GEC Village", "GEC Precinct", "GEC Address", "Date Submitted",
       "Submitted By", "Verification Status"
     ])
 
@@ -321,19 +325,22 @@ class ReportGenerator
     workbook.add_worksheet(name: safe_name) do |sheet|
       sheet.add_row headers, style: header_style(workbook)
       supporters.each do |s|
-        gec_match = lookup_gec_voter(gec_lookup, s)
+        gec_match = gec_voter_for_report(gec_lookup, s)
         sheet.add_row [
           s.last_name, s.first_name, s.dob&.strftime("%m/%d/%Y"),
           s.contact_number, s.street_address,
           s.village&.name, s.precinct&.number,
           gec_match&.voter_registration_number,
+          gec_match&.village_name,
+          gec_match&.precinct_number,
+          gec_match&.address,
           s.created_at&.strftime("%m/%d/%Y"),
           s.entered_by&.name || "System",
           s.verification_status&.humanize,
           *supporter_report_values(s)
         ]
       end
-      sheet.column_widths 15, 15, 12, 15, 25, 15, 10, 15, 12, 15, 15, 18, 24, 24, 24, 18, 16
+      sheet.column_widths(*Array.new(headers.length, 18))
     end
   end
 
@@ -575,13 +582,15 @@ class ReportGenerator
     {
       columns: supporter_report_headers([
         "Last Name", "First Name", "DOB", "Phone", "Street Address",
-        "Village", "Precinct", "Voter Reg #", "Date Submitted", "Submitted By", "Verification Status"
+        "DPG Village", "DPG Precinct", "GEC Voter Reg #", "GEC Village", "GEC Precinct", "GEC Address",
+        "Date Submitted", "Submitted By", "Verification Status"
       ]),
       rows: rows.map do |s|
-        gec_match = lookup_gec_voter(gec_lookup, s)
+        gec_match = gec_voter_for_report(gec_lookup, s)
         [
           s.last_name, s.first_name, format_date(s.dob), s.contact_number, s.street_address,
           s.village&.name, s.precinct&.number, gec_match&.voter_registration_number,
+          gec_match&.village_name, gec_match&.precinct_number, gec_match&.address,
           format_date(s.created_at), s.entered_by&.name || "System", s.verification_status&.humanize,
           *supporter_report_values(s)
         ]

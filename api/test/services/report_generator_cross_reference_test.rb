@@ -130,4 +130,22 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
     assert_equal @possible_match.first_name, preview[:rows].first[1]
     assert_match "Candidates: 2", preview[:rows].first.last
   end
+
+  test "support list separates DPG assignment from linked GEC geography" do
+    dpg_village = Village.find_or_create_by!(name: "Barrigada")
+    dpg_precinct = Precinct.find_or_create_by!(village: dpg_village, number: "15C")
+    @linked_contact.update!(village: dpg_village, precinct: dpg_precinct)
+
+    preview = ReportGenerator.new(report_type: "support_list").preview
+    row = preview[:rows].find { |values| values[0] == @linked_contact.last_name && values[1] == @linked_contact.first_name }
+
+    assert_includes preview[:columns], "DPG Village"
+    assert_includes preview[:columns], "GEC Village"
+    assert_equal dpg_village.name, row[5]
+    assert_equal dpg_precinct.number, row[6]
+    assert_equal @linked_voter.voter_registration_number, row[7]
+    assert_equal @village.name, row[8]
+    assert_equal @precinct.number, row[9]
+    assert_equal @linked_voter.address, row[10]
+  end
 end
