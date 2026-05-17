@@ -418,10 +418,14 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "active_contact", supporter.contact_classification
     assert_equal "supporter", supporter.support_status
     assert_equal "interested", supporter.volunteer_status
+    assert_equal "in_progress", supporter.support_follow_up_status
+    assert supporter.support_follow_up_date.present?
     assert_equal original_classified_at.to_i, supporter.classified_at.to_i
     assert_equal @admin.id, supporter.classified_by_user_id
     assert_equal "in_person", supporter.supporter_contact_attempts.last.channel
-    assert_equal "household_canvass_logged", AuditLog.where(auditable: supporter).last.action
+    audit_log = AuditLog.where(auditable: supporter).last
+    assert_equal "household_canvass_logged", audit_log.action
+    assert_equal [ nil, "in_progress" ], audit_log.changed_data.dig("follow_up", "support_follow_up_status")
   end
 
   test "village-scoped canvasser can log household canvass but cannot export contacts" do

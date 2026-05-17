@@ -32,12 +32,14 @@ module Api
         attempt.recorded_at ||= Time.current
 
         if attempt.save
+          follow_up_changes = sync_follow_up_from_contact_attempt!(attempt)
           log_audit!(@supporter, action: "contact_attempt_logged", changed_data: {
             contact_attempt_id: attempt.id,
             channel: attempt.channel,
             outcome: attempt.outcome,
-            recorded_at: attempt.recorded_at&.iso8601
-          })
+            recorded_at: attempt.recorded_at&.iso8601,
+            follow_up_status: follow_up_changes.presence
+          }.compact)
           render json: { contact_attempt: attempt_json(attempt) }, status: :created
         else
           render_api_error(
@@ -102,6 +104,31 @@ module Api
           status: :forbidden,
           code: "contact_attempt_edit_access_required"
         )
+      end
+
+      def sync_follow_up_from_contact_attempt!(attempt)
+        updates = FollowUpStatusSync.contact_attempt_updates(@supporter, attempt)
+        return {} if updates.blank?
+
+        before = follow_up_audit_snapshot(@supporter)
+        @supporter.update!(updates)
+        follow_up_changed_data(before, follow_up_audit_snapshot(@supporter))
+      end
+
+      def follow_up_audit_snapshot(supporter)
+        {
+          registration_outreach_status: supporter.registration_outreach_status,
+          registration_outreach_date: supporter.registration_outreach_date&.iso8601,
+          support_follow_up_status: supporter.support_follow_up_status,
+          support_follow_up_date: supporter.support_follow_up_date&.iso8601
+        }
+      end
+
+      def follow_up_changed_data(before, after)
+        before.each_with_object({}) do |(field, before_value), memo|
+          after_value = after[field]
+          memo[field] = [ before_value, after_value ] unless before_value == after_value
+        end
       end
 
       def contact_attempt_audit_snapshot(attempt)

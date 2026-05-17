@@ -210,6 +210,7 @@ module Api
 
         attempt = nil
         old_review_state = supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status")
+        old_follow_up_state = follow_up_audit_snapshot(supporter)
 
         begin
           ApplicationRecord.transaction do
@@ -226,10 +227,12 @@ module Api
             apply_contact_classification_metadata!(supporter, updates)
             supporter.update!(updates)
             attempt = create_intake_review_contact_attempt!(supporter, review[:contact_attempt])
+            sync_follow_up_from_contact_attempt!(supporter, attempt) if attempt
 
             log_audit!(supporter, action: "intake_reviewed", changed_data: {
               "before" => old_review_state,
               "after" => supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status"),
+              "follow_up" => follow_up_changed_data(old_follow_up_state, follow_up_audit_snapshot(supporter)).presence,
               "decision" => decision,
               "note" => review[:note].presence,
               "contact_attempt_id" => attempt&.id
@@ -287,6 +290,7 @@ module Api
 
         old_classification = supporter.contact_classification
         old_relationship_state = supporter.slice("support_status", "volunteer_status")
+        old_follow_up_state = follow_up_audit_snapshot(supporter)
         attempt = nil
 
         begin
@@ -302,12 +306,14 @@ module Api
             supporter.update!(updates)
 
             attempt = create_required_canvass_contact_attempt!(supporter, canvass[:contact_attempt])
+            sync_follow_up_from_contact_attempt!(supporter, attempt)
             log_audit!(supporter, action: "household_canvass_logged", changed_data: {
               "contact_classification" => old_classification == supporter.contact_classification ? nil : [ old_classification, supporter.contact_classification ],
               "relationship" => old_relationship_state == supporter.slice("support_status", "volunteer_status") ? nil : {
                 "before" => old_relationship_state,
                 "after" => supporter.slice("support_status", "volunteer_status")
               },
+              "follow_up" => follow_up_changed_data(old_follow_up_state, follow_up_audit_snapshot(supporter)).presence,
               "contact_attempt_id" => attempt.id,
               "channel" => attempt.channel,
               "outcome" => attempt.outcome,
@@ -1301,6 +1307,27 @@ module Api
         Time.zone.parse(value.to_s)
       rescue ArgumentError, TypeError
         nil
+      end
+
+      def sync_follow_up_from_contact_attempt!(supporter, attempt)
+        updates = FollowUpStatusSync.contact_attempt_updates(supporter, attempt)
+        supporter.update!(updates) if updates.present?
+      end
+
+      def follow_up_audit_snapshot(supporter)
+        {
+          "registration_outreach_status" => supporter.registration_outreach_status,
+          "registration_outreach_date" => supporter.registration_outreach_date&.iso8601,
+          "support_follow_up_status" => supporter.support_follow_up_status,
+          "support_follow_up_date" => supporter.support_follow_up_date&.iso8601
+        }
+      end
+
+      def follow_up_changed_data(before, after)
+        before.each_with_object({}) do |(field, before_value), memo|
+          after_value = after[field]
+          memo[field] = [ before_value, after_value ] unless before_value == after_value
+        end
       end
 
       def normalize_registered_voter_fields(attributes)

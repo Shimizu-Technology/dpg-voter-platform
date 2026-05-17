@@ -520,9 +520,9 @@ function hasSupportServiceFollowUp(supporter: Pick<SupporterDetail, 'needs_absen
 
 function registrationFollowUpStatusLabel(status?: string | null) {
   if (status === 'registered') return 'Registered via follow-up';
-  if (status === 'contacted') return 'Contacted';
+  if (status === 'contacted') return 'Contact logged';
   if (status === 'declined') return 'Declined';
-  return 'Not contacted';
+  return 'No registration outcome set';
 }
 
 function registrationFollowUpStatusClass(status?: string | null) {
@@ -536,7 +536,7 @@ function supportFollowUpStatusLabel(status?: string | null) {
   if (status === 'in_progress') return 'In progress';
   if (status === 'completed') return 'Completed';
   if (status === 'declined') return 'Declined';
-  return 'Not started';
+  return 'No voter-help progress set';
 }
 
 function supportFollowUpStatusClass(status?: string | null) {
@@ -1341,6 +1341,11 @@ export default function SupporterDetailPage() {
             <p className="text-sm text-[var(--text-secondary)]">
               {verificationStatusDetail(supporter)}
             </p>
+            {canMarkVerifiedVoter && supporter.verification_status !== 'verified' && (
+              <p className="text-xs text-[var(--text-secondary)]">
+                Confirming the match links this contact to the best current GEC voter match found by name, date of birth, and village, then updates the contact's voter-list village and precinct from that GEC record.
+              </p>
+            )}
 
             {canEdit && (
               <>
@@ -1351,6 +1356,7 @@ export default function SupporterDetailPage() {
                       type="button"
                       disabled={supporter.verification_status === 'verified'}
                       onClick={async () => {
+                        if (!window.confirm('Confirm the best current GEC voter match for this contact? This will link the contact to that GEC voter and update their voter-list village and precinct from the GEC record.')) return;
                         try {
                           await verifySupporter(supporter.id, 'verified');
                           refetch();
@@ -1360,7 +1366,7 @@ export default function SupporterDetailPage() {
                       }}
                       className="min-h-[40px] px-3.5 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Mark Matched To GEC
+                      Confirm Best GEC Match
                     </button>
                   )}
                   <button
@@ -1456,6 +1462,9 @@ export default function SupporterDetailPage() {
           <p className="mb-3 text-sm text-[var(--text-secondary)]">
             Use this for outreach tasks like registration help, voter-help requests, and volunteer interest. GEC match review stays in Voter Check above.
           </p>
+          <p className="mb-3 text-xs text-[var(--text-secondary)]">
+            Contact History below is the actual call, text, email, and visit log. Logging a first contact will automatically mark untouched follow-up tasks as started; use these follow-up fields to record the task result.
+          </p>
           <div className="space-y-3">
             {supporter.registration_outreach_status === 'registered' && (
               <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
@@ -1538,8 +1547,8 @@ export default function SupporterDetailPage() {
                   }}
                   className="border border-[var(--border-soft)] rounded-xl px-3 py-2 text-sm bg-[var(--surface-raised)]"
                 >
-                  <option value="">Not contacted</option>
-                  <option value="contacted">Contacted</option>
+                  <option value="">No registration outcome set</option>
+                  <option value="contacted">Contact logged</option>
                   <option value="registered">Registered via follow-up</option>
                   <option value="declined">Declined</option>
                 </select>
@@ -1599,7 +1608,7 @@ export default function SupporterDetailPage() {
                       }}
                       className="border border-[var(--border-soft)] rounded-xl px-3 py-2 text-sm bg-[var(--surface-raised)]"
                     >
-                      <option value="">Not started</option>
+                      <option value="">No voter-help progress set</option>
                       <option value="in_progress">In progress</option>
                       <option value="completed">Completed</option>
                       <option value="declined">Declined</option>

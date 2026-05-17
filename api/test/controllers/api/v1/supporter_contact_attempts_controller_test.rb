@@ -68,6 +68,73 @@ class Api::V1::SupporterContactAttemptsControllerTest < ActionDispatch::Integrat
     assert_equal "Contact Leader", payload["contact_attempts"].first["recorded_by_name"]
   end
 
+  test "logging a contact attempt starts open follow-up lanes" do
+    @supporter.update!(
+      registered_voter_status: "not_sure",
+      registered_voter: false,
+      volunteer_status: "interested",
+      registration_outreach_status: nil,
+      registration_outreach_date: nil,
+      support_follow_up_status: nil,
+      support_follow_up_date: nil
+    )
+
+    post "/api/v1/supporters/#{@supporter.id}/contact_attempts",
+      params: {
+        contact_attempt: {
+          channel: "call",
+          outcome: "reached",
+          note: "Talked through registration and volunteer interest.",
+          recorded_at: "2026-05-12T09:30:00+10:00"
+        }
+      },
+      headers: auth_headers(@leader),
+      as: :json
+
+    assert_response :created
+    @supporter.reload
+    assert_equal "contacted", @supporter.registration_outreach_status
+    assert_equal Time.zone.parse("2026-05-12T09:30:00+10:00").to_i, @supporter.registration_outreach_date.to_i
+    assert_equal "in_progress", @supporter.support_follow_up_status
+    assert_equal Time.zone.parse("2026-05-12T09:30:00+10:00").to_i, @supporter.support_follow_up_date.to_i
+
+    audit_log = AuditLog.where(auditable: @supporter, action: "contact_attempt_logged").last
+    follow_up_changes = audit_log.changed_data["follow_up_status"]
+    assert_equal [ nil, "contacted" ], follow_up_changes["registration_outreach_status"]
+    assert_equal [ nil, "in_progress" ], follow_up_changes["support_follow_up_status"]
+  end
+
+  test "logging a contact attempt preserves resolved follow-up lanes" do
+    @supporter.update!(
+      registered_voter_status: "no",
+      registered_voter: false,
+      volunteer_status: "interested",
+      registration_outreach_status: "registered",
+      registration_outreach_date: 2.days.ago,
+      support_follow_up_status: "completed",
+      support_follow_up_date: 1.day.ago
+    )
+
+    post "/api/v1/supporters/#{@supporter.id}/contact_attempts",
+      params: {
+        contact_attempt: {
+          channel: "sms",
+          outcome: "reached",
+          note: "Confirmed no further help needed."
+        }
+      },
+      headers: auth_headers(@leader),
+      as: :json
+
+    assert_response :created
+    @supporter.reload
+    assert_equal "registered", @supporter.registration_outreach_status
+    assert_equal "completed", @supporter.support_follow_up_status
+
+    audit_log = AuditLog.where(auditable: @supporter, action: "contact_attempt_logged").last
+    assert_nil audit_log.changed_data["follow_up_status"]
+  end
+
   test "contact attempts respect village scoping" do
     other_supporter = Supporter.create!(
       first_name: "Pedro",

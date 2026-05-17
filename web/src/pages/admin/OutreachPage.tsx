@@ -82,22 +82,22 @@ const QUEUE_VIEWS = [
 
 const REGISTRATION_STATUS_OPTIONS = [
   { value: '', label: 'All registration follow-up' },
-  { value: 'not_contacted', label: 'Not Contacted' },
-  { value: 'contacted', label: 'Contacted' },
+  { value: 'not_contacted', label: 'No registration outcome set' },
+  { value: 'contacted', label: 'Contact logged' },
   { value: 'registered', label: 'Registered via follow-up' },
   { value: 'declined', label: 'Declined' },
 ];
 
 const SUPPORT_STATUS_OPTIONS = [
   { value: '', label: 'All voter-help / volunteer progress' },
-  { value: 'not_started', label: 'Not Started' },
+  { value: 'not_started', label: 'No voter-help progress set' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Completed' },
   { value: 'declined', label: 'Declined' },
 ];
 
 const REGISTRATION_STATUS_BADGES: Record<string, { bg: string; text: string; label: string }> = {
-  contacted: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Contacted' },
+  contacted: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Contact logged' },
   registered: { bg: 'bg-green-100', text: 'text-green-800', label: 'Registered via follow-up' },
   declined: { bg: 'bg-red-100', text: 'text-red-800', label: 'Declined' },
 };
@@ -147,7 +147,7 @@ function priorityBadgeClass(priority?: string | null) {
 
 function reasonChipClass(reason: string) {
   if (reason.includes('Registered via follow-up')) return 'bg-green-100 text-green-700';
-  if (reason.includes('Support help completed')) return 'bg-green-100 text-green-700';
+  if (reason.includes('Voter-help / volunteer follow-up completed')) return 'bg-green-100 text-green-700';
   if (reason.includes('Declined')) return 'bg-red-100 text-red-700';
   if (reason.includes('registration') || reason.includes('No GEC match') || reason.includes('not registered')) return 'bg-amber-100 text-amber-800';
   return 'bg-blue-100 text-blue-700';
@@ -600,14 +600,14 @@ export default function OutreachPage() {
                       {supporter.needs_registration_follow_up && (
                         <StatusBadge
                           status={supporter.registration_outreach_status}
-                          emptyLabel="Registration: Not Contacted"
+                          emptyLabel="Registration: No outcome set"
                           badges={REGISTRATION_STATUS_BADGES}
                         />
                       )}
                       {supporter.needs_support_follow_up && (
                         <StatusBadge
                           status={supporter.support_follow_up_status}
-                          emptyLabel="Voter Help: Not Started"
+                          emptyLabel="Voter Help: No progress set"
                           badges={SUPPORT_STATUS_BADGES}
                         />
                       )}
@@ -720,8 +720,8 @@ export default function OutreachPage() {
                               onChange={(e) => updateDraft(supporter.id, { registrationStatus: e.target.value })}
                               className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm"
                             >
-                              <option value="">Not contacted</option>
-                              <option value="contacted">Contacted</option>
+                              <option value="">No registration outcome set</option>
+                              <option value="contacted">Contact logged</option>
                               <option value="registered">Registered via follow-up</option>
                               <option value="declined">Declined</option>
                             </select>
@@ -751,7 +751,7 @@ export default function OutreachPage() {
                               onChange={(e) => updateDraft(supporter.id, { supportStatus: e.target.value })}
                               className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm"
                             >
-                              <option value="">Not started</option>
+                              <option value="">No voter-help progress set</option>
                               <option value="in_progress">In progress</option>
                               <option value="completed">Completed</option>
                               <option value="declined">Declined</option>
@@ -780,7 +780,9 @@ export default function OutreachPage() {
                       <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                         <div>
                           <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Log contact attempt</div>
-                          <div className="mt-1 text-xs text-slate-500">Record the actual outreach touch while working this queue.</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Record the actual outreach touch. The first logged contact also marks untouched follow-up tasks as started.
+                          </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <label className="block">

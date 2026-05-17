@@ -217,7 +217,7 @@ function supportRequestBadges(supporter: Pick<SupporterItem, 'needs_voter_regist
 
 function registrationFollowUpResultLabel(supporter: Pick<SupporterItem, 'registration_outreach_status'>) {
   if (supporter.registration_outreach_status === 'registered') return 'Registered via follow-up';
-  if (supporter.registration_outreach_status === 'contacted') return 'Contacted';
+  if (supporter.registration_outreach_status === 'contacted') return 'Contact logged';
   if (supporter.registration_outreach_status === 'declined') return 'Declined';
   return null;
 }
@@ -230,9 +230,9 @@ function registrationFollowUpResultClass(supporter: Pick<SupporterItem, 'registr
 }
 
 function supportFollowUpResultLabel(supporter: Pick<SupporterItem, 'support_follow_up_status'>) {
-  if (supporter.support_follow_up_status === 'completed') return 'Support completed';
-  if (supporter.support_follow_up_status === 'in_progress') return 'Support in progress';
-  if (supporter.support_follow_up_status === 'declined') return 'Support declined';
+  if (supporter.support_follow_up_status === 'completed') return 'Voter-help / volunteer completed';
+  if (supporter.support_follow_up_status === 'in_progress') return 'Voter-help / volunteer in progress';
+  if (supporter.support_follow_up_status === 'declined') return 'Voter-help / volunteer declined';
   return null;
 }
 
