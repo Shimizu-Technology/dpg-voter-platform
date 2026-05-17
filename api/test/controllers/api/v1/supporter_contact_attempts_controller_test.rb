@@ -104,6 +104,40 @@ class Api::V1::SupporterContactAttemptsControllerTest < ActionDispatch::Integrat
     assert_equal [ nil, "in_progress" ], follow_up_changes["support_follow_up_status"]
   end
 
+  test "logging a contact attempt rolls back when follow-up sync fails" do
+    @supporter.update!(
+      volunteer_status: "interested",
+      support_follow_up_status: nil,
+      support_follow_up_date: nil
+    )
+
+    original_sync = FollowUpStatusSync.method(:contact_attempt_updates)
+    FollowUpStatusSync.define_singleton_method(:contact_attempt_updates) { |_supporter, _attempt| { support_follow_up_status: "invalid_status" } }
+
+    begin
+      assert_no_difference -> { SupporterContactAttempt.count } do
+        assert_no_difference -> { AuditLog.where(auditable: @supporter).count } do
+          post "/api/v1/supporters/#{@supporter.id}/contact_attempts",
+            params: {
+              contact_attempt: {
+                channel: "call",
+                outcome: "reached",
+                note: "This should roll back with the invalid sync."
+              }
+            },
+            headers: auth_headers(@leader),
+            as: :json
+        end
+      end
+    ensure
+      FollowUpStatusSync.define_singleton_method(:contact_attempt_updates, original_sync)
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal "contact_attempt_create_failed", response.parsed_body["code"]
+    assert_nil @supporter.reload.support_follow_up_status
+  end
+
   test "logging a contact attempt preserves resolved follow-up lanes" do
     @supporter.update!(
       registered_voter_status: "no",

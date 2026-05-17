@@ -529,6 +529,7 @@ module Api
             :submitted_village,
             :precinct,
             :block,
+            :gec_voter,
             :referred_from_village,
             household_group: [ supporters: :village ]
           )
@@ -1649,6 +1650,7 @@ module Api
 
         supporter_json(supporter, reason_payload: reason_payload).merge(
           block_name: supporter.block&.name,
+          gec_match_candidates: gec_match_candidates_json(supporter),
           household_members: supporter.household_members.map do |member|
             {
               id: member.id,
@@ -1987,6 +1989,49 @@ module Api
           matches: matches,
           best_match: matches.first
         }
+      end
+
+      def gec_match_candidates_json(supporter)
+        matches =
+          if supporter.gec_voter_id.present? && supporter.gec_voter.present?
+            [ { gec_voter: supporter.gec_voter, confidence: :exact, match_type: :confirmed, match_count: 1 } ]
+          else
+            GecVoter.find_matches(
+              first_name: supporter.first_name,
+              last_name: supporter.last_name,
+              dob: supporter.dob,
+              birth_year: supporter.dob&.year,
+              village_name: supporter.village&.name
+            ).first(5)
+          end
+
+        matches.map do |match|
+          gec_voter_match_json(match)
+        end
+      end
+
+      def gec_voter_match_json(match)
+        voter = match[:gec_voter]
+        {
+          id: voter.id,
+          first_name: voter.first_name,
+          middle_name: voter.middle_name,
+          last_name: voter.last_name,
+          name: [ voter.first_name, voter.middle_name, voter.last_name ].compact_blank.join(" "),
+          address: voter.address,
+          dob: voter.dob,
+          birth_year: voter.birth_year || voter.dob&.year,
+          village_id: voter.village_id,
+          village_name: voter.village_name,
+          precinct_id: voter.precinct_id,
+          precinct_number: voter.precinct_number,
+          voter_registration_number: voter.voter_registration_number,
+          status: voter.status,
+          gec_list_date: voter.gec_list_date,
+          confidence: match[:confidence]&.to_s,
+          match_type: match[:match_type]&.to_s,
+          match_count: match[:match_count]
+        }.compact
       end
 
       # Alias for backward compatibility with callers

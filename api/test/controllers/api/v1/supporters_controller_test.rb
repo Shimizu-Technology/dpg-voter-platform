@@ -73,6 +73,15 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal submitted_village.id, supporter.village_id
     assert_equal submitted_village.id, supporter.submitted_village_id
 
+    get "/api/v1/supporters/#{supporter.id}", headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    candidate = response.parsed_body.dig("supporter", "gec_match_candidates").first
+    assert_equal gec_voter.id, candidate["id"]
+    assert_equal "Leon A. Shimizu", candidate["name"]
+    assert_equal gec_village.name, candidate["village_name"]
+    assert_equal gec_precinct.number, candidate["precinct_number"]
+
     patch "/api/v1/supporters/#{supporter.id}/verify",
       params: { verification_status: "verified" },
       headers: auth_headers(@admin),

@@ -30,20 +30,26 @@ module Api
         attempt = @supporter.supporter_contact_attempts.build(contact_attempt_params)
         attempt.recorded_by_user = current_user
         attempt.recorded_at ||= Time.current
+        follow_up_changes = {}
 
-        if attempt.save
-          follow_up_changes = sync_follow_up_from_contact_attempt!(attempt)
-          log_audit!(@supporter, action: "contact_attempt_logged", changed_data: {
-            contact_attempt_id: attempt.id,
-            channel: attempt.channel,
-            outcome: attempt.outcome,
-            recorded_at: attempt.recorded_at&.iso8601,
-            follow_up_status: follow_up_changes.presence
-          }.compact)
+        begin
+          ApplicationRecord.transaction do
+            attempt.save!
+            follow_up_changes = sync_follow_up_from_contact_attempt!(attempt)
+            log_audit!(@supporter, action: "contact_attempt_logged", changed_data: {
+              contact_attempt_id: attempt.id,
+              channel: attempt.channel,
+              outcome: attempt.outcome,
+              recorded_at: attempt.recorded_at&.iso8601,
+              follow_up_status: follow_up_changes.presence
+            }.compact)
+          end
+
           render json: { contact_attempt: attempt_json(attempt) }, status: :created
-        else
+        rescue ActiveRecord::RecordInvalid => e
+          record = e.record || attempt
           render_api_error(
-            message: attempt.errors.full_messages.to_sentence,
+            message: record.errors.full_messages.to_sentence,
             status: :unprocessable_entity,
             code: "contact_attempt_create_failed"
           )
