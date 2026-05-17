@@ -443,11 +443,13 @@ function verificationStatusDetail(supporter: Pick<SupporterDetail, 'verification
   return 'This supporter still needs voter-check review.';
 }
 
-function gecCandidateName(candidate: NonNullable<SupporterDetail['gec_match_candidates']>[number]) {
+type GecMatchCandidate = NonNullable<SupporterDetail['gec_match_candidates']>[number];
+
+function gecCandidateName(candidate: GecMatchCandidate) {
   return candidate.name || [candidate.first_name, candidate.middle_name, candidate.last_name].filter(Boolean).join(' ') || 'GEC voter';
 }
 
-function gecCandidateMatchLabel(candidate: NonNullable<SupporterDetail['gec_match_candidates']>[number]) {
+function gecCandidateMatchLabel(candidate: GecMatchCandidate) {
   const matchType = candidate.match_type;
   if (matchType === 'confirmed') return 'Confirmed link';
   if (matchType === 'different_village') return 'Same name and birth year, different village';
@@ -459,7 +461,7 @@ function gecCandidateMatchLabel(candidate: NonNullable<SupporterDetail['gec_matc
   return 'Current GEC match candidate';
 }
 
-function gecCandidateConfidenceLabel(candidate: NonNullable<SupporterDetail['gec_match_candidates']>[number]) {
+function gecCandidateConfidenceLabel(candidate: GecMatchCandidate) {
   if (candidate.confidence === 'exact') return 'Exact';
   if (candidate.confidence === 'high') return 'High confidence';
   if (candidate.confidence === 'medium') return 'Needs review';
@@ -851,6 +853,18 @@ export default function SupporterDetailPage() {
 
   const gecMatchCandidates = supporter.gec_match_candidates || [];
   const bestGecMatchCandidate = gecMatchCandidates[0];
+  const confirmGecMatch = async (candidate?: GecMatchCandidate) => {
+    const selectedCandidate = candidate || bestGecMatchCandidate;
+    const candidateName = selectedCandidate ? gecCandidateName(selectedCandidate) : 'the best current GEC voter match';
+    const candidateVillage = selectedCandidate?.village_name ? ` in ${selectedCandidate.village_name}` : '';
+    if (!window.confirm(`Confirm ${candidateName}${candidateVillage} as the GEC voter match for this contact? This links the contact to that official GEC voter record while keeping the contact-entered name, address, and village for DPG outreach.`)) return;
+    try {
+      await verifySupporter(supporter.id, 'verified', selectedCandidate?.id);
+      refetch();
+    } catch {
+      alert('Failed to mark supporter as matched to GEC. Select one of the current GEC match candidates.');
+    }
+  };
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -1384,6 +1398,49 @@ export default function SupporterDetailPage() {
             <p className="text-sm text-[var(--text-secondary)]">
               {verificationStatusDetail(supporter)}
             </p>
+            {bestGecMatchCandidate && supporter.verification_status === 'verified' && (
+              <div className="rounded-xl border border-green-100 bg-green-50/70 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-green-800">
+                      Linked GEC voter record
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                      {gecCandidateName(bestGecMatchCandidate)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      Contact details above stay as DPG outreach info. This official GEC record is used for voter-list matching.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-green-800">
+                    Confirmed
+                  </span>
+                </div>
+                <dl className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">GEC village</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.village_name || 'Unknown'}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">GEC precinct</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.precinct_number || 'Unknown'}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">Birth year</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.birth_year || (bestGecMatchCandidate.dob ? new Date(bestGecMatchCandidate.dob).getFullYear() : 'Unknown')}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">Reg. no.</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.voter_registration_number || 'Not shown'}</dd>
+                  </div>
+                </dl>
+                {bestGecMatchCandidate.address && (
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                    GEC address: <span className="font-medium text-[var(--text-primary)]">{bestGecMatchCandidate.address}</span>
+                  </p>
+                )}
+              </div>
+            )}
             {bestGecMatchCandidate && supporter.verification_status !== 'verified' && (
               <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1426,18 +1483,43 @@ export default function SupporterDetailPage() {
                   </p>
                 )}
                 <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                  Confirm only if this is the same person. If the suggested voter is wrong, use the GEC Voter List review tools to link a different voter or leave this contact flagged.
+                  Confirm only if this is the same person. This creates the official GEC link and keeps the contact-entered name, address, and village as DPG outreach details.
                 </p>
+                {canEdit && canMarkVerifiedVoter && (
+                  <button
+                    type="button"
+                    onClick={() => confirmGecMatch(bestGecMatchCandidate)}
+                    className="mt-3 min-h-[40px] rounded-lg bg-green-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  >
+                    Confirm this GEC record
+                  </button>
+                )}
                 {gecMatchCandidates.length > 1 && (
                   <div className="mt-3 border-t border-blue-100 pt-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">Other possible matches</p>
                     <div className="mt-2 grid gap-2 md:grid-cols-2">
                       {gecMatchCandidates.slice(1).map((candidate) => (
                         <div key={candidate.id} className="rounded-lg bg-white px-3 py-2 text-xs">
-                          <p className="font-semibold text-[var(--text-primary)]">{gecCandidateName(candidate)}</p>
-                          <p className="mt-0.5 text-[var(--text-secondary)]">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <p className="font-semibold text-[var(--text-primary)]">{gecCandidateName(candidate)}</p>
+                              <p className="mt-0.5 text-[var(--text-secondary)]">
                             {[candidate.village_name, candidate.precinct_number && `Precinct ${candidate.precinct_number}`, candidate.birth_year && `Born ${candidate.birth_year}`].filter(Boolean).join(' · ') || 'GEC voter record'}
-                          </p>
+                              </p>
+                              {candidate.address && (
+                                <p className="mt-0.5 text-[var(--text-secondary)]">GEC address: {candidate.address}</p>
+                              )}
+                            </div>
+                            {canEdit && canMarkVerifiedVoter && (
+                              <button
+                                type="button"
+                                onClick={() => confirmGecMatch(candidate)}
+                                className="rounded-md border border-blue-200 px-2.5 py-1 font-semibold text-blue-800 hover:bg-blue-50"
+                              >
+                                Use this match
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1447,7 +1529,7 @@ export default function SupporterDetailPage() {
             )}
             {canMarkVerifiedVoter && supporter.verification_status !== 'verified' && (
               <p className="text-xs text-[var(--text-secondary)]">
-                Confirming links this contact to the GEC voter shown above, then updates the contact's voter-list village and precinct from that GEC record.
+                Confirming links this contact to a specific GEC voter record. The official voter-list name, address, village, and precinct stay on the linked GEC record; the contact fields stay as DPG outreach details.
               </p>
             )}
 
@@ -1459,20 +1541,10 @@ export default function SupporterDetailPage() {
                     <button
                       type="button"
                       disabled={supporter.verification_status === 'verified'}
-                      onClick={async () => {
-                        const candidateName = bestGecMatchCandidate ? gecCandidateName(bestGecMatchCandidate) : 'the best current GEC voter match';
-                        const candidateVillage = bestGecMatchCandidate?.village_name ? ` in ${bestGecMatchCandidate.village_name}` : '';
-                        if (!window.confirm(`Confirm ${candidateName}${candidateVillage} as the GEC voter match for this contact? This will link the contact to that GEC voter and update their voter-list village and precinct from the GEC record.`)) return;
-                        try {
-                          await verifySupporter(supporter.id, 'verified');
-                          refetch();
-                        } catch {
-                          alert('Failed to mark supporter as matched to GEC. A current GEC match is required.');
-                        }
-                      }}
+                      onClick={() => confirmGecMatch(bestGecMatchCandidate)}
                       className="min-h-[40px] px-3.5 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Confirm Shown GEC Match
+                      Confirm Suggested GEC Match
                     </button>
                   )}
                   <button

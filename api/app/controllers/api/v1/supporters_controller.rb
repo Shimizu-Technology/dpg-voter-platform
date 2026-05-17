@@ -354,7 +354,8 @@ module Api
           )
         end
 
-        match_payload = new_status == "verified" ? verification_match_payload(supporter) : nil
+        selected_gec_voter_id = params[:gec_voter_id].presence || params[:selected_gec_voter_id].presence
+        match_payload = new_status == "verified" ? verification_match_payload(supporter, selected_gec_voter_id: selected_gec_voter_id) : nil
 
         if new_status == "verified"
           matches = match_payload&.fetch(:matches, []) || []
@@ -363,6 +364,14 @@ module Api
               message: "Supporter cannot be marked as a verified voter without a current GEC match.",
               status: :unprocessable_entity,
               code: "gec_match_required_for_verified"
+            )
+          end
+
+          if match_payload[:selected_match_missing]
+            return render_api_error(
+              message: "Selected GEC voter is not one of the current match candidates for this contact.",
+              status: :unprocessable_entity,
+              code: "gec_match_candidate_not_found"
             )
           end
         end
@@ -1939,15 +1948,17 @@ module Api
           gec_voter = best_match&.dig(:gec_voter)
           attrs.merge!(
             gec_voter_id: gec_voter&.id,
-            village_id: gec_voter&.village_id || supporter.village_id,
-            precinct_id: gec_voter&.precinct_id || supporter.precinct_id,
             registered_voter: true,
             registered_voter_status: "yes",
             verified_by_user_id: current_user.id,
             verified_at: Time.current,
             verification_reason: "manual_staff_verified",
             verification_reason_metadata: {
+              "gec_voter_id" => gec_voter&.id,
+              "gec_voter_name" => [ gec_voter&.first_name, gec_voter&.middle_name, gec_voter&.last_name ].compact_blank.join(" "),
               "gec_village_name" => gec_voter&.village_name,
+              "gec_precinct_number" => gec_voter&.precinct_number,
+              "gec_address" => gec_voter&.address,
               "confidence" => best_match&.dig(:confidence)&.to_s,
               "match_type" => best_match&.dig(:match_type)&.to_s,
               "match_count" => best_match&.dig(:match_count)
@@ -1976,7 +1987,7 @@ module Api
         attrs
       end
 
-      def verification_match_payload(supporter)
+      def verification_match_payload(supporter, selected_gec_voter_id: nil)
         matches = GecVoter.find_matches(
           first_name: supporter.first_name,
           last_name: supporter.last_name,
@@ -1984,10 +1995,13 @@ module Api
           birth_year: supporter.dob&.year,
           village_name: supporter.village&.name
         )
+        selected_id = selected_gec_voter_id.present? ? selected_gec_voter_id.to_i : nil
+        selected_match = selected_id ? matches.find { |match| match[:gec_voter].id == selected_id } : nil
 
         {
           matches: matches,
-          best_match: matches.first
+          best_match: selected_match || matches.first,
+          selected_match_missing: selected_id.present? && selected_match.blank?
         }
       end
 

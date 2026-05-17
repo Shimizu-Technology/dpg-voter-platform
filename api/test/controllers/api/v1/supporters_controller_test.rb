@@ -83,23 +83,132 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal gec_precinct.number, candidate["precinct_number"]
 
     patch "/api/v1/supporters/#{supporter.id}/verify",
-      params: { verification_status: "verified" },
+      params: { verification_status: "verified", gec_voter_id: gec_voter.id },
       headers: auth_headers(@admin),
       as: :json
 
     assert_response :success
     supporter.reload
     assert_equal gec_voter.id, supporter.gec_voter_id
-    assert_equal gec_village.id, supporter.village_id
+    assert_equal submitted_village.id, supporter.village_id
     assert_equal submitted_village.id, supporter.submitted_village_id
-    assert_equal gec_precinct.id, supporter.precinct_id
+    assert_nil supporter.precinct_id
     assert_equal true, supporter.registered_voter
     assert_equal "yes", supporter.registered_voter_status
     assert_equal "manual_staff_verified", supporter.verification_reason
+    assert_equal gec_voter.id, supporter.verification_reason_metadata["gec_voter_id"]
     assert_equal "Leon", supporter.first_name
     assert_nil supporter.middle_name
     assert_equal "Shimizu", supporter.last_name
     assert_equal "221 Lirio Ave", supporter.street_address
+  end
+
+  test "manual GEC verification can link an explicitly selected match candidate" do
+    submitted_village = Village.find_or_create_by!(name: "Barrigada")
+    first_gec_village = Village.find_or_create_by!(name: "Tamuning")
+    second_gec_village = Village.find_or_create_by!(name: "Hagåtña")
+    first_gec_voter = GecVoter.create!(
+      first_name: "Maria",
+      last_name: "Cruz",
+      birth_year: 1988,
+      address: "100 Marine Dr",
+      village: first_gec_village,
+      village_name: first_gec_village.name,
+      precinct_number: "17A",
+      voter_registration_number: "100001",
+      gec_list_date: Date.new(2026, 5, 13),
+      imported_at: Time.current
+    )
+    selected_gec_voter = GecVoter.create!(
+      first_name: "Maria",
+      last_name: "Cruz",
+      birth_year: 1988,
+      address: "PO BOX 500",
+      village: second_gec_village,
+      village_name: second_gec_village.name,
+      precinct_number: "1",
+      voter_registration_number: "100002",
+      gec_list_date: Date.new(2026, 5, 13),
+      imported_at: Time.current
+    )
+    supporter = Supporter.create!(
+      first_name: "Maria",
+      last_name: "Cruz",
+      contact_number: "6715550101",
+      dob: Date.new(1988, 1, 1),
+      street_address: "123 Contact St",
+      village: submitted_village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      status: "active"
+    )
+
+    patch "/api/v1/supporters/#{supporter.id}/verify",
+      params: { verification_status: "verified", gec_voter_id: selected_gec_voter.id },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    supporter.reload
+    assert_equal selected_gec_voter.id, supporter.gec_voter_id
+    refute_equal first_gec_voter.id, supporter.gec_voter_id
+    assert_equal submitted_village.id, supporter.village_id
+    assert_equal "123 Contact St", supporter.street_address
+    assert_equal selected_gec_voter.id, supporter.verification_reason_metadata["gec_voter_id"]
+    assert_equal second_gec_village.name, supporter.verification_reason_metadata["gec_village_name"]
+  end
+
+  test "manual GEC verification rejects a selected voter outside the current candidate set" do
+    submitted_village = Village.find_or_create_by!(name: "Barrigada")
+    candidate_village = Village.find_or_create_by!(name: "Tamuning")
+    wrong_village = Village.find_or_create_by!(name: "Dededo")
+    GecVoter.create!(
+      first_name: "Tasi",
+      last_name: "Santos",
+      birth_year: 1975,
+      address: "100 Marine Dr",
+      village: candidate_village,
+      village_name: candidate_village.name,
+      precinct_number: "17A",
+      voter_registration_number: "200001",
+      gec_list_date: Date.new(2026, 5, 13),
+      imported_at: Time.current
+    )
+    wrong_voter = GecVoter.create!(
+      first_name: "Different",
+      last_name: "Person",
+      birth_year: 1975,
+      address: "999 Other Rd",
+      village: wrong_village,
+      village_name: wrong_village.name,
+      precinct_number: "18A",
+      voter_registration_number: "200002",
+      gec_list_date: Date.new(2026, 5, 13),
+      imported_at: Time.current
+    )
+    supporter = Supporter.create!(
+      first_name: "Tasi",
+      last_name: "Santos",
+      contact_number: "6715550102",
+      dob: Date.new(1975, 4, 2),
+      village: submitted_village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      status: "active"
+    )
+
+    patch "/api/v1/supporters/#{supporter.id}/verify",
+      params: { verification_status: "verified", gec_voter_id: wrong_voter.id },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "gec_match_candidate_not_found", response.parsed_body["code"]
+    assert_nil supporter.reload.gec_voter_id
   end
 
   test "review intake classifies contact and logs initial outreach" do
