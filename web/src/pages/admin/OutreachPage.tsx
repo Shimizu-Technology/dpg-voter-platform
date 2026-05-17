@@ -89,7 +89,7 @@ const REGISTRATION_STATUS_OPTIONS = [
 ];
 
 const SUPPORT_STATUS_OPTIONS = [
-  { value: '', label: 'All support help progress' },
+  { value: '', label: 'All voter-help / volunteer progress' },
   { value: 'not_started', label: 'Not Started' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Completed' },
@@ -140,7 +140,7 @@ function StatusBadge({
 
 function priorityBadgeClass(priority?: string | null) {
   if (priority === 'Registration Priority') return 'bg-red-100 text-red-700';
-  if (priority === 'Support Help') return 'bg-amber-100 text-amber-800';
+  if (priority === 'Voter Help / Volunteer') return 'bg-amber-100 text-amber-800';
   if (priority === 'Resolved') return 'bg-emerald-100 text-emerald-700';
   return 'bg-slate-100 text-slate-700';
 }
@@ -452,7 +452,7 @@ export default function OutreachPage() {
         </div>
         <div className="app-card p-3 text-center">
           <div className="text-2xl font-bold text-amber-600">{counts.support_requests}</div>
-          <div className="text-xs text-gray-500">Open Support Help</div>
+          <div className="text-xs text-gray-500">Open Voter Help / Volunteer</div>
         </div>
         <div className="app-card p-3 text-center">
           <div className="text-2xl font-bold text-green-600">{counts.completed}</div>
@@ -572,10 +572,10 @@ export default function OutreachPage() {
               .at(-1);
             const queueStatusText = supporter.follow_up_open
               ? supporter.registration_follow_up_open && supporter.support_follow_up_open
-                ? 'Registration + support help still open'
+                ? 'Registration + voter-help / volunteer follow-up still open'
                 : supporter.registration_follow_up_open
                   ? 'Registration follow-up still open'
-                  : 'Support help still open'
+                  : 'Voter-help / volunteer follow-up still open'
               : 'All needed follow-up resolved';
 
             return (
@@ -607,7 +607,7 @@ export default function OutreachPage() {
                       {supporter.needs_support_follow_up && (
                         <StatusBadge
                           status={supporter.support_follow_up_status}
-                          emptyLabel="Support: Not Started"
+                          emptyLabel="Voter Help: Not Started"
                           badges={SUPPORT_STATUS_BADGES}
                         />
                       )}
@@ -686,7 +686,7 @@ export default function OutreachPage() {
                           <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
                             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-blue-700">
                               <StickyNote className="h-3.5 w-3.5" />
-                              Support follow-up note
+                              Voter-help / volunteer note
                             </div>
                             <div className="mt-1 whitespace-pre-wrap">{supporter.support_follow_up_notes}</div>
                           </div>
@@ -741,7 +741,7 @@ export default function OutreachPage() {
                       {supporter.needs_support_follow_up && (
                         <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
                           <div>
-                            <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Voter-help follow-up</div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Voter-help / volunteer follow-up</div>
                             <div className="mt-1 text-xs text-blue-900">Use this track for volunteer, absentee, homebound, and ride-to-polls requests.</div>
                           </div>
                           <div>

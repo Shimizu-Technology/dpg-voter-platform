@@ -791,7 +791,7 @@ module Api
           if params[:support_follow_up_status].present?
             unless allowed_support_statuses.include?(params[:support_follow_up_status])
               return render_api_error(
-                message: "Invalid support follow-up status. Must be: #{allowed_support_statuses.join(', ')}",
+                message: "Invalid voter-help / volunteer follow-up status. Must be: #{allowed_support_statuses.join(', ')}",
                 status: :unprocessable_entity,
                 code: "invalid_support_follow_up_status"
               )
@@ -1835,7 +1835,7 @@ module Api
       def outreach_priority_label(supporter)
         return "Resolved" unless follow_up_open?(supporter)
         return "Registration Priority" if registration_follow_up_open?(supporter)
-        "Support Help"
+        "Voter Help / Volunteer"
       end
 
       def outreach_reasons(supporter)
@@ -1844,8 +1844,8 @@ module Api
         reasons.concat(support_request_reasons(supporter))
         reasons << "Registered via follow-up" if supporter.registration_outreach_status == "registered"
         reasons << "Registration follow-up declined" if supporter.registration_outreach_status == "declined"
-        reasons << "Support help completed" if supporter.support_follow_up_status == "completed"
-        reasons << "Support help declined" if supporter.support_follow_up_status == "declined"
+        reasons << "Voter-help / volunteer follow-up completed" if supporter.support_follow_up_status == "completed"
+        reasons << "Voter-help / volunteer follow-up declined" if supporter.support_follow_up_status == "declined"
         reasons.uniq
       end
 

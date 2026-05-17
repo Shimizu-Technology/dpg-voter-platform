@@ -177,8 +177,8 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   referred_by_name: 'Referred by',
   registration_outreach_status: 'Registration follow-up result',
   registration_outreach_notes: 'Registration follow-up notes',
-  support_follow_up_status: 'Support follow-up progress',
-  support_follow_up_notes: 'Support follow-up notes',
+  support_follow_up_status: 'Voter-help / volunteer follow-up progress',
+  support_follow_up_notes: 'Voter-help / volunteer follow-up notes',
   opt_in_email: 'Opt-in email',
   opt_in_text: 'Opt-in text',
   created_at: 'Created at',
@@ -1452,7 +1452,7 @@ export default function SupporterDetailPage() {
         </section>
 
         <section className="app-card p-4">
-          <h2 className="font-semibold text-[var(--text-primary)] mb-1">Registration & Support Follow-Up</h2>
+          <h2 className="font-semibold text-[var(--text-primary)] mb-1">Registration, Voter-Help & Volunteer Follow-Up</h2>
           <p className="mb-3 text-sm text-[var(--text-secondary)]">
             Use this for outreach tasks like registration help, voter-help requests, and volunteer interest. GEC match review stays in Voter Check above.
           </p>
@@ -1517,7 +1517,7 @@ export default function SupporterDetailPage() {
             </div>
             {hasSupportServiceFollowUp(supporter) && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-[var(--text-secondary)]">Support follow-up:</span>
+                <span className="text-sm text-[var(--text-secondary)]">Voter-help / volunteer follow-up:</span>
                 <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${supportFollowUpStatusClass(supporter.support_follow_up_status)}`}>
                   {supportFollowUpStatusLabel(supporter.support_follow_up_status)}
                 </span>
@@ -1585,7 +1585,7 @@ export default function SupporterDetailPage() {
             {hasSupportServiceFollowUp(supporter) && (
               <>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-[var(--text-secondary)]">Update support follow-up:</span>
+                  <span className="text-sm text-[var(--text-secondary)]">Update voter-help / volunteer follow-up:</span>
                   {canEdit ? (
                     <select
                       value={supporter.support_follow_up_status || ''}
@@ -1594,7 +1594,7 @@ export default function SupporterDetailPage() {
                           await updateOutreachStatus(supporter.id, { support_follow_up_status: e.target.value || null });
                           refetch();
                         } catch {
-                          alert('Failed to update support follow-up progress.');
+                          alert('Failed to update voter-help / volunteer follow-up progress.');
                         }
                       }}
                       className="border border-[var(--border-soft)] rounded-xl px-3 py-2 text-sm bg-[var(--surface-raised)]"
@@ -1612,7 +1612,7 @@ export default function SupporterDetailPage() {
                 </div>
                 {canEdit && (
                   <div>
-                    <label className="text-sm text-[var(--text-secondary)] block mb-1">Support follow-up notes</label>
+                    <label className="text-sm text-[var(--text-secondary)] block mb-1">Voter-help / volunteer follow-up notes</label>
                     <textarea
                       defaultValue={supporter.support_follow_up_notes || ''}
                       onBlur={async (e) => {
@@ -1622,7 +1622,7 @@ export default function SupporterDetailPage() {
                             await updateOutreachStatus(supporter.id, { support_follow_up_notes: newNotes });
                             refetch();
                           } catch {
-                            alert('Failed to save support follow-up notes.');
+                            alert('Failed to save voter-help / volunteer follow-up notes.');
                           }
                         }
                       }}
@@ -1634,13 +1634,13 @@ export default function SupporterDetailPage() {
                 )}
                 {!canEdit && supporter.support_follow_up_notes && (
                   <div>
-                    <span className="text-sm text-[var(--text-secondary)]">Support notes:</span>
+                    <span className="text-sm text-[var(--text-secondary)]">Voter-help / volunteer notes:</span>
                     <p className="text-sm text-[var(--text-primary)] mt-1">{supporter.support_follow_up_notes}</p>
                   </div>
                 )}
                 {supporter.support_follow_up_date && (
                   <p className="text-xs text-[var(--text-muted)]">
-                    Last support follow-up: {formatDateTime(supporter.support_follow_up_date)}
+                    Last voter-help / volunteer follow-up: {formatDateTime(supporter.support_follow_up_date)}
                   </p>
                 )}
               </>
