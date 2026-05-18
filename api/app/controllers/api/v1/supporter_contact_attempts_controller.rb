@@ -60,14 +60,20 @@ module Api
         return render_contact_attempt_edit_error unless can_edit_contact_attempts?
 
         before = contact_attempt_audit_snapshot(@contact_attempt)
-        if @contact_attempt.update(contact_attempt_params)
-          after = contact_attempt_audit_snapshot(@contact_attempt)
-          changed_data = contact_attempt_changed_data(before, after)
-          log_audit!(@supporter, action: "contact_attempt_updated", changed_data: changed_data) if changed_data.any?
+
+        begin
+          ApplicationRecord.transaction do
+            @contact_attempt.update!(contact_attempt_params)
+            after = contact_attempt_audit_snapshot(@contact_attempt)
+            changed_data = contact_attempt_changed_data(before, after)
+            log_audit!(@supporter, action: "contact_attempt_updated", changed_data: changed_data) if changed_data.any?
+          end
+
           render json: { contact_attempt: attempt_json(@contact_attempt) }
-        else
+        rescue ActiveRecord::RecordInvalid => e
+          record = e.record || @contact_attempt
           render_api_error(
-            message: @contact_attempt.errors.full_messages.to_sentence,
+            message: record.errors.full_messages.to_sentence,
             status: :unprocessable_entity,
             code: "contact_attempt_update_failed"
           )

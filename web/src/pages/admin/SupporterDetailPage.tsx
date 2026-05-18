@@ -589,8 +589,12 @@ function supportFollowUpStatusClass(status?: string | null) {
 }
 
 function supportDetailBackLabel(returnTo: string) {
+  if (returnTo.includes('/intake')) return 'Back to Intake';
+  if (returnTo.includes('/gec-voters')) return 'Back to GEC Voters';
+  if (returnTo.includes('/households')) return 'Back to Households';
+  if (returnTo.includes('/outreach')) return 'Back to Follow-Up';
   if (returnTo.includes('/villages/')) return 'Back to Village';
-  if (returnTo.includes('/supporters')) return 'Back to Supporters';
+  if (returnTo.includes('/supporters')) return 'Back to Contacts';
   return 'Back';
 }
 
@@ -848,7 +852,7 @@ export default function SupporterDetailPage() {
   };
 
   if (isLoading || !supporter || !currentForm) {
-    return <div className="min-h-screen flex items-center justify-center text-[var(--text-muted)]">Loading supporter...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-[var(--text-muted)]">Loading contact...</div>;
   }
 
   const gecMatchCandidates = supporter.gec_match_candidates || [];
@@ -884,16 +888,16 @@ export default function SupporterDetailPage() {
         <p className="text-gray-500 text-sm">
           {activityActionLabel(supporter)} {formatDateTime(supporter.created_at)} · {activitySourceLabel(supporter)}
         </p>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex flex-wrap items-center gap-2 mt-1">
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${contactClassificationChipClass(supporter.contact_classification)}`}>
-            {contactClassificationLabel(supporter.contact_classification)}
+            Record: {contactClassificationLabel(supporter.contact_classification)}
           </span>
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${supportStatusChipClass(supporter.support_status)}`}>
-            {supportStatusLabel(supporter.support_status)}
+            Support: {supportStatusLabel(supporter.support_status)}
           </span>
           {supporter.volunteer_status && supporter.volunteer_status !== 'unknown' && (
             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${volunteerStatusChipClass(supporter.volunteer_status)}`}>
-              {volunteerStatusLabel(supporter.volunteer_status)}
+              Volunteer: {volunteerStatusLabel(supporter.volunteer_status)}
             </span>
           )}
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -901,11 +905,11 @@ export default function SupporterDetailPage() {
             supporter.verification_status === 'flagged' ? 'bg-red-100 text-red-800' :
             'bg-yellow-100 text-yellow-800'
           }`}>
-            {verificationStatusLabel(supporter)}
+            Voter list: {verificationStatusLabel(supporter)}
           </span>
           {supporter.status === 'removed' && (
             <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
-              Removed
+              Lifecycle: Removed
             </span>
           )}
         </div>
@@ -1590,7 +1594,7 @@ export default function SupporterDetailPage() {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!window.confirm('Remove this supporter? They will be excluded from all counts but kept in the audit log.')) return;
+                        if (!window.confirm('Remove this contact? They will be excluded from all counts but kept in the audit log.')) return;
                         try {
                           await updateSupporter(supporter.id, { status: 'removed' });
                           refetch();
@@ -2053,7 +2057,7 @@ export default function SupporterDetailPage() {
                   {supporter.household_primary ? 'Primary household contact' : 'Household member'}
                 </span>
                 <span className="text-sm text-[var(--text-secondary)]">
-                  {supporter.household_member_count || 0} linked supporter{(supporter.household_member_count || 0) === 1 ? '' : 's'} in this household group.
+                  {supporter.household_member_count || 0} linked contact{(supporter.household_member_count || 0) === 1 ? '' : 's'} in this household group.
                 </span>
               </div>
               {supporter.household_members && supporter.household_members.length > 0 ? (
@@ -2074,7 +2078,7 @@ export default function SupporterDetailPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-[var(--text-secondary)]">No additional household supporters are linked yet.</p>
+                <p className="text-sm text-[var(--text-secondary)]">No additional household contacts are linked yet.</p>
               )}
             </div>
           </section>

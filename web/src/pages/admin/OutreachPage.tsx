@@ -552,7 +552,7 @@ export default function OutreachPage() {
         {showInitialLoading ? (
           <div className="app-card p-8 text-center text-gray-400">Loading...</div>
         ) : supporters.length === 0 ? (
-          <div className="app-card p-8 text-center text-gray-400">No supporters found</div>
+          <div className="app-card p-8 text-center text-gray-400">No contacts found</div>
         ) : (
           supporters.map((supporter) => {
             const draft = getDraft(supporter);
@@ -584,7 +584,10 @@ export default function OutreachPage() {
                   <div className="min-w-0 flex-1 space-y-4">
                     <div className="flex flex-wrap items-start gap-2">
                       <div className="min-w-0 flex-1">
-                        <Link to={`/admin/supporters/${supporter.id}`} className="text-primary hover:underline text-lg font-semibold">
+                        <Link
+                          to={`/admin/supporters/${supporter.id}?return_to=${encodeURIComponent('/admin/outreach')}`}
+                          className="text-primary hover:underline text-lg font-semibold"
+                        >
                           {supporter.first_name} {supporter.last_name}
                         </Link>
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-gray-500">
@@ -659,7 +662,7 @@ export default function OutreachPage() {
                     <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Household / referral</div>
                       <div className="mt-1 text-sm text-gray-700">
-                        {(supporter.household_member_count || 0) > 0 ? `${supporter.household_member_count} linked supporter${supporter.household_member_count === 1 ? '' : 's'}` : 'Single supporter'}
+                        {(supporter.household_member_count || 0) > 0 ? `${supporter.household_member_count} linked contact${supporter.household_member_count === 1 ? '' : 's'}` : 'Single contact'}
                       </div>
                       <div className="mt-1 text-xs text-gray-500">
                         {supporter.referred_by_name ? `Referred by ${supporter.referred_by_name}` : 'No referral note'}

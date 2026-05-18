@@ -242,6 +242,10 @@ function contactName(contact: Pick<ContactResult, 'print_name' | 'first_name' | 
   return contact.print_name || [contact.first_name, contact.middle_name, contact.last_name].filter(Boolean).join(' ');
 }
 
+function contactDetailPath(contactId: number, returnTo = '/admin/gec-voters') {
+  return `/admin/supporters/${contactId}?return_to=${encodeURIComponent(returnTo)}`;
+}
+
 function contactClassificationLabel(value?: string | null) {
   if (!value) return 'DPG contact';
   return value.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
@@ -1280,7 +1284,16 @@ export default function GecVotersPage() {
                     <Fragment key={voter.id}>
                     <tr className={`align-top ${isLinked ? 'bg-green-50/45' : hasPossibleMatch ? 'bg-amber-50/45' : ''}`}>
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-950">{fullName(voter)}</div>
+                        {isLinked && linkedContact ? (
+                          <Link
+                            to={contactDetailPath(linkedContact.id)}
+                            className="block font-semibold text-slate-950 hover:text-primary hover:underline"
+                          >
+                            {fullName(voter)}
+                          </Link>
+                        ) : (
+                          <div className="font-semibold text-slate-950">{fullName(voter)}</div>
+                        )}
                         <div className="text-xs text-slate-500">{voter.voter_registration_number || 'No voter number'}{voter.birth_year ? ` · Born ${voter.birth_year}` : ''}</div>
                       </td>
                       <td className="px-4 py-3 text-slate-600">{voter.address || '—'}</td>
@@ -1294,7 +1307,7 @@ export default function GecVotersPage() {
                             </span>
                             {linkedContact && (
                               <Link
-                                to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                to={contactDetailPath(linkedContact.id)}
                                 className="block text-xs font-semibold text-primary hover:underline"
                               >
                                 {contactName(linkedContact)}
@@ -1310,7 +1323,7 @@ export default function GecVotersPage() {
                               Possible DPG match
                             </span>
                             <Link
-                              to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                              to={contactDetailPath(possibleContact.id)}
                               className="block text-xs font-semibold text-amber-900 hover:underline"
                             >
                               {contactName(possibleContact)}
@@ -1328,7 +1341,7 @@ export default function GecVotersPage() {
                           {isLinked ? (
                             linkedContact ? (
                               <Link
-                                to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                to={contactDetailPath(linkedContact.id)}
                                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-green-200 bg-white px-3 text-xs font-semibold text-green-800 hover:bg-green-50"
                               >
                                 <Eye className="h-4 w-4" />
@@ -1340,7 +1353,7 @@ export default function GecVotersPage() {
                           ) : hasPossibleMatch && possibleContact ? (
                             <>
                               <Link
-                                to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                to={contactDetailPath(possibleContact.id)}
                                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-3 text-xs font-semibold text-amber-800 hover:bg-amber-50"
                               >
                                 <AlertTriangle className="h-4 w-4" />
@@ -1554,7 +1567,12 @@ export default function GecVotersPage() {
                           {household.contacts.map((contact) => (
                             <div key={contact.id} className="rounded-lg bg-white/70 p-2 text-sm text-slate-700">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-semibold text-slate-800">{contact.print_name || `${contact.first_name} ${contact.last_name}`}</span>
+                                <Link
+                                  to={contactDetailPath(contact.id)}
+                                  className="font-semibold text-slate-800 hover:text-primary hover:underline"
+                                >
+                                  {contact.print_name || `${contact.first_name} ${contact.last_name}`}
+                                </Link>
                                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${contactClassificationChipClass(contact.contact_classification || 'new_intake')}`}>
                                   {contactClassificationLabel(contact.contact_classification || 'new_intake')}
                                 </span>
@@ -1585,7 +1603,16 @@ export default function GecVotersPage() {
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-semibold text-slate-800">{fullName(voter)}</span>
+                                {isLinked && linkedContact ? (
+                                  <Link
+                                    to={contactDetailPath(linkedContact.id)}
+                                    className="font-semibold text-slate-800 hover:text-primary hover:underline"
+                                  >
+                                    {fullName(voter)}
+                                  </Link>
+                                ) : (
+                                  <span className="font-semibold text-slate-800">{fullName(voter)}</span>
+                                )}
                                 {isLinked && (
                                   <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">DPG contact</span>
                                 )}
@@ -1598,7 +1625,7 @@ export default function GecVotersPage() {
                               </div>
                               {hasPossibleMatch && possibleContact && (
                                 <Link
-                                  to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                  to={contactDetailPath(possibleContact.id)}
                                   className="mt-1 block text-xs font-semibold text-amber-900 hover:underline"
                                 >
                                   {contactName(possibleContact)} · {contactClassificationLabel(possibleContact.contact_classification)}
@@ -1609,7 +1636,7 @@ export default function GecVotersPage() {
                               {isLinked ? (
                                 linkedContact ? (
                                   <Link
-                                    to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                    to={contactDetailPath(linkedContact.id)}
                                     className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-green-200 bg-white px-2.5 text-xs font-semibold text-green-800 hover:bg-green-50"
                                   >
                                     <Eye className="h-3.5 w-3.5" />
@@ -1621,7 +1648,7 @@ export default function GecVotersPage() {
                               ) : hasPossibleMatch && possibleContact ? (
                                 <>
                                   <Link
-                                    to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/gec-voters')}`}
+                                    to={contactDetailPath(possibleContact.id)}
                                     className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-white px-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
                                   >
                                     <AlertTriangle className="h-3.5 w-3.5" />

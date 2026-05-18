@@ -115,6 +115,10 @@ function contactName(contact: Pick<HouseholdContact, 'print_name' | 'first_name'
   return contact.print_name || fullName(contact);
 }
 
+function contactDetailPath(contactId: number) {
+  return `/admin/supporters/${contactId}?return_to=${encodeURIComponent('/admin/households')}`;
+}
+
 export default function HouseholdsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -378,14 +382,23 @@ export default function HouseholdsPage() {
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
-                            <div className="font-semibold text-slate-950">{fullName(voter)}</div>
+                            {isLinked && linkedContact ? (
+                              <Link
+                                to={contactDetailPath(linkedContact.id)}
+                                className="block font-semibold text-slate-950 hover:text-primary hover:underline"
+                              >
+                                {fullName(voter)}
+                              </Link>
+                            ) : (
+                              <div className="font-semibold text-slate-950">{fullName(voter)}</div>
+                            )}
                             <div className="mt-1 text-xs text-slate-500">{voterLabel(voter)}</div>
                             {isLinked ? (
                               <div className="mt-2 space-y-1 text-xs">
                                 <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 font-semibold text-green-800">DPG contact</span>
                                 {linkedContact && (
                                   <Link
-                                    to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                    to={contactDetailPath(linkedContact.id)}
                                     className="block font-semibold text-green-900 hover:underline"
                                   >
                                     {contactName(linkedContact)}
@@ -396,7 +409,7 @@ export default function HouseholdsPage() {
                               <div className="mt-2 space-y-1 text-xs">
                                 <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">Possible DPG match</span>
                                 <Link
-                                  to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                  to={contactDetailPath(possibleContact.id)}
                                   className="block font-semibold text-amber-900 hover:underline"
                                 >
                                   {contactName(possibleContact)}
@@ -412,7 +425,7 @@ export default function HouseholdsPage() {
                           <div className="flex shrink-0 flex-wrap gap-2">
                             {isLinked && linkedContact ? (
                               <Link
-                                to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                to={contactDetailPath(linkedContact.id)}
                                 className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-green-200 bg-white px-2.5 text-xs font-semibold text-green-800 hover:bg-green-50"
                               >
                                 <Users className="h-3.5 w-3.5" />
@@ -420,7 +433,7 @@ export default function HouseholdsPage() {
                               </Link>
                             ) : hasPossibleMatch && possibleContact ? (
                               <Link
-                                to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                to={contactDetailPath(possibleContact.id)}
                                 className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-white px-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
                               >
                                 <AlertTriangle className="h-3.5 w-3.5" />
@@ -481,7 +494,12 @@ export default function HouseholdsPage() {
                               ) : contactResults.map((contact) => (
                                 <div key={contact.id} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-2 sm:flex-row sm:items-center sm:justify-between">
                                   <div className="min-w-0">
-                                    <div className="font-semibold text-slate-900">{contact.print_name || `${contact.first_name} ${contact.last_name}`}</div>
+                                    <Link
+                                      to={contactDetailPath(contact.id)}
+                                      className="font-semibold text-slate-900 hover:text-primary hover:underline"
+                                    >
+                                      {contact.print_name || `${contact.first_name} ${contact.last_name}`}
+                                    </Link>
                                     <div className="text-xs text-slate-500">
                                       {[contact.contact_number, contact.email, contact.village_name, contact.street_address].filter(Boolean).join(' · ') || 'No contact details'}
                                     </div>
@@ -523,7 +541,12 @@ export default function HouseholdsPage() {
                           <div key={contact.id} className="rounded-xl border border-slate-200 p-3">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
-                                <div className="font-semibold text-slate-950">{contact.print_name || fullName(contact)}</div>
+                                <Link
+                                  to={contactDetailPath(contact.id)}
+                                  className="font-semibold text-slate-950 hover:text-primary hover:underline"
+                                >
+                                  {contact.print_name || fullName(contact)}
+                                </Link>
                                 <div className="mt-1 text-xs text-slate-500">
                                   {[contact.contact_number, contact.email].filter(Boolean).join(' · ') || 'No phone or email'}
                                 </div>
@@ -570,7 +593,7 @@ export default function HouseholdsPage() {
                                 </span>
                               )}
                               <Link
-                                to={`/admin/supporters/${contact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                to={contactDetailPath(contact.id)}
                                 className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                               >
                                 Open Record

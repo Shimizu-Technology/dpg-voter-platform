@@ -199,9 +199,9 @@ function supporterSortName(supporter: Pick<SupporterItem, 'first_name' | 'middle
 }
 
 function selfReportedStatusLabel(supporter: Pick<SupporterItem, 'registered_voter_status'>) {
-  if (supporter.registered_voter_status === 'yes') return 'Self: Yes';
-  if (supporter.registered_voter_status === 'no') return 'Self: No';
-  return 'Self: Not sure';
+  if (supporter.registered_voter_status === 'yes') return 'Self-reported voter: Yes';
+  if (supporter.registered_voter_status === 'no') return 'Self-reported voter: No';
+  return 'Self-reported voter: Not sure';
 }
 
 function supportRequestBadges(supporter: Pick<SupporterItem, 'needs_voter_registration_help' | 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer' | 'household_member_count'>) {
@@ -877,41 +877,43 @@ export default function SupportersPage() {
         <div className={`md:hidden space-y-3 transition-opacity duration-200 ${isFetching ? 'opacity-70' : 'opacity-100'}`}>
           {visibleSupporters.map((s) => (
             <div key={s.id} className="app-card p-4">
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5">
-                  <Link to={supporterDetailLink(s.id)} className="font-semibold text-[var(--text-primary)] hover:underline">
-                    {supporterSortName(s)}
-                  </Link>
-                  {s.potential_duplicate && (
-                    <span className="flex-shrink-0 w-2 h-2 rounded-full bg-amber-400" title="Potential duplicate" />
-                  )}
-                </div>
-                <span className={`app-chip ${
-                  sourceChipClass(s)
-                }`}>
-                  {sourceLabel(s)}
-                </span>
-                <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
-                  {contactClassificationLabel(s.contact_classification)}
-                </span>
-                <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
-                  {supportStatusLabel(s.support_status)}
-                </span>
-                {s.volunteer_status && s.volunteer_status !== 'unknown' && (
-                  <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
-                    {volunteerStatusLabel(s.volunteer_status)}
+              <div className="mb-2 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <Link to={supporterDetailLink(s.id)} className="truncate font-semibold text-[var(--text-primary)] hover:underline">
+                      {supporterSortName(s)}
+                    </Link>
+                    {s.potential_duplicate && (
+                      <span className="flex-shrink-0 w-2 h-2 rounded-full bg-amber-400" title="Potential duplicate" />
+                    )}
+                  </div>
+                  <span className={`app-chip ${sourceChipClass(s)}`}>
+                    Origin: {sourceLabel(s)}
                   </span>
-                )}
-                <span className={`app-chip ${
-                  s.verification_status === 'verified' ? 'bg-green-100 text-green-700' :
-                  s.verification_status === 'flagged' ? 'bg-red-100 text-red-700' :
-                  'bg-yellow-100 text-yellow-700'
-                }`}>
-                  {verificationStatusLabel(s)}
-                </span>
-                <span className={`app-chip ${lifecycleChipClass(s.status)}`}>
-                  {s.status}
-                </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
+                    Record: {contactClassificationLabel(s.contact_classification)}
+                  </span>
+                  <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
+                    Support: {supportStatusLabel(s.support_status)}
+                  </span>
+                  {s.volunteer_status && s.volunteer_status !== 'unknown' && (
+                    <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
+                      Volunteer: {volunteerStatusLabel(s.volunteer_status)}
+                    </span>
+                  )}
+                  <span className={`app-chip ${
+                    s.verification_status === 'verified' ? 'bg-green-100 text-green-700' :
+                    s.verification_status === 'flagged' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    Voter list: {verificationStatusLabel(s)}
+                  </span>
+                  <span className={`app-chip ${lifecycleChipClass(s.status)}`}>
+                    Lifecycle: {s.status}
+                  </span>
+                </div>
               </div>
               <div className="text-sm text-[var(--text-secondary)] space-y-0.5">
                 <div className="flex justify-between">
@@ -1078,14 +1080,14 @@ export default function SupportersPage() {
                     <td className="px-4 py-3 whitespace-nowrap align-middle">
                       <div className="flex flex-wrap gap-1.5">
                         <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
-                          {contactClassificationLabel(s.contact_classification)}
+                          Record: {contactClassificationLabel(s.contact_classification)}
                         </span>
                         <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
-                          {supportStatusLabel(s.support_status)}
+                          Support: {supportStatusLabel(s.support_status)}
                         </span>
                         {s.volunteer_status && s.volunteer_status !== 'unknown' && (
                           <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
-                            {volunteerStatusLabel(s.volunteer_status)}
+                            Volunteer: {volunteerStatusLabel(s.volunteer_status)}
                           </span>
                         )}
                       </div>
