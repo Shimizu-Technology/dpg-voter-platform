@@ -110,6 +110,55 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, household["contacts"].length
   end
 
+  test "households group common address variants without merging villages" do
+    GecVoter.create!(
+      first_name: "Variant",
+      last_name: "Voter",
+      address: "221 Lirio Avenue Barrigada Heights",
+      village: @village,
+      village_name: @village.name,
+      precinct: @precinct,
+      precinct_number: @precinct.number,
+      gec_list_date: Date.new(2026, 1, 25),
+      imported_at: Time.current
+    )
+    Supporter.create!(
+      first_name: "Variant",
+      last_name: "Contact",
+      contact_number: "671-555-0123",
+      village: @village,
+      street_address: "221 Lirio Ave",
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      status: "active"
+    )
+    other_village = Village.find_or_create_by!(name: "Dededo")
+    Supporter.create!(
+      first_name: "Other",
+      last_name: "Village",
+      contact_number: "671-555-0124",
+      village: other_village,
+      street_address: "221 Lirio Ave",
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      status: "active"
+    )
+
+    get "/api/v1/gec_voters/households", params: { q: "221 Lirio" }, headers: auth_headers(@admin)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    barrigada_household = payload["households"].find { |row| row["village_name"] == "Barrigada" && row["address"].include?("Lirio") }
+    dededo_household = payload["households"].find { |row| row["village_name"] == "Dededo" && row["address"].include?("Lirio") }
+    assert_equal 1, barrigada_household["gec_voters"].length
+    assert_equal 1, barrigada_household["contacts"].length
+    assert_equal 1, dededo_household["contacts"].length
+  end
+
   test "index and households surface possible pending contacts for unlinked GEC voters" do
     other_village = Village.find_or_create_by!(name: "Dededo")
     possible_contact = Supporter.create!(

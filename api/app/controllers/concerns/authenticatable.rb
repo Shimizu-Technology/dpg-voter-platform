@@ -149,6 +149,16 @@ module Authenticatable
     )
   end
 
+  def require_supporter_export_access!
+    return if can_export_supporters?
+
+    render_api_error(
+      message: "Supporter export access required",
+      status: :forbidden,
+      code: "supporter_export_access_required"
+    )
+  end
+
   def require_coordinator_or_above!
     unless current_user&.admin? || current_user&.data_team? || current_user&.coordinator?
       render_api_error(
@@ -243,6 +253,10 @@ module Authenticatable
     current_user&.admin? || current_user&.data_team? || current_user&.coordinator?
   end
 
+  def can_edit_contact_attempts?
+    current_user&.admin? || current_user&.data_team?
+  end
+
   def can_view_supporters?
     current_user&.admin? || current_user&.data_team? || current_user&.coordinator? || current_user&.chief? || current_user&.leader?
   end
@@ -252,7 +266,7 @@ module Authenticatable
   end
 
   def can_access_qr?
-    current_user&.admin? || current_user&.coordinator? || current_user&.chief? || current_user&.leader?
+    current_user&.admin? || current_user&.data_team? || current_user&.coordinator? || current_user&.chief? || current_user&.leader?
   end
 
   def can_access_leaderboard?
@@ -276,7 +290,11 @@ module Authenticatable
   end
 
   def can_import_supporters?
-    can_create_staff_supporters?
+    current_user&.admin? || current_user&.data_team? || current_user&.coordinator?
+  end
+
+  def can_export_supporters?
+    current_user&.admin? || current_user&.data_team?
   end
 
   def can_upload_gec?

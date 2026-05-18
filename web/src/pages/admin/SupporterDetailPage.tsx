@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ChevronLeft, Loader2, Mail, MapPin, MessageSquare, Pencil, Phone, Plus, Save, StickyNote, UserRound, X } from 'lucide-react';
-import { createSupporterContactAttempt, getSupporter, getSupporterContactAttempts, getVillages, updateSupporter, verifySupporter, updateOutreachStatus } from '../../lib/api';
+import { createSupporterContactAttempt, getSupporter, getSupporterContactAttempts, getVillages, updateSupporter, updateSupporterContactAttempt, verifySupporter, updateOutreachStatus } from '../../lib/api';
 import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, CONTACT_ATTEMPT_OUTCOME_OPTIONS } from '../../lib/contactAttempt';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
@@ -70,6 +70,22 @@ interface SupporterDetail {
   verification_reason_detail?: string | null;
   verification_reason_metadata?: Record<string, unknown> | null;
   verification_reason_derived?: boolean;
+  gec_match_candidates?: Array<{
+    id: number;
+    first_name?: string | null;
+    middle_name?: string | null;
+    last_name?: string | null;
+    name?: string | null;
+    address?: string | null;
+    dob?: string | null;
+    birth_year?: number | null;
+    village_name?: string | null;
+    precinct_number?: string | null;
+    voter_registration_number?: string | null;
+    confidence?: string | null;
+    match_type?: string | null;
+    match_count?: number | null;
+  }>;
   verified_at: string | null;
   verified_by_user_id: number | null;
   potential_duplicate: boolean;
@@ -134,6 +150,7 @@ interface ContactAttemptItem {
 
 interface SupporterPermissions {
   can_edit: boolean;
+  can_edit_contact_attempts?: boolean;
 }
 
 const AUDIT_FIELD_LABELS: Record<string, string> = {
@@ -160,6 +177,10 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   verification_status: 'Verification status',
   attribution_method: 'Entry method',
   referral_code_id: 'Referrer',
+  channel: 'Contact channel',
+  outcome: 'Contact outcome',
+  note: 'Contact note',
+  recorded_at: 'Contact date',
   self_reported_registered_voter: 'Self-reported registered voter',
   registered_voter_status: 'Self-reported voter status',
   registered_voter_location_note: 'Votes elsewhere note',
@@ -172,8 +193,8 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   referred_by_name: 'Referred by',
   registration_outreach_status: 'Registration follow-up result',
   registration_outreach_notes: 'Registration follow-up notes',
-  support_follow_up_status: 'Support follow-up progress',
-  support_follow_up_notes: 'Support follow-up notes',
+  support_follow_up_status: 'Voter-help / volunteer follow-up progress',
+  support_follow_up_notes: 'Voter-help / volunteer follow-up notes',
   opt_in_email: 'Opt-in email',
   opt_in_text: 'Opt-in text',
   created_at: 'Created at',
@@ -265,6 +286,10 @@ const PRIMARY_AUDIT_FIELD_ORDER = [
   'status',
   'attribution_method',
   'source',
+  'channel',
+  'outcome',
+  'recorded_at',
+  'note',
   'village_id',
   'precinct_id',
   'first_name',
@@ -348,6 +373,10 @@ function humanizeAuditValue(value: unknown, field?: string) {
 }
 
 function auditDiffParts(diff: unknown): { from: unknown; to: unknown } {
+  if (Array.isArray(diff) && diff.length === 2) {
+    return { from: diff[0], to: diff[1] };
+  }
+
   if (diff && typeof diff === 'object' && !Array.isArray(diff) && ('from' in diff || 'to' in diff)) {
     const record = diff as { from?: unknown; to?: unknown };
     return { from: record.from, to: record.to };
@@ -412,6 +441,32 @@ function verificationStatusDetail(supporter: Pick<SupporterDetail, 'verification
     return 'This supporter was not found in the current voter list.';
   }
   return 'This supporter still needs voter-check review.';
+}
+
+type GecMatchCandidate = NonNullable<SupporterDetail['gec_match_candidates']>[number];
+
+function gecCandidateName(candidate: GecMatchCandidate) {
+  return candidate.name || [candidate.first_name, candidate.middle_name, candidate.last_name].filter(Boolean).join(' ') || 'GEC voter';
+}
+
+function gecCandidateMatchLabel(candidate: GecMatchCandidate) {
+  const matchType = candidate.match_type;
+  if (matchType === 'confirmed') return 'Confirmed link';
+  if (matchType === 'different_village') return 'Same name and birth year, different village';
+  if (matchType === 'name_year_village') return 'Same name, birth year, and village';
+  if (matchType === 'exact_dob_village') return 'Same name, date of birth, and village';
+  if (matchType === 'name_year_only') return 'Same name and birth year';
+  if (matchType === 'fuzzy_name_year') return 'Similar name and same birth year';
+  if (matchType === 'name_village_only') return 'Same name and village';
+  return 'Current GEC match candidate';
+}
+
+function gecCandidateConfidenceLabel(candidate: GecMatchCandidate) {
+  if (candidate.confidence === 'exact') return 'Exact';
+  if (candidate.confidence === 'high') return 'High confidence';
+  if (candidate.confidence === 'medium') return 'Needs review';
+  if (candidate.confidence === 'low') return 'Low confidence';
+  return 'Suggested';
 }
 
 function isNoGecMatch(supporter: Pick<SupporterDetail, 'verification_status' | 'registered_voter' | 'referred_from_village_id'>) {
@@ -491,25 +546,25 @@ function selfReportedRegisteredStatusLabel(status?: string | null, fallback?: bo
   return 'Not sure';
 }
 
-function supportRequestBadges(supporter: Pick<SupporterDetail, 'needs_voter_registration_help' | 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer'>) {
+function supportRequestBadges(supporter: Pick<SupporterDetail, 'needs_voter_registration_help' | 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer' | 'volunteer_status'>) {
   const badges: string[] = [];
   if (supporter.needs_voter_registration_help) badges.push('Registration Help');
   if (supporter.needs_absentee_ballot_help) badges.push('Absentee Help');
   if (supporter.needs_homebound_voting_help) badges.push('Homebound Help');
   if (supporter.needs_election_day_ride) badges.push('Ride To Polls');
-  if (supporter.wants_to_volunteer) badges.push('Volunteer');
+  if (supporter.wants_to_volunteer || supporter.volunteer_status === 'interested') badges.push('Volunteer');
   return badges;
 }
 
-function hasSupportServiceFollowUp(supporter: Pick<SupporterDetail, 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer'>) {
-  return supporter.needs_absentee_ballot_help || supporter.needs_homebound_voting_help || supporter.needs_election_day_ride || supporter.wants_to_volunteer;
+function hasSupportServiceFollowUp(supporter: Pick<SupporterDetail, 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer' | 'volunteer_status'>) {
+  return supporter.needs_absentee_ballot_help || supporter.needs_homebound_voting_help || supporter.needs_election_day_ride || supporter.wants_to_volunteer || supporter.volunteer_status === 'interested';
 }
 
 function registrationFollowUpStatusLabel(status?: string | null) {
   if (status === 'registered') return 'Registered via follow-up';
-  if (status === 'contacted') return 'Contacted';
+  if (status === 'contacted') return 'Contact logged';
   if (status === 'declined') return 'Declined';
-  return 'Not contacted';
+  return 'No registration outcome set';
 }
 
 function registrationFollowUpStatusClass(status?: string | null) {
@@ -523,7 +578,7 @@ function supportFollowUpStatusLabel(status?: string | null) {
   if (status === 'in_progress') return 'In progress';
   if (status === 'completed') return 'Completed';
   if (status === 'declined') return 'Declined';
-  return 'Not started';
+  return 'No voter-help progress set';
 }
 
 function supportFollowUpStatusClass(status?: string | null) {
@@ -534,8 +589,12 @@ function supportFollowUpStatusClass(status?: string | null) {
 }
 
 function supportDetailBackLabel(returnTo: string) {
+  if (returnTo.includes('/intake')) return 'Back to Intake';
+  if (returnTo.includes('/gec-voters')) return 'Back to GEC Voters';
+  if (returnTo.includes('/households')) return 'Back to Households';
+  if (returnTo.includes('/outreach')) return 'Back to Follow-Up';
   if (returnTo.includes('/villages/')) return 'Back to Village';
-  if (returnTo.includes('/supporters')) return 'Back to Supporters';
+  if (returnTo.includes('/supporters')) return 'Back to Contacts';
   return 'Back';
 }
 
@@ -596,6 +655,7 @@ export default function SupporterDetailPage() {
   const permissions: SupporterPermissions | undefined = data?.permissions;
   const auditLogs: AuditLogItem[] = data?.audit_logs || [];
   const contactAttempts: ContactAttemptItem[] = contactAttemptsData?.contact_attempts || [];
+  const latestContactAttempt = contactAttempts[0];
   const returnTo = searchParams.get('return_to') || '';
   const villages: VillageOption[] = useMemo(() => villagesData?.villages || [], [villagesData]);
   const villageNameById = useMemo(
@@ -615,9 +675,18 @@ export default function SupporterDetailPage() {
     note: '',
     recorded_at: localDateTimeInputValue(),
   });
+  const [editingAttemptId, setEditingAttemptId] = useState<number | null>(null);
+  const [editingAttemptDraft, setEditingAttemptDraft] = useState({
+    channel: 'in_person',
+    outcome: 'reached',
+    note: '',
+    recorded_at: localDateTimeInputValue(),
+  });
   const [attemptError, setAttemptError] = useState<string | null>(null);
+  const [attemptEditError, setAttemptEditError] = useState<string | null>(null);
   const canEdit = permissions?.can_edit ?? false;
   const canLogContactAttempt = canEdit;
+  const canEditContactAttempts = permissions?.can_edit_contact_attempts ?? false;
   const canMarkVerifiedVoter = supporter ? !isNoGecMatch(supporter) : false;
   const supporterDetailPath = (targetId: number) => {
     const basePath = '/admin/supporters';
@@ -708,6 +777,34 @@ export default function SupporterDetailPage() {
     },
   });
 
+  const contactAttemptEditMutation = useMutation({
+    mutationFn: () => {
+      if (!editingAttemptId) throw new Error('No contact attempt selected.');
+      return updateSupporterContactAttempt(supporterId, editingAttemptId, {
+        channel: editingAttemptDraft.channel,
+        outcome: editingAttemptDraft.outcome,
+        note: editingAttemptDraft.note.trim(),
+        recorded_at: editingAttemptDraft.recorded_at,
+      });
+    },
+    onSuccess: () => {
+      setAttemptEditError(null);
+      setEditingAttemptId(null);
+      queryClient.invalidateQueries({ queryKey: ['supporter-contact-attempts', supporterId] });
+      queryClient.invalidateQueries({ queryKey: ['supporter', supporterId] });
+      queryClient.invalidateQueries({ queryKey: ['supporters'] });
+      queryClient.invalidateQueries({ queryKey: ['outreach'] });
+    },
+    onError: (error: unknown) => {
+      if (typeof error === 'object' && error && 'response' in error) {
+        const response = (error as { response?: { data?: { error?: string } } }).response;
+        setAttemptEditError(response?.data?.error || 'Could not save this contact history edit.');
+      } else {
+        setAttemptEditError('Could not save this contact history edit.');
+      }
+    },
+  });
+
 
   useEffect(() => {
     if (!isEditing || !isDirty) return;
@@ -731,6 +828,18 @@ export default function SupporterDetailPage() {
     setIsEditing(true);
   };
 
+  const startAttemptEdit = (attempt: ContactAttemptItem) => {
+    if (!canEditContactAttempts) return;
+    setAttemptEditError(null);
+    setEditingAttemptId(attempt.id);
+    setEditingAttemptDraft({
+      channel: attempt.channel,
+      outcome: attempt.outcome,
+      note: attempt.note || '',
+      recorded_at: localDateTimeInputValue(new Date(attempt.recorded_at)),
+    });
+  };
+
   const cancelEdit = () => {
     if (!confirmDiscardIfNeeded()) return;
     setDraft(null);
@@ -743,8 +852,23 @@ export default function SupporterDetailPage() {
   };
 
   if (isLoading || !supporter || !currentForm) {
-    return <div className="min-h-screen flex items-center justify-center text-[var(--text-muted)]">Loading supporter...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-[var(--text-muted)]">Loading contact...</div>;
   }
+
+  const gecMatchCandidates = supporter.gec_match_candidates || [];
+  const bestGecMatchCandidate = gecMatchCandidates[0];
+  const confirmGecMatch = async (candidate?: GecMatchCandidate) => {
+    const selectedCandidate = candidate || bestGecMatchCandidate;
+    const candidateName = selectedCandidate ? gecCandidateName(selectedCandidate) : 'the best current GEC voter match';
+    const candidateVillage = selectedCandidate?.village_name ? ` in ${selectedCandidate.village_name}` : '';
+    if (!window.confirm(`Confirm ${candidateName}${candidateVillage} as the GEC voter match for this contact? This links the contact to that official GEC voter record while keeping the contact-entered name, address, and village for DPG outreach.`)) return;
+    try {
+      await verifySupporter(supporter.id, 'verified', selectedCandidate?.id);
+      refetch();
+    } catch {
+      alert('Failed to mark supporter as matched to GEC. Select one of the current GEC match candidates.');
+    }
+  };
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -764,16 +888,16 @@ export default function SupporterDetailPage() {
         <p className="text-gray-500 text-sm">
           {activityActionLabel(supporter)} {formatDateTime(supporter.created_at)} · {activitySourceLabel(supporter)}
         </p>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex flex-wrap items-center gap-2 mt-1">
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${contactClassificationChipClass(supporter.contact_classification)}`}>
-            {contactClassificationLabel(supporter.contact_classification)}
+            Record: {contactClassificationLabel(supporter.contact_classification)}
           </span>
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${supportStatusChipClass(supporter.support_status)}`}>
-            {supportStatusLabel(supporter.support_status)}
+            Support: {supportStatusLabel(supporter.support_status)}
           </span>
           {supporter.volunteer_status && supporter.volunteer_status !== 'unknown' && (
             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${volunteerStatusChipClass(supporter.volunteer_status)}`}>
-              {volunteerStatusLabel(supporter.volunteer_status)}
+              Volunteer: {volunteerStatusLabel(supporter.volunteer_status)}
             </span>
           )}
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -781,11 +905,11 @@ export default function SupporterDetailPage() {
             supporter.verification_status === 'flagged' ? 'bg-red-100 text-red-800' :
             'bg-yellow-100 text-yellow-800'
           }`}>
-            {verificationStatusLabel(supporter)}
+            Voter list: {verificationStatusLabel(supporter)}
           </span>
           {supporter.status === 'removed' && (
             <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
-              Removed
+              Lifecycle: Removed
             </span>
           )}
         </div>
@@ -1231,6 +1355,29 @@ export default function SupporterDetailPage() {
             <p className="text-sm text-[var(--text-secondary)]">
               {supporterStatusLabel(supporter)}. Support status tracks whether this person supports DPG. Party membership can be added later if DPG provides an official member roster.
             </p>
+            <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-bg)] px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Latest contact</p>
+              {latestContactAttempt ? (
+                <div className="mt-1 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-[var(--text-primary)]">
+                      {contactAttemptChannelLabel(latestContactAttempt.channel)}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${contactAttemptTone(latestContactAttempt.outcome)}`}>
+                      {contactAttemptOutcomeLabel(latestContactAttempt.outcome)}
+                    </span>
+                    <span className="text-sm text-[var(--text-secondary)]">
+                      {formatDateTime(latestContactAttempt.recorded_at)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Logged by {latestContactAttempt.recorded_by_name || latestContactAttempt.recorded_by_email || 'DPG staff'}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">Not contacted yet</p>
+              )}
+            </div>
           </div>
         </section>
 
@@ -1255,6 +1402,140 @@ export default function SupporterDetailPage() {
             <p className="text-sm text-[var(--text-secondary)]">
               {verificationStatusDetail(supporter)}
             </p>
+            {bestGecMatchCandidate && supporter.verification_status === 'verified' && (
+              <div className="rounded-xl border border-green-100 bg-green-50/70 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-green-800">
+                      Linked GEC voter record
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                      {gecCandidateName(bestGecMatchCandidate)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      Contact details above stay as DPG outreach info. This official GEC record is used for voter-list matching.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-green-800">
+                    Confirmed
+                  </span>
+                </div>
+                <dl className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">GEC village</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.village_name || 'Unknown'}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">GEC precinct</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.precinct_number || 'Unknown'}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">Birth year</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.birth_year || (bestGecMatchCandidate.dob ? new Date(bestGecMatchCandidate.dob).getFullYear() : 'Unknown')}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">Reg. no.</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.voter_registration_number || 'Not shown'}</dd>
+                  </div>
+                </dl>
+                {bestGecMatchCandidate.address && (
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                    GEC address: <span className="font-medium text-[var(--text-primary)]">{bestGecMatchCandidate.address}</span>
+                  </p>
+                )}
+              </div>
+            )}
+            {bestGecMatchCandidate && supporter.verification_status !== 'verified' && (
+              <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">
+                      Best GEC match to confirm
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                      {gecCandidateName(bestGecMatchCandidate)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      {gecCandidateMatchLabel(bestGecMatchCandidate)}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-800">
+                    {gecCandidateConfidenceLabel(bestGecMatchCandidate)}
+                  </span>
+                </div>
+                <dl className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">Village</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.village_name || 'Unknown'}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">Precinct</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.precinct_number || 'Unknown'}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">Birth year</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.birth_year || (bestGecMatchCandidate.dob ? new Date(bestGecMatchCandidate.dob).getFullYear() : 'Unknown')}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-[var(--text-muted)]">Reg. no.</dt>
+                    <dd className="mt-0.5 text-[var(--text-primary)]">{bestGecMatchCandidate.voter_registration_number || 'Not shown'}</dd>
+                  </div>
+                </dl>
+                {bestGecMatchCandidate.address && (
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                    GEC address: <span className="font-medium text-[var(--text-primary)]">{bestGecMatchCandidate.address}</span>
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  Confirm only if this is the same person. This creates the official GEC link and keeps the contact-entered name, address, and village as DPG outreach details.
+                </p>
+                {canEdit && canMarkVerifiedVoter && (
+                  <button
+                    type="button"
+                    onClick={() => confirmGecMatch(bestGecMatchCandidate)}
+                    className="mt-3 min-h-[40px] rounded-lg bg-green-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  >
+                    Confirm this GEC record
+                  </button>
+                )}
+                {gecMatchCandidates.length > 1 && (
+                  <div className="mt-3 border-t border-blue-100 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">Other possible matches</p>
+                    <div className="mt-2 grid gap-2 md:grid-cols-2">
+                      {gecMatchCandidates.slice(1).map((candidate) => (
+                        <div key={candidate.id} className="rounded-lg bg-white px-3 py-2 text-xs">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <p className="font-semibold text-[var(--text-primary)]">{gecCandidateName(candidate)}</p>
+                              <p className="mt-0.5 text-[var(--text-secondary)]">
+                            {[candidate.village_name, candidate.precinct_number && `Precinct ${candidate.precinct_number}`, candidate.birth_year && `Born ${candidate.birth_year}`].filter(Boolean).join(' · ') || 'GEC voter record'}
+                              </p>
+                              {candidate.address && (
+                                <p className="mt-0.5 text-[var(--text-secondary)]">GEC address: {candidate.address}</p>
+                              )}
+                            </div>
+                            {canEdit && canMarkVerifiedVoter && (
+                              <button
+                                type="button"
+                                onClick={() => confirmGecMatch(candidate)}
+                                className="rounded-md border border-blue-200 px-2.5 py-1 font-semibold text-blue-800 hover:bg-blue-50"
+                              >
+                                Use this match
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {canMarkVerifiedVoter && supporter.verification_status !== 'verified' && (
+              <p className="text-xs text-[var(--text-secondary)]">
+                Confirming links this contact to a specific GEC voter record. The official voter-list name, address, village, and precinct stay on the linked GEC record; the contact fields stay as DPG outreach details.
+              </p>
+            )}
 
             {canEdit && (
               <>
@@ -1264,17 +1545,10 @@ export default function SupporterDetailPage() {
                     <button
                       type="button"
                       disabled={supporter.verification_status === 'verified'}
-                      onClick={async () => {
-                        try {
-                          await verifySupporter(supporter.id, 'verified');
-                          refetch();
-                        } catch {
-                          alert('Failed to mark supporter as matched to GEC. A current GEC match is required.');
-                        }
-                      }}
+                      onClick={() => confirmGecMatch(bestGecMatchCandidate)}
                       className="min-h-[40px] px-3.5 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Mark Matched To GEC
+                      Confirm Suggested GEC Match
                     </button>
                   )}
                   <button
@@ -1320,7 +1594,7 @@ export default function SupporterDetailPage() {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!window.confirm('Remove this supporter? They will be excluded from all counts but kept in the audit log.')) return;
+                        if (!window.confirm('Remove this contact? They will be excluded from all counts but kept in the audit log.')) return;
                         try {
                           await updateSupporter(supporter.id, { status: 'removed' });
                           refetch();
@@ -1366,7 +1640,13 @@ export default function SupporterDetailPage() {
         </section>
 
         <section className="app-card p-4">
-          <h2 className="font-semibold text-[var(--text-primary)] mb-2">Follow-Up Workflow</h2>
+          <h2 className="font-semibold text-[var(--text-primary)] mb-1">Registration, Voter-Help & Volunteer Follow-Up</h2>
+          <p className="mb-3 text-sm text-[var(--text-secondary)]">
+            Use this for outreach tasks like registration help, voter-help requests, and volunteer interest. GEC match review stays in Voter Check above.
+          </p>
+          <p className="mb-3 text-xs text-[var(--text-secondary)]">
+            Contact History below is the actual call, text, email, and visit log. Logging a first contact will automatically mark untouched follow-up tasks as started; use these follow-up fields to record the task result.
+          </p>
           <div className="space-y-3">
             {supporter.registration_outreach_status === 'registered' && (
               <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
@@ -1404,7 +1684,7 @@ export default function SupporterDetailPage() {
                 {gecMatchLabel(supporter)}
               </span>
               {!supporter.current_gec_match && supporter.registered_voter && (
-                <span className={`text-sm ${gecMatchClass(supporter)}`}>Review still needed before this supporter is treated as linked to the election-day voter list.</span>
+                <span className={`text-sm ${gecMatchClass(supporter)}`}>Voter-list review still needed before this contact is treated as matched to the current GEC file. Handle this in Voter Check above, not the outreach follow-up queue.</span>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1428,7 +1708,7 @@ export default function SupporterDetailPage() {
             </div>
             {hasSupportServiceFollowUp(supporter) && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-[var(--text-secondary)]">Support follow-up:</span>
+                <span className="text-sm text-[var(--text-secondary)]">Voter-help / volunteer follow-up:</span>
                 <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${supportFollowUpStatusClass(supporter.support_follow_up_status)}`}>
                   {supportFollowUpStatusLabel(supporter.support_follow_up_status)}
                 </span>
@@ -1449,8 +1729,8 @@ export default function SupporterDetailPage() {
                   }}
                   className="border border-[var(--border-soft)] rounded-xl px-3 py-2 text-sm bg-[var(--surface-raised)]"
                 >
-                  <option value="">Not contacted</option>
-                  <option value="contacted">Contacted</option>
+                  <option value="">No registration outcome set</option>
+                  <option value="contacted">Contact logged</option>
                   <option value="registered">Registered via follow-up</option>
                   <option value="declined">Declined</option>
                 </select>
@@ -1496,7 +1776,7 @@ export default function SupporterDetailPage() {
             {hasSupportServiceFollowUp(supporter) && (
               <>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-[var(--text-secondary)]">Update support follow-up:</span>
+                  <span className="text-sm text-[var(--text-secondary)]">Update voter-help / volunteer follow-up:</span>
                   {canEdit ? (
                     <select
                       value={supporter.support_follow_up_status || ''}
@@ -1505,12 +1785,12 @@ export default function SupporterDetailPage() {
                           await updateOutreachStatus(supporter.id, { support_follow_up_status: e.target.value || null });
                           refetch();
                         } catch {
-                          alert('Failed to update support follow-up progress.');
+                          alert('Failed to update voter-help / volunteer follow-up progress.');
                         }
                       }}
                       className="border border-[var(--border-soft)] rounded-xl px-3 py-2 text-sm bg-[var(--surface-raised)]"
                     >
-                      <option value="">Not started</option>
+                      <option value="">No voter-help progress set</option>
                       <option value="in_progress">In progress</option>
                       <option value="completed">Completed</option>
                       <option value="declined">Declined</option>
@@ -1523,7 +1803,7 @@ export default function SupporterDetailPage() {
                 </div>
                 {canEdit && (
                   <div>
-                    <label className="text-sm text-[var(--text-secondary)] block mb-1">Support follow-up notes</label>
+                    <label className="text-sm text-[var(--text-secondary)] block mb-1">Voter-help / volunteer follow-up notes</label>
                     <textarea
                       defaultValue={supporter.support_follow_up_notes || ''}
                       onBlur={async (e) => {
@@ -1533,7 +1813,7 @@ export default function SupporterDetailPage() {
                             await updateOutreachStatus(supporter.id, { support_follow_up_notes: newNotes });
                             refetch();
                           } catch {
-                            alert('Failed to save support follow-up notes.');
+                            alert('Failed to save voter-help / volunteer follow-up notes.');
                           }
                         }
                       }}
@@ -1545,13 +1825,13 @@ export default function SupporterDetailPage() {
                 )}
                 {!canEdit && supporter.support_follow_up_notes && (
                   <div>
-                    <span className="text-sm text-[var(--text-secondary)]">Support notes:</span>
+                    <span className="text-sm text-[var(--text-secondary)]">Voter-help / volunteer notes:</span>
                     <p className="text-sm text-[var(--text-primary)] mt-1">{supporter.support_follow_up_notes}</p>
                   </div>
                 )}
                 {supporter.support_follow_up_date && (
                   <p className="text-xs text-[var(--text-muted)]">
-                    Last support follow-up: {formatDateTime(supporter.support_follow_up_date)}
+                    Last voter-help / volunteer follow-up: {formatDateTime(supporter.support_follow_up_date)}
                   </p>
                 )}
               </>
@@ -1647,26 +1927,121 @@ export default function SupporterDetailPage() {
               </div>
             ) : contactAttempts.map((attempt) => {
               const ChannelIcon = CONTACT_ATTEMPT_CHANNELS.find((option) => option.value === attempt.channel)?.icon || StickyNote;
+              const isEditingAttempt = editingAttemptId === attempt.id;
               return (
                 <div key={attempt.id} className="rounded-xl border border-[var(--border-soft)] px-4 py-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ChannelIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-                        <span className="font-semibold text-[var(--text-primary)]">{contactAttemptChannelLabel(attempt.channel)}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${contactAttemptTone(attempt.outcome)}`}>
-                          {contactAttemptOutcomeLabel(attempt.outcome)}
-                        </span>
+                  {isEditingAttempt ? (
+                    <form
+                      className="space-y-3"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        contactAttemptEditMutation.mutate();
+                      }}
+                    >
+                      <div className="grid gap-3 md:grid-cols-[160px_160px_190px_minmax(0,1fr)]">
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Channel</span>
+                          <select
+                            value={editingAttemptDraft.channel}
+                            onChange={(event) => setEditingAttemptDraft((prev) => ({ ...prev, channel: event.target.value }))}
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                          >
+                            {CONTACT_ATTEMPT_CHANNELS.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Outcome</span>
+                          <select
+                            value={editingAttemptDraft.outcome}
+                            onChange={(event) => setEditingAttemptDraft((prev) => ({ ...prev, outcome: event.target.value }))}
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                          >
+                            {CONTACT_ATTEMPT_OUTCOMES.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">When</span>
+                          <input
+                            type="datetime-local"
+                            value={editingAttemptDraft.recorded_at}
+                            onChange={(event) => setEditingAttemptDraft((prev) => ({ ...prev, recorded_at: event.target.value }))}
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Note</span>
+                          <input
+                            value={editingAttemptDraft.note}
+                            onChange={(event) => setEditingAttemptDraft((prev) => ({ ...prev, note: event.target.value }))}
+                            placeholder="What happened?"
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm"
+                          />
+                        </label>
                       </div>
-                      {attempt.note && (
-                        <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-primary)]">{attempt.note}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={contactAttemptEditMutation.isPending}
+                          className="app-btn-primary min-h-9 justify-center"
+                        >
+                          {contactAttemptEditMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          Save edit
+                        </button>
+                        <button
+                          type="button"
+                          className="app-btn-secondary min-h-9 justify-center"
+                          onClick={() => {
+                            setEditingAttemptId(null);
+                            setAttemptEditError(null);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                          Cancel
+                        </button>
+                        <span className="text-xs text-[var(--text-muted)]">Edits are recorded in Audit History.</span>
+                      </div>
+                      {attemptEditError && (
+                        <div className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                          {attemptEditError}
+                        </div>
                       )}
+                    </form>
+                  ) : (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ChannelIcon className="h-4 w-4 text-[var(--text-secondary)]" />
+                          <span className="font-semibold text-[var(--text-primary)]">{contactAttemptChannelLabel(attempt.channel)}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${contactAttemptTone(attempt.outcome)}`}>
+                            {contactAttemptOutcomeLabel(attempt.outcome)}
+                          </span>
+                        </div>
+                        {attempt.note && (
+                          <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-primary)]">{attempt.note}</p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 flex-col items-start gap-2 text-xs text-[var(--text-muted)] sm:items-end sm:text-right">
+                        <div>
+                          <div>{formatDateTime(attempt.recorded_at)}</div>
+                          <div>{attempt.recorded_by_name || attempt.recorded_by_email || 'DPG staff'}</div>
+                        </div>
+                        {canEditContactAttempts && (
+                          <button
+                            type="button"
+                            onClick={() => startAttemptEdit(attempt)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-soft)] bg-white px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:border-primary hover:text-primary"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="shrink-0 text-left text-xs text-[var(--text-muted)] sm:text-right">
-                      <div>{formatDateTime(attempt.recorded_at)}</div>
-                      <div>{attempt.recorded_by_name || attempt.recorded_by_email || 'DPG staff'}</div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
@@ -1682,7 +2057,7 @@ export default function SupporterDetailPage() {
                   {supporter.household_primary ? 'Primary household contact' : 'Household member'}
                 </span>
                 <span className="text-sm text-[var(--text-secondary)]">
-                  {supporter.household_member_count || 0} linked supporter{(supporter.household_member_count || 0) === 1 ? '' : 's'} in this household group.
+                  {supporter.household_member_count || 0} linked contact{(supporter.household_member_count || 0) === 1 ? '' : 's'} in this household group.
                 </span>
               </div>
               {supporter.household_members && supporter.household_members.length > 0 ? (
@@ -1703,7 +2078,7 @@ export default function SupporterDetailPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-[var(--text-secondary)]">No additional household supporters are linked yet.</p>
+                <p className="text-sm text-[var(--text-secondary)]">No additional household contacts are linked yet.</p>
               )}
             </div>
           </section>

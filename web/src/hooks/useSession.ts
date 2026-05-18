@@ -33,9 +33,11 @@ export interface SessionResponse {
     can_send_sms: boolean;
     can_send_email: boolean;
     can_edit_supporters: boolean;
+    can_edit_contact_attempts: boolean;
     can_view_supporters: boolean;
     can_create_staff_supporters: boolean;
     can_import_supporters: boolean;
+    can_export_supporters: boolean;
     can_access_duplicates: boolean;
     can_access_audit_logs: boolean;
     can_access_qr: boolean;

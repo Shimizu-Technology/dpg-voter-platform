@@ -4,18 +4,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Database, Home, Link as LinkIcon, MapPin, MessageSquare, Search, Users } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
 import { createContactFromGecVoter, getGecHouseholds, getSupporters, linkContactToGecVoter, updateSupporterCanvass } from '../../lib/api';
-import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, getErrorMessage } from '../../lib/contactAttempt';
+import { CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, contactAttemptChannelLabel, contactAttemptOutcomeLabel, getErrorMessage } from '../../lib/contactAttempt';
 import { formatDateTime } from '../../lib/datetime';
 import {
   contactClassificationChipClass,
   contactClassificationLabel,
 } from '../../lib/contactClassification';
 import {
-  MEMBERSHIP_STATUS_OPTIONS,
   SUPPORT_STATUS_OPTIONS,
   VOLUNTEER_STATUS_OPTIONS,
-  membershipStatusChipClass,
-  membershipStatusLabel,
   supportStatusChipClass,
   supportStatusLabel,
   volunteerStatusChipClass,
@@ -49,7 +46,6 @@ type HouseholdContact = {
   village_name?: string | null;
   contact_classification?: string | null;
   support_status?: string | null;
-  membership_status?: string | null;
   volunteer_status?: string | null;
   review_status?: string | null;
   verification_status?: string | null;
@@ -86,7 +82,6 @@ type ContactResult = {
 type CanvassDraft = {
   contact_classification: string;
   support_status: string;
-  membership_status: string;
   volunteer_status: string;
   channel: string;
   outcome: string;
@@ -97,7 +92,6 @@ function initialCanvassDraft(contact: HouseholdContact): CanvassDraft {
   return {
     contact_classification: 'active_contact',
     support_status: contact.support_status || 'unknown',
-    membership_status: contact.membership_status || 'not_member',
     volunteer_status: contact.volunteer_status || 'unknown',
     channel: 'in_person',
     outcome: '',
@@ -119,6 +113,10 @@ function voterLabel(voter: GecVoter) {
 
 function contactName(contact: Pick<HouseholdContact, 'print_name' | 'first_name' | 'middle_name' | 'last_name'>) {
   return contact.print_name || fullName(contact);
+}
+
+function contactDetailPath(contactId: number) {
+  return `/admin/supporters/${contactId}?return_to=${encodeURIComponent('/admin/households')}`;
 }
 
 export default function HouseholdsPage() {
@@ -193,7 +191,6 @@ export default function HouseholdsPage() {
       updateSupporterCanvass(contact.id, {
         contact_classification: draft.contact_classification,
         support_status: draft.support_status,
-        membership_status: draft.membership_status,
         volunteer_status: draft.volunteer_status,
         contact_attempt: {
           channel: draft.channel,
@@ -385,14 +382,23 @@ export default function HouseholdsPage() {
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
-                            <div className="font-semibold text-slate-950">{fullName(voter)}</div>
+                            {isLinked && linkedContact ? (
+                              <Link
+                                to={contactDetailPath(linkedContact.id)}
+                                className="block font-semibold text-slate-950 hover:text-primary hover:underline"
+                              >
+                                {fullName(voter)}
+                              </Link>
+                            ) : (
+                              <div className="font-semibold text-slate-950">{fullName(voter)}</div>
+                            )}
                             <div className="mt-1 text-xs text-slate-500">{voterLabel(voter)}</div>
                             {isLinked ? (
                               <div className="mt-2 space-y-1 text-xs">
                                 <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 font-semibold text-green-800">DPG contact</span>
                                 {linkedContact && (
                                   <Link
-                                    to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                    to={contactDetailPath(linkedContact.id)}
                                     className="block font-semibold text-green-900 hover:underline"
                                   >
                                     {contactName(linkedContact)}
@@ -403,7 +409,7 @@ export default function HouseholdsPage() {
                               <div className="mt-2 space-y-1 text-xs">
                                 <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">Possible DPG match</span>
                                 <Link
-                                  to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                  to={contactDetailPath(possibleContact.id)}
                                   className="block font-semibold text-amber-900 hover:underline"
                                 >
                                   {contactName(possibleContact)}
@@ -419,7 +425,7 @@ export default function HouseholdsPage() {
                           <div className="flex shrink-0 flex-wrap gap-2">
                             {isLinked && linkedContact ? (
                               <Link
-                                to={`/admin/supporters/${linkedContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                to={contactDetailPath(linkedContact.id)}
                                 className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-green-200 bg-white px-2.5 text-xs font-semibold text-green-800 hover:bg-green-50"
                               >
                                 <Users className="h-3.5 w-3.5" />
@@ -427,7 +433,7 @@ export default function HouseholdsPage() {
                               </Link>
                             ) : hasPossibleMatch && possibleContact ? (
                               <Link
-                                to={`/admin/supporters/${possibleContact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                to={contactDetailPath(possibleContact.id)}
                                 className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-white px-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
                               >
                                 <AlertTriangle className="h-3.5 w-3.5" />
@@ -488,7 +494,12 @@ export default function HouseholdsPage() {
                               ) : contactResults.map((contact) => (
                                 <div key={contact.id} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-2 sm:flex-row sm:items-center sm:justify-between">
                                   <div className="min-w-0">
-                                    <div className="font-semibold text-slate-900">{contact.print_name || `${contact.first_name} ${contact.last_name}`}</div>
+                                    <Link
+                                      to={contactDetailPath(contact.id)}
+                                      className="font-semibold text-slate-900 hover:text-primary hover:underline"
+                                    >
+                                      {contact.print_name || `${contact.first_name} ${contact.last_name}`}
+                                    </Link>
                                     <div className="text-xs text-slate-500">
                                       {[contact.contact_number, contact.email, contact.village_name, contact.street_address].filter(Boolean).join(' · ') || 'No contact details'}
                                     </div>
@@ -530,7 +541,12 @@ export default function HouseholdsPage() {
                           <div key={contact.id} className="rounded-xl border border-slate-200 p-3">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
-                                <div className="font-semibold text-slate-950">{contact.print_name || fullName(contact)}</div>
+                                <Link
+                                  to={contactDetailPath(contact.id)}
+                                  className="font-semibold text-slate-950 hover:text-primary hover:underline"
+                                >
+                                  {contact.print_name || fullName(contact)}
+                                </Link>
                                 <div className="mt-1 text-xs text-slate-500">
                                   {[contact.contact_number, contact.email].filter(Boolean).join(' · ') || 'No phone or email'}
                                 </div>
@@ -542,11 +558,6 @@ export default function HouseholdsPage() {
                                 <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${supportStatusChipClass(contact.support_status)}`}>
                                   {supportStatusLabel(contact.support_status)}
                                 </span>
-                                {contact.membership_status === 'member' && (
-                                  <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${membershipStatusChipClass(contact.membership_status)}`}>
-                                    {membershipStatusLabel(contact.membership_status)}
-                                  </span>
-                                )}
                                 {contact.volunteer_status && contact.volunteer_status !== 'unknown' && (
                                   <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${volunteerStatusChipClass(contact.volunteer_status)}`}>
                                     {volunteerStatusLabel(contact.volunteer_status)}
@@ -558,11 +569,12 @@ export default function HouseholdsPage() {
                               <span>{contact.current_gec_match ? 'Linked to current GEC voter' : 'No current GEC link'}</span>
                               {contact.latest_contact_attempt ? (
                                 <span>
-                                  Last: {contact.latest_contact_attempt.channel.replaceAll('_', ' ')} / {contact.latest_contact_attempt.outcome.replaceAll('_', ' ')}
+                                  Last contact: {contactAttemptChannelLabel(contact.latest_contact_attempt.channel)} / {contactAttemptOutcomeLabel(contact.latest_contact_attempt.outcome)}
                                   {contact.latest_contact_attempt.recorded_at ? ` on ${formatDateTime(contact.latest_contact_attempt.recorded_at)}` : ''}
+                                  {contact.latest_contact_attempt.recorded_by_name ? ` by ${contact.latest_contact_attempt.recorded_by_name}` : ''}
                                 </span>
                               ) : (
-                                <span>No outreach logged yet</span>
+                                <span>Not contacted yet</span>
                               )}
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -581,7 +593,7 @@ export default function HouseholdsPage() {
                                 </span>
                               )}
                               <Link
-                                to={`/admin/supporters/${contact.id}?return_to=${encodeURIComponent('/admin/households')}`}
+                                to={contactDetailPath(contact.id)}
                                 className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                               >
                                 Open Record
@@ -589,59 +601,64 @@ export default function HouseholdsPage() {
                             </div>
                             {isExpanded && (
                               <div className="mt-3 rounded-lg bg-slate-50 p-3">
-                              <div className="grid gap-2 sm:grid-cols-3">
+                                <p className="mb-3 text-xs leading-5 text-slate-600">
+                                  Use support status for whether this person supports DPG, volunteer interest for whether they want to help, and contact method/outcome for what happened during this canvass touch.
+                                </p>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Support status
                                   <select
                                     value={draft.support_status}
                                     onChange={(event) => updateCanvassDraft(contact, { support_status: event.target.value })}
-                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900"
                                     aria-label="Support status"
                                   >
                                   {SUPPORT_STATUS_OPTIONS.map((option) => (
                                       <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                   </select>
-                                <select
-                                  value={draft.membership_status}
-                                  onChange={(event) => updateCanvassDraft(contact, { membership_status: event.target.value })}
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                                  aria-label="Membership status"
-                                >
-                                  {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                  ))}
-                                </select>
+                                </label>
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Volunteer interest
                                 <select
                                   value={draft.volunteer_status}
                                   onChange={(event) => updateCanvassDraft(contact, { volunteer_status: event.target.value })}
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900"
                                   aria-label="Volunteer status"
                                 >
                                   {VOLUNTEER_STATUS_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                   ))}
                                 </select>
+                                </label>
                               </div>
-                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Contact method
                                   <select
                                     value={draft.channel}
                                     onChange={(event) => updateCanvassDraft(contact, { channel: event.target.value })}
-                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900"
                                     aria-label="Contact method"
                                   >
                                     {CONTACT_ATTEMPT_CHANNEL_OPTIONS.map((option) => (
                                       <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                   </select>
+                                </label>
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Contact outcome
                                   <select
                                     value={draft.outcome}
                                     onChange={(event) => updateCanvassDraft(contact, { outcome: event.target.value })}
-                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900"
                                     aria-label="Contact outcome"
                                   >
                                     {OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS.map((option) => (
                                       <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                   </select>
+                                </label>
                                 </div>
                                 <textarea
                                   value={draft.note}

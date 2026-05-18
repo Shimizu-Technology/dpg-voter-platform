@@ -174,12 +174,14 @@ Role permissions should control access inside that workspace.
 
 Suggested roles:
 
-- Main Admin
+- Administrator
 - Data Manager
-- Staff
 - Field Organizer
+- Village Coordinator
 - Canvasser
 - Poll Watcher later
+
+Implementation note: the database role values still use the original internal names for compatibility (`campaign_admin`, `data_team`, `district_coordinator`, `village_chief`, `block_leader`), while the UI presents the DPG labels above. Export is intentionally limited to Administrator/Data Manager, bulk contact import to Administrator/Data Manager/Field Organizer, and canvassing/contact logging remains available to scoped field users.
 
 ## Workflow design
 
@@ -276,6 +278,7 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 - Build Contact Attempt logging. **Implemented on contact detail, Follow-Up Queue cards, and SMS/email blast jobs.**
 - Build Household/Address workspace. **Implemented as `/admin/households`.**
 - Build Outreach queues for registration, absentee, homebound, ride, volunteer, and future official member-roster follow-up if DPG defines it. **Partially implemented through the Follow-Up Queue, classification filters, latest-attempt summaries, and inline attempt logging; richer DPG-specific queue labels and support-need workflows remain.**
+- Keep GEC possible-match review separate from outreach follow-up. Possible matches are voter-check/data-review work handled through Intake, GEC Voters, and Contact Detail, while the Follow-Up Queue is for contacting people about registration, voter help, and volunteer/support needs.
 - Surface latest contact attempts in the Follow-Up Queue and let staff log call/SMS/in-person touches from each queue card. **Implemented in the outreach queue so queue work updates the shared contact-history timeline.**
 
 ### Phase 4: Imports and List Types

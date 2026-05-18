@@ -6,7 +6,7 @@ import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle,
 import { motion, useReducedMotion } from 'framer-motion';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
-import { OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, getErrorMessage } from '../../lib/contactAttempt';
+import { OPTIONAL_CONTACT_ATTEMPT_CHANNEL_OPTIONS, OPTIONAL_CONTACT_ATTEMPT_OUTCOME_OPTIONS, contactAttemptChannelLabel, contactAttemptOutcomeLabel, getErrorMessage } from '../../lib/contactAttempt';
 import { useSession } from '../../hooks/useSession';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import WorkspacePage from '../../components/WorkspacePage';
@@ -78,6 +78,14 @@ interface SupporterItem {
   household_member_count?: number;
   registration_outreach_status?: string | null;
   support_follow_up_status?: string | null;
+  latest_contact_attempt?: {
+    channel: string;
+    outcome: string;
+    note?: string | null;
+    recorded_at?: string | null;
+    recorded_by_name?: string | null;
+    recorded_by_email?: string | null;
+  } | null;
   status: string;
   created_at: string;
 }
@@ -101,7 +109,6 @@ type IntakeReviewDraft = {
   decision: 'approve' | 'reject';
   contact_classification: string;
   support_status: string;
-  membership_status: string;
   volunteer_status: string;
   note: string;
   contact_attempt_channel: string;
@@ -192,9 +199,9 @@ function supporterSortName(supporter: Pick<SupporterItem, 'first_name' | 'middle
 }
 
 function selfReportedStatusLabel(supporter: Pick<SupporterItem, 'registered_voter_status'>) {
-  if (supporter.registered_voter_status === 'yes') return 'Self: Yes';
-  if (supporter.registered_voter_status === 'no') return 'Self: No';
-  return 'Self: Not sure';
+  if (supporter.registered_voter_status === 'yes') return 'Self-reported voter: Yes';
+  if (supporter.registered_voter_status === 'no') return 'Self-reported voter: No';
+  return 'Self-reported voter: Not sure';
 }
 
 function supportRequestBadges(supporter: Pick<SupporterItem, 'needs_voter_registration_help' | 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer' | 'household_member_count'>) {
@@ -210,7 +217,7 @@ function supportRequestBadges(supporter: Pick<SupporterItem, 'needs_voter_regist
 
 function registrationFollowUpResultLabel(supporter: Pick<SupporterItem, 'registration_outreach_status'>) {
   if (supporter.registration_outreach_status === 'registered') return 'Registered via follow-up';
-  if (supporter.registration_outreach_status === 'contacted') return 'Contacted';
+  if (supporter.registration_outreach_status === 'contacted') return 'Contact logged';
   if (supporter.registration_outreach_status === 'declined') return 'Declined';
   return null;
 }
@@ -223,9 +230,9 @@ function registrationFollowUpResultClass(supporter: Pick<SupporterItem, 'registr
 }
 
 function supportFollowUpResultLabel(supporter: Pick<SupporterItem, 'support_follow_up_status'>) {
-  if (supporter.support_follow_up_status === 'completed') return 'Support completed';
-  if (supporter.support_follow_up_status === 'in_progress') return 'Support in progress';
-  if (supporter.support_follow_up_status === 'declined') return 'Support declined';
+  if (supporter.support_follow_up_status === 'completed') return 'Voter-help / volunteer completed';
+  if (supporter.support_follow_up_status === 'in_progress') return 'Voter-help / volunteer in progress';
+  if (supporter.support_follow_up_status === 'declined') return 'Voter-help / volunteer declined';
   return null;
 }
 
@@ -234,6 +241,24 @@ function supportFollowUpResultClass(supporter: Pick<SupporterItem, 'support_foll
   if (supporter.support_follow_up_status === 'in_progress') return 'bg-blue-100 text-blue-700';
   if (supporter.support_follow_up_status === 'declined') return 'bg-red-100 text-red-700';
   return 'bg-gray-100 text-gray-700';
+}
+
+function latestContactSummary(supporter: Pick<SupporterItem, 'latest_contact_attempt'>) {
+  const attempt = supporter.latest_contact_attempt;
+  if (!attempt) return 'Not contacted yet';
+
+  const method = contactAttemptChannelLabel(attempt.channel);
+  const outcome = contactAttemptOutcomeLabel(attempt.outcome);
+  const when = attempt.recorded_at ? formatDateTime(attempt.recorded_at) : null;
+  return [method, outcome, when].filter(Boolean).join(' · ');
+}
+
+function latestContactDetail(supporter: Pick<SupporterItem, 'latest_contact_attempt'>) {
+  const attempt = supporter.latest_contact_attempt;
+  if (!attempt) return 'No contact attempt has been logged for this person yet.';
+
+  const staff = attempt.recorded_by_name || attempt.recorded_by_email;
+  return staff ? `Logged by ${staff}` : 'Logged by DPG staff';
 }
 
 function hasAnyIntakeContactAttemptField(draft: IntakeReviewDraft) {
@@ -283,7 +308,6 @@ export default function SupportersPage() {
     decision: 'approve',
     contact_classification: 'active_contact',
     support_status: 'unknown',
-    membership_status: 'not_member',
     volunteer_status: 'unknown',
     note: '',
     contact_attempt_channel: '',
@@ -447,7 +471,6 @@ export default function SupportersPage() {
         decision: draft.decision,
         contact_classification: draft.contact_classification,
         support_status: draft.support_status,
-        membership_status: draft.membership_status,
         volunteer_status: draft.volunteer_status,
         note: draft.note.trim() || undefined,
         contact_attempt: hasContactAttempt ? {
@@ -479,7 +502,6 @@ export default function SupportersPage() {
       decision: isTerminalIntakeClassification(classification) ? 'reject' : 'approve',
       contact_classification: classification,
       support_status: supporter.support_status || 'unknown',
-      membership_status: supporter.membership_status || 'not_member',
       volunteer_status: supporter.volunteer_status || (supporter.wants_to_volunteer ? 'interested' : 'unknown'),
       note: '',
       contact_attempt_channel: '',
@@ -574,28 +596,30 @@ export default function SupportersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{isIntakeView ? 'Pending Intake' : 'All Contacts'}</h1>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => exportSupporters({
-                village_id: effectiveVillageFilter || undefined,
-                precinct_id: precinctFilter || undefined,
-                source: sourceFilter || undefined,
-                opt_in: optInFilter || undefined,
-                verification_status: verificationFilter || undefined,
-                contact_classification: contactClassificationParam,
-                exclude_contact_classification: excludeContactClassificationParam,
-                support_status: supportStatusFilter || undefined,
-                registered_voter_status: registeredStatusFilter || undefined,
-                support_need: supportNeedFilter || undefined,
-                status: lifecycleFilter || undefined,
-                unassigned_precinct: unassignedPrecinct ? 'true' : undefined,
-                search: debouncedSearch || undefined,
-                sort_by: sortBy || undefined,
-                sort_dir: sortDir || undefined,
-              })}
-              className="app-btn-secondary"
+            {sessionData?.permissions?.can_export_supporters && (
+              <button
+                onClick={() => exportSupporters({
+                  village_id: effectiveVillageFilter || undefined,
+                  precinct_id: precinctFilter || undefined,
+                  source: sourceFilter || undefined,
+                  opt_in: optInFilter || undefined,
+                  verification_status: verificationFilter || undefined,
+                  contact_classification: contactClassificationParam,
+                  exclude_contact_classification: excludeContactClassificationParam,
+                  support_status: supportStatusFilter || undefined,
+                  registered_voter_status: registeredStatusFilter || undefined,
+                  support_need: supportNeedFilter || undefined,
+                  status: lifecycleFilter || undefined,
+                  unassigned_precinct: unassignedPrecinct ? 'true' : undefined,
+                  search: debouncedSearch || undefined,
+                  sort_by: sortBy || undefined,
+                  sort_dir: sortDir || undefined,
+                })}
+                className="app-btn-secondary"
               >
                 <Download className="w-4 h-4" /> Excel
               </button>
+            )}
               {sessionData?.permissions?.can_create_staff_supporters && (
                 <Link to="/admin/supporters/new" className="app-btn-danger">
                   <ClipboardPlus className="w-4 h-4" /> New Entry
@@ -853,41 +877,43 @@ export default function SupportersPage() {
         <div className={`md:hidden space-y-3 transition-opacity duration-200 ${isFetching ? 'opacity-70' : 'opacity-100'}`}>
           {visibleSupporters.map((s) => (
             <div key={s.id} className="app-card p-4">
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5">
-                  <Link to={supporterDetailLink(s.id)} className="font-semibold text-[var(--text-primary)] hover:underline">
-                    {supporterSortName(s)}
-                  </Link>
-                  {s.potential_duplicate && (
-                    <span className="flex-shrink-0 w-2 h-2 rounded-full bg-amber-400" title="Potential duplicate" />
-                  )}
-                </div>
-                <span className={`app-chip ${
-                  sourceChipClass(s)
-                }`}>
-                  {sourceLabel(s)}
-                </span>
-                <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
-                  {contactClassificationLabel(s.contact_classification)}
-                </span>
-                <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
-                  {supportStatusLabel(s.support_status)}
-                </span>
-                {s.volunteer_status && s.volunteer_status !== 'unknown' && (
-                  <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
-                    {volunteerStatusLabel(s.volunteer_status)}
+              <div className="mb-2 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <Link to={supporterDetailLink(s.id)} className="truncate font-semibold text-[var(--text-primary)] hover:underline">
+                      {supporterSortName(s)}
+                    </Link>
+                    {s.potential_duplicate && (
+                      <span className="flex-shrink-0 w-2 h-2 rounded-full bg-amber-400" title="Potential duplicate" />
+                    )}
+                  </div>
+                  <span className={`app-chip ${sourceChipClass(s)}`}>
+                    Origin: {sourceLabel(s)}
                   </span>
-                )}
-                <span className={`app-chip ${
-                  s.verification_status === 'verified' ? 'bg-green-100 text-green-700' :
-                  s.verification_status === 'flagged' ? 'bg-red-100 text-red-700' :
-                  'bg-yellow-100 text-yellow-700'
-                }`}>
-                  {verificationStatusLabel(s)}
-                </span>
-                <span className={`app-chip ${lifecycleChipClass(s.status)}`}>
-                  {s.status}
-                </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
+                    Record: {contactClassificationLabel(s.contact_classification)}
+                  </span>
+                  <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
+                    Support: {supportStatusLabel(s.support_status)}
+                  </span>
+                  {s.volunteer_status && s.volunteer_status !== 'unknown' && (
+                    <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
+                      Volunteer: {volunteerStatusLabel(s.volunteer_status)}
+                    </span>
+                  )}
+                  <span className={`app-chip ${
+                    s.verification_status === 'verified' ? 'bg-green-100 text-green-700' :
+                    s.verification_status === 'flagged' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    Voter list: {verificationStatusLabel(s)}
+                  </span>
+                  <span className={`app-chip ${lifecycleChipClass(s.status)}`}>
+                    Lifecycle: {s.status}
+                  </span>
+                </div>
               </div>
               <div className="text-sm text-[var(--text-secondary)] space-y-0.5">
                 <div className="flex justify-between">
@@ -916,6 +942,10 @@ export default function SupportersPage() {
                   {!registrationFollowUpResultLabel(s) && !supportFollowUpResultLabel(s) && supportRequestBadges(s).length === 0 && (
                     <span className="text-xs text-[var(--text-muted)]">No extra flags</span>
                   )}
+                </div>
+                <div className="rounded-lg bg-[var(--surface-bg)] px-3 py-2 text-xs">
+                  <div className="font-semibold text-[var(--text-primary)]">{latestContactSummary(s)}</div>
+                  <div className="mt-0.5 text-[var(--text-muted)]">{latestContactDetail(s)}</div>
                 </div>
                 <div className="flex justify-between">
                   <span className={gecMatchClass(s)}>{gecMatchLabel(s)}</span>
@@ -951,7 +981,7 @@ export default function SupportersPage() {
 
         {/* Desktop Table */}
         <div className={`hidden md:block app-card overflow-x-auto transition-opacity duration-200 ${isFetching ? 'opacity-80' : 'opacity-100'}`}>
-          <table className="w-full min-w-[1320px] text-sm">
+          <table className="w-full min-w-[1460px] text-sm">
             <thead>
               <tr className="border-b bg-[var(--surface-bg)]">
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">
@@ -978,6 +1008,7 @@ export default function SupportersPage() {
                   </button>
                 </th>
                   <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Status</th>
+                <th className="w-[230px] min-w-[230px] text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Latest Contact</th>
                 <th className="w-[320px] min-w-[320px] text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Voter Check</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Lifecycle</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">
@@ -1049,18 +1080,31 @@ export default function SupportersPage() {
                     <td className="px-4 py-3 whitespace-nowrap align-middle">
                       <div className="flex flex-wrap gap-1.5">
                         <span className={`app-chip ${contactClassificationChipClass(s.contact_classification)}`}>
-                          {contactClassificationLabel(s.contact_classification)}
+                          Record: {contactClassificationLabel(s.contact_classification)}
                         </span>
                         <span className={`app-chip ${supportStatusChipClass(s.support_status)}`}>
-                          {supportStatusLabel(s.support_status)}
+                          Support: {supportStatusLabel(s.support_status)}
                         </span>
                         {s.volunteer_status && s.volunteer_status !== 'unknown' && (
                           <span className={`app-chip ${volunteerStatusChipClass(s.volunteer_status)}`}>
-                            {volunteerStatusLabel(s.volunteer_status)}
+                            Volunteer: {volunteerStatusLabel(s.volunteer_status)}
                           </span>
                         )}
                       </div>
                     </td>
+                  <td className="w-[230px] min-w-[230px] px-4 py-3 align-top">
+                    <div className="space-y-1">
+                      <span className={`app-chip ${s.latest_contact_attempt ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {s.latest_contact_attempt ? 'Contacted' : 'Not contacted'}
+                      </span>
+                      <div className="text-xs leading-5 text-[var(--text-secondary)] whitespace-normal">
+                        {latestContactSummary(s)}
+                      </div>
+                      <div className="text-xs text-[var(--text-muted)] whitespace-normal">
+                        {latestContactDetail(s)}
+                      </div>
+                    </div>
+                  </td>
                   <td className="w-[320px] min-w-[320px] px-4 py-3 align-top">
                     <div className="space-y-2">
                       <span className={`app-chip ${

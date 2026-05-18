@@ -352,8 +352,9 @@ export default function StaffEntryPage() {
             value={form.street_address}
             onChange={e => updateField('street_address', e.target.value)}
             className={inputClass("street_address")}
-            placeholder="123 Marine Corps Dr"
+            placeholder="123 Example St"
           />
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Street only is best. Use the village field for village/locality so household matching stays cleaner.</p>
         </div>
 
         <div className="space-y-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-raised)] p-4">

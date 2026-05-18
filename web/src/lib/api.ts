@@ -69,8 +69,8 @@ export const reviewIntakeSupporter = (id: number, data: JsonRecord) =>
   api.patch(`/supporters/${id}/review_intake`, { intake_review: data }).then(r => r.data);
 export const updateSupporterCanvass = (id: number, data: JsonRecord) =>
   api.patch(`/supporters/${id}/canvass_update`, { canvass_update: data }).then(r => r.data);
-export const verifySupporter = (id: number, status: string) =>
-  api.patch(`/supporters/${id}/verify`, { verification_status: status }).then(r => r.data);
+export const verifySupporter = (id: number, status: string, gecVoterId?: number) =>
+  api.patch(`/supporters/${id}/verify`, { verification_status: status, gec_voter_id: gecVoterId }).then(r => r.data);
 export const bulkVerifySupporters = (ids: number[], status: string) =>
   api.post('/supporters/bulk_verify', { supporter_ids: ids, verification_status: status }).then(r => r.data);
 export const getDuplicates = (villageId?: number) =>
@@ -87,6 +87,8 @@ export const getSupporterContactAttempts = (supporterId: number) =>
   api.get(`/supporters/${supporterId}/contact_attempts`).then(r => r.data);
 export const createSupporterContactAttempt = (supporterId: number, data: JsonRecord) =>
   api.post(`/supporters/${supporterId}/contact_attempts`, { contact_attempt: data }).then(r => r.data);
+export const updateSupporterContactAttempt = (supporterId: number, attemptId: number, data: JsonRecord) =>
+  api.patch(`/supporters/${supporterId}/contact_attempts/${attemptId}`, { contact_attempt: data }).then(r => r.data);
 
 // SMS/email outreach
 export const getSmsStatus = () => api.get('/sms/status').then(r => r.data);

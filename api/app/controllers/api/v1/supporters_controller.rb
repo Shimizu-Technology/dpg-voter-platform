@@ -13,7 +13,8 @@ module Api
       include Authenticatable
       include AuditLoggable
       before_action :authenticate_request, only: [ :index, :check_duplicate, :export, :show, :update, :verify, :review_intake, :canvass_update, :bulk_verify, :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :outreach, :outreach_status, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
-      before_action :require_supporter_access!, only: [ :index, :check_duplicate, :export, :show, :review_intake, :canvass_update, :outreach, :outreach_status ]
+      before_action :require_supporter_access!, only: [ :index, :check_duplicate, :show, :review_intake, :canvass_update, :outreach, :outreach_status ]
+      before_action :require_supporter_export_access!, only: [ :export ]
       before_action :require_data_ops_access!, only: [ :revet, :bulk_revet, :duplicates, :resolve_duplicate, :scan_duplicates, :public_review, :reject_public_review, :vetting_queue, :approve_supporter, :reject_supporter ]
       before_action :require_chief_or_above!, only: [ :verify, :bulk_verify ]
 
@@ -209,6 +210,7 @@ module Api
 
         attempt = nil
         old_review_state = supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status")
+        old_follow_up_state = follow_up_audit_snapshot(supporter)
 
         begin
           ApplicationRecord.transaction do
@@ -225,10 +227,12 @@ module Api
             apply_contact_classification_metadata!(supporter, updates)
             supporter.update!(updates)
             attempt = create_intake_review_contact_attempt!(supporter, review[:contact_attempt])
+            sync_follow_up_from_contact_attempt!(supporter, attempt) if attempt
 
             log_audit!(supporter, action: "intake_reviewed", changed_data: {
               "before" => old_review_state,
               "after" => supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status"),
+              "follow_up" => follow_up_changed_data(old_follow_up_state, follow_up_audit_snapshot(supporter)).presence,
               "decision" => decision,
               "note" => review[:note].presence,
               "contact_attempt_id" => attempt&.id
@@ -257,15 +261,15 @@ module Api
 
       # PATCH /api/v1/supporters/:id/canvass_update
       def canvass_update
-        unless supporter_edit_allowed?
+        supporter = scope_supporters(Supporter.contacts).find_by(id: params[:id])
+        unless supporter
           return render_api_error(
-            message: "You do not have permission to update household canvassing records",
-            status: :forbidden,
-            code: "supporter_edit_access_required"
+            message: "Contact not found",
+            status: :not_found,
+            code: "supporter_not_found"
           )
         end
 
-        supporter = scope_supporters(Supporter.contacts).find(params[:id])
         unless household_canvassable?(supporter)
           return render_api_error(
             message: "Only active contact records can be updated from household canvassing",
@@ -285,7 +289,8 @@ module Api
         end
 
         old_classification = supporter.contact_classification
-        old_relationship_state = supporter.slice("support_status", "membership_status", "volunteer_status")
+        old_relationship_state = supporter.slice("support_status", "volunteer_status")
+        old_follow_up_state = follow_up_audit_snapshot(supporter)
         attempt = nil
 
         begin
@@ -295,19 +300,20 @@ module Api
             updates = {
               contact_classification: classification,
               support_status: canvass[:support_status].presence || supporter.support_status,
-              membership_status: canvass[:membership_status].presence || supporter.membership_status,
               volunteer_status: canvass[:volunteer_status].presence || supporter.volunteer_status
             }
             apply_contact_classification_metadata!(supporter, updates)
             supporter.update!(updates)
 
             attempt = create_required_canvass_contact_attempt!(supporter, canvass[:contact_attempt])
+            sync_follow_up_from_contact_attempt!(supporter, attempt)
             log_audit!(supporter, action: "household_canvass_logged", changed_data: {
               "contact_classification" => old_classification == supporter.contact_classification ? nil : [ old_classification, supporter.contact_classification ],
-              "relationship" => old_relationship_state == supporter.slice("support_status", "membership_status", "volunteer_status") ? nil : {
+              "relationship" => old_relationship_state == supporter.slice("support_status", "volunteer_status") ? nil : {
                 "before" => old_relationship_state,
-                "after" => supporter.slice("support_status", "membership_status", "volunteer_status")
+                "after" => supporter.slice("support_status", "volunteer_status")
               },
+              "follow_up" => follow_up_changed_data(old_follow_up_state, follow_up_audit_snapshot(supporter)).presence,
               "contact_attempt_id" => attempt.id,
               "channel" => attempt.channel,
               "outcome" => attempt.outcome,
@@ -348,7 +354,8 @@ module Api
           )
         end
 
-        match_payload = new_status == "verified" ? verification_match_payload(supporter) : nil
+        selected_gec_voter_id = params[:gec_voter_id].presence || params[:selected_gec_voter_id].presence
+        match_payload = new_status == "verified" ? verification_match_payload(supporter, selected_gec_voter_id: selected_gec_voter_id) : nil
 
         if new_status == "verified"
           matches = match_payload&.fetch(:matches, []) || []
@@ -357,6 +364,14 @@ module Api
               message: "Supporter cannot be marked as a verified voter without a current GEC match.",
               status: :unprocessable_entity,
               code: "gec_match_required_for_verified"
+            )
+          end
+
+          if match_payload[:selected_match_missing]
+            return render_api_error(
+              message: "Selected GEC voter is not one of the current match candidates for this contact.",
+              status: :unprocessable_entity,
+              code: "gec_match_candidate_not_found"
             )
           end
         end
@@ -507,8 +522,10 @@ module Api
           ).payload || {}
         end
 
+        latest_contact_attempts = LatestSupporterContactAttempts.call(supporters, include_recorded_by: true)
+
         render json: {
-          supporters: supporters.map { |s| supporter_json(s, reason_payload: verification_reason_overrides[s.id]) },
+          supporters: supporters.map { |s| supporter_json(s, reason_payload: verification_reason_overrides[s.id], latest_contact_attempt: latest_contact_attempts[s.id]) },
           pagination: { page: page, per_page: per_page, total: total, pages: (total.to_f / per_page).ceil }
         }
       end
@@ -521,6 +538,7 @@ module Api
             :submitted_village,
             :precinct,
             :block,
+            :gec_voter,
             :referred_from_village,
             household_group: [ supporters: :village ]
           )
@@ -530,7 +548,8 @@ module Api
         render json: {
           supporter: supporter_detail_json(supporter),
           permissions: {
-            can_edit: supporter_edit_allowed?
+            can_edit: supporter_edit_allowed?,
+            can_edit_contact_attempts: can_edit_contact_attempts?
           },
           audit_logs: audit_logs.map do |log|
             {
@@ -550,7 +569,7 @@ module Api
 
       # GET /api/v1/supporters/export
       def export
-        supporters = apply_export_filters(scope_supporters(Supporter.includes(:village, :precinct).contacts.order(created_at: :desc)))
+        supporters = apply_export_filters(scope_supporters(Supporter.includes(:village, :precinct, :gec_voter).contacts.order(created_at: :desc)))
         total = supporters.count
 
         if total > MAX_EXPORT_ROWS
@@ -562,17 +581,23 @@ module Api
           )
         end
 
-        headers = [ "First Name", "Last Name", "Phone", "Village", "Precinct", "Street Address", "Email", "DOB",
+        headers = [ "First Name", "Last Name", "Phone", "DPG Village", "DPG Precinct", "Street Address", "Email", "DOB",
+                    "GEC Voter Reg #", "GEC Village", "GEC Precinct", "GEC Address",
                     "Self-Reported Voter Status", "Votes Elsewhere Note", "Needs Registration Help", "Needs Absentee Help",
                     "Needs Homebound Help", "Needs Ride", "Wants To Volunteer", "Referred By", "Household Group",
-"Opt-In Email", "Opt-In Text",
+                    "Opt-In Email", "Opt-In Text",
                     "Verification Status", "Source", "Date Signed Up" ]
 
         rows = []
         supporters.find_each do |s|
+          gec_voter = s.gec_voter
           rows << [
             s.first_name, s.last_name, s.contact_number, s.village&.name, s.precinct&.number,
             s.street_address, s.email, s.dob&.strftime("%m/%d/%Y"),
+            gec_voter&.voter_registration_number,
+            gec_voter&.village_name,
+            gec_voter&.precinct_number,
+            gec_voter&.address,
             s.registered_voter_status&.humanize,
             s.registered_voter_location_note,
             s.needs_voter_registration_help ? "Yes" : "No",
@@ -788,7 +813,7 @@ module Api
           if params[:support_follow_up_status].present?
             unless allowed_support_statuses.include?(params[:support_follow_up_status])
               return render_api_error(
-                message: "Invalid support follow-up status. Must be: #{allowed_support_statuses.join(', ')}",
+                message: "Invalid voter-help / volunteer follow-up status. Must be: #{allowed_support_statuses.join(', ')}",
                 status: :unprocessable_entity,
                 code: "invalid_support_follow_up_status"
               )
@@ -1169,7 +1194,6 @@ module Api
         params.require(:canvass_update).permit(
           :contact_classification,
           :support_status,
-          :membership_status,
           :volunteer_status,
           contact_attempt: [ :channel, :outcome, :note, :recorded_at ]
         )
@@ -1299,6 +1323,27 @@ module Api
         Time.zone.parse(value.to_s)
       rescue ArgumentError, TypeError
         nil
+      end
+
+      def sync_follow_up_from_contact_attempt!(supporter, attempt)
+        updates = FollowUpStatusSync.contact_attempt_updates(supporter, attempt)
+        supporter.update!(updates) if updates.present?
+      end
+
+      def follow_up_audit_snapshot(supporter)
+        {
+          "registration_outreach_status" => supporter.registration_outreach_status,
+          "registration_outreach_date" => supporter.registration_outreach_date&.iso8601,
+          "support_follow_up_status" => supporter.support_follow_up_status,
+          "support_follow_up_date" => supporter.support_follow_up_date&.iso8601
+        }
+      end
+
+      def follow_up_changed_data(before, after)
+        before.each_with_object({}) do |(field, before_value), memo|
+          after_value = after[field]
+          memo[field] = [ before_value, after_value ] unless before_value == after_value
+        end
       end
 
       def normalize_registered_voter_fields(attributes)
@@ -1453,6 +1498,9 @@ module Api
         phone_digits = raw.gsub(/\D/, "")
         conditions = [
           "LOWER(supporters.print_name) LIKE :text_query",
+          "LOWER(CONCAT_WS(' ', supporters.first_name, supporters.middle_name, supporters.last_name)) LIKE :text_query",
+          "LOWER(CONCAT_WS(' ', supporters.first_name, supporters.last_name)) LIKE :text_query",
+          "LOWER(CONCAT_WS(', ', supporters.last_name, supporters.first_name)) LIKE :text_query",
           "LOWER(supporters.first_name) LIKE :text_query",
           "LOWER(supporters.middle_name) LIKE :text_query",
           "LOWER(supporters.last_name) LIKE :text_query",
@@ -1483,7 +1531,7 @@ module Api
         end
       end
 
-      def supporter_json(supporter, reason_payload: nil)
+      def supporter_json(supporter, reason_payload: nil, latest_contact_attempt: nil)
         reason_payload ||= SupporterVerificationReasonService.new(supporter).payload || {}
         current_gec_match = supporter.gec_voter_id.present?
 
@@ -1558,6 +1606,7 @@ module Api
           support_follow_up_status: supporter.support_follow_up_status,
           support_follow_up_notes: supporter.support_follow_up_notes,
           support_follow_up_date: supporter.support_follow_up_date&.iso8601,
+          latest_contact_attempt: latest_contact_attempt && contact_attempt_summary_json(latest_contact_attempt),
           created_at: supporter.created_at&.iso8601
         }
       end
@@ -1616,6 +1665,7 @@ module Api
 
         supporter_json(supporter, reason_payload: reason_payload).merge(
           block_name: supporter.block&.name,
+          gec_match_candidates: gec_match_candidates_json(supporter),
           household_members: supporter.household_members.map do |member|
             {
               id: member.id,
@@ -1749,7 +1799,7 @@ module Api
         when "ride"
           scope.where(needs_election_day_ride: true)
         when "volunteer"
-          scope.where(wants_to_volunteer: true)
+          scope.where(wants_to_volunteer: true).or(scope.where(volunteer_status: "interested"))
         when "any"
           scope.needs_campaign_help
         else
@@ -1813,6 +1863,7 @@ module Api
               supporters.needs_election_day_ride = TRUE
             ) THEN 8
             WHEN supporters.support_follow_up_status IS NULL AND supporters.wants_to_volunteer = TRUE THEN 7
+            WHEN supporters.support_follow_up_status IS NULL AND supporters.volunteer_status = 'interested' THEN 7
             WHEN supporters.registration_outreach_status = 'contacted' THEN 6
             WHEN supporters.support_follow_up_status = 'in_progress' THEN 5
             WHEN supporters.registration_outreach_status = 'registered' THEN 2
@@ -1828,7 +1879,7 @@ module Api
       def outreach_priority_label(supporter)
         return "Resolved" unless follow_up_open?(supporter)
         return "Registration Priority" if registration_follow_up_open?(supporter)
-        "Support Help"
+        "Voter Help / Volunteer"
       end
 
       def outreach_reasons(supporter)
@@ -1837,8 +1888,8 @@ module Api
         reasons.concat(support_request_reasons(supporter))
         reasons << "Registered via follow-up" if supporter.registration_outreach_status == "registered"
         reasons << "Registration follow-up declined" if supporter.registration_outreach_status == "declined"
-        reasons << "Support help completed" if supporter.support_follow_up_status == "completed"
-        reasons << "Support help declined" if supporter.support_follow_up_status == "declined"
+        reasons << "Voter-help / volunteer follow-up completed" if supporter.support_follow_up_status == "completed"
+        reasons << "Voter-help / volunteer follow-up declined" if supporter.support_follow_up_status == "declined"
         reasons.uniq
       end
 
@@ -1856,7 +1907,7 @@ module Api
         reasons << "Absentee help" if supporter.needs_absentee_ballot_help
         reasons << "Homebound help" if supporter.needs_homebound_voting_help
         reasons << "Ride to polls" if supporter.needs_election_day_ride
-        reasons << "Volunteer interest" if supporter.wants_to_volunteer
+        reasons << "Volunteer interest" if supporter.wants_to_volunteer || supporter.volunteer_status == "interested"
         reasons
       end
 
@@ -1903,15 +1954,17 @@ module Api
           gec_voter = best_match&.dig(:gec_voter)
           attrs.merge!(
             gec_voter_id: gec_voter&.id,
-            village_id: gec_voter&.village_id || supporter.village_id,
-            precinct_id: gec_voter&.precinct_id || supporter.precinct_id,
             registered_voter: true,
             registered_voter_status: "yes",
             verified_by_user_id: current_user.id,
             verified_at: Time.current,
             verification_reason: "manual_staff_verified",
             verification_reason_metadata: {
+              "gec_voter_id" => gec_voter&.id,
+              "gec_voter_name" => [ gec_voter&.first_name, gec_voter&.middle_name, gec_voter&.last_name ].compact_blank.join(" "),
               "gec_village_name" => gec_voter&.village_name,
+              "gec_precinct_number" => gec_voter&.precinct_number,
+              "gec_address" => gec_voter&.address,
               "confidence" => best_match&.dig(:confidence)&.to_s,
               "match_type" => best_match&.dig(:match_type)&.to_s,
               "match_count" => best_match&.dig(:match_count)
@@ -1940,7 +1993,7 @@ module Api
         attrs
       end
 
-      def verification_match_payload(supporter)
+      def verification_match_payload(supporter, selected_gec_voter_id: nil)
         matches = GecVoter.find_matches(
           first_name: supporter.first_name,
           last_name: supporter.last_name,
@@ -1948,11 +2001,57 @@ module Api
           birth_year: supporter.dob&.year,
           village_name: supporter.village&.name
         )
+        selected_id = selected_gec_voter_id.present? ? selected_gec_voter_id.to_i : nil
+        selected_match = selected_id ? matches.find { |match| match[:gec_voter].id == selected_id } : nil
 
         {
           matches: matches,
-          best_match: matches.first
+          best_match: selected_match || matches.first,
+          selected_match_missing: selected_id.present? && selected_match.blank?
         }
+      end
+
+      def gec_match_candidates_json(supporter)
+        matches =
+          if supporter.gec_voter_id.present? && supporter.gec_voter.present?
+            [ { gec_voter: supporter.gec_voter, confidence: :exact, match_type: :confirmed, match_count: 1 } ]
+          else
+            GecVoter.find_matches(
+              first_name: supporter.first_name,
+              last_name: supporter.last_name,
+              dob: supporter.dob,
+              birth_year: supporter.dob&.year,
+              village_name: supporter.village&.name
+            ).first(5)
+          end
+
+        matches.map do |match|
+          gec_voter_match_json(match)
+        end
+      end
+
+      def gec_voter_match_json(match)
+        voter = match[:gec_voter]
+        {
+          id: voter.id,
+          first_name: voter.first_name,
+          middle_name: voter.middle_name,
+          last_name: voter.last_name,
+          name: [ voter.first_name, voter.middle_name, voter.last_name ].compact_blank.join(" "),
+          address: voter.address,
+          dob: voter.dob,
+          birth_year: voter.birth_year || voter.dob&.year,
+          village_id: voter.village_id,
+          village_name: voter.village_name,
+          precinct_id: voter.precinct_id,
+          precinct_number: voter.precinct_number,
+          voter_registration_number: voter.voter_registration_number,
+          status: voter.status,
+          gec_list_date: voter.gec_list_date,
+          confidence: match[:confidence]&.to_s,
+          match_type: match[:match_type]&.to_s,
+          match_count: match[:match_count]
+        }.compact
       end
 
       # Alias for backward compatibility with callers

@@ -123,9 +123,11 @@ Partially completed on `feature/intake-relationship-household-polish`:
 - Household search shows latest contact attempt for DPG records.
 - Staff can log a canvassing/contact outcome directly from household results.
 - Staff can update support/volunteer status from the household view.
+- Current PR adds conservative address normalization for household grouping so common variants like Ave/Avenue, St/Street, punctuation, PO Box variants, and trailing village/locality text group together without changing the raw stored address.
 
 Still turn household search into a fuller field action:
 
+- Add admin-reviewed "possible same address" handling before any destructive merge. Bad household merges are harder to unwind than duplicate household cards, so auto-merge should be conservative.
 - "I am at this address" mode.
 - Show GEC voters and DPG contacts at the address.
 - Add follow-up needs from the household view.
@@ -147,21 +149,30 @@ Future polish can add print-ready downloads, event-specific templates, and DPG-a
 
 ### 5. Roles and permissions polish
 
-Rename and tune roles into DPG language:
+Current branch `codex/dpg-role-contact-workflow-polish` implements the first pass:
 
-- Main Admin
+- Administrator
 - Data Manager
-- Staff
 - Field Organizer
+- Village Coordinator
 - Canvasser
 - Poll Watcher later
 
-Tighten:
+Tightened in this branch:
 
-- export permissions
-- delete/archive permissions
-- village/precinct scoping
-- user management access
+- export permissions: Administrator/Data Manager only
+- contact import permissions: Administrator/Data Manager/Field Organizer only
+- QR/signup-link access: field roles can create/use scoped links
+- household canvass logging: assigned field users can log method/outcome/note and update support/volunteer status in their scope
+- membership remains hidden from active manual workflows and reserved for future official roster/list handling
+- contact-attempt correction workflow: Administrator/Data Manager can edit an existing attempt, and every correction writes before/after values into Audit History
+
+Still future:
+
+- optional contact-attempt void/cancel workflow if DPG needs to mark an entry invalid without deleting the audit trail
+- delete/archive permission review
+- poll watcher role
+- precinct-specific Election Day access rules
 
 ### 6. Election-day scope
 
