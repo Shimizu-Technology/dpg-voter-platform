@@ -916,7 +916,7 @@ class ReportGenerator
   end
 
   def dpg_gec_mismatch_relation
-    dpg_contacts_linked_to_gec_scope.includes(:gec_voter, :village, :precinct).order(:last_name, :first_name)
+    dpg_contacts_linked_to_gec_scope.includes(:gec_voter, :village, :precinct).order(:last_name, :first_name, :id)
   end
 
   def each_ordered_dpg_gec_mismatch_batch(batch_size: 100)
