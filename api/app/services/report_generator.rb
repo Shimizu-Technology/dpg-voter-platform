@@ -14,6 +14,7 @@
 #   - dpg_contacts_unlinked_from_gec: DPG contacts not tied to public GEC voters
 #   - gec_voters_not_in_dpg: Public GEC voters with no linked DPG contact
 #   - possible_gec_matches: DPG contacts with a possible/manual GEC match
+#   - dpg_gec_mismatches: linked DPG contacts where DPG-entered geography differs from official GEC data
 class ReportGenerator
   REPORT_TYPES = %w[
     support_list
@@ -26,6 +27,7 @@ class ReportGenerator
     dpg_contacts_unlinked_from_gec
     gec_voters_not_in_dpg
     possible_gec_matches
+    dpg_gec_mismatches
   ].freeze
 
   def initialize(
@@ -558,17 +560,41 @@ class ReportGenerator
 
     package = Axlsx::Package.new
     wb = package.workbook
-    headers = [ "Last Name", "First Name", "DOB", "Birth Year", "Address", "Village", "Precinct", "Voter Reg #", "GEC List Date", "Status" ]
+    headers = [ "GEC Voter ID", "Last Name", "First Name", "DOB", "Birth Year", "Address", "Village", "Precinct", "Voter Reg #", "GEC List Date", "Status" ]
 
     wb.add_worksheet(name: "GEC Not In DPG") do |sheet|
       sheet.add_row headers, style: header_style(wb)
       scope.each do |voter|
         sheet.add_row gec_voter_cross_reference_values(voter)
       end
-      sheet.column_widths 16, 16, 12, 10, 30, 18, 10, 16, 14, 20
+      sheet.column_widths 12, 16, 16, 12, 10, 30, 18, 10, 16, 14, 20
     end
 
     { package: package, filename: "gec-voters-not-in-dpg-#{date_today}.xlsx" }
+  end
+
+  def generate_dpg_gec_mismatches
+    package = Axlsx::Package.new
+    wb = package.workbook
+    headers = dpg_gec_mismatch_headers
+
+    wb.add_worksheet(name: "DPG GEC Mismatches") do |sheet|
+      sheet.add_row headers, style: header_style(wb)
+      each_ordered_dpg_gec_mismatch_batch do |candidates|
+        mismatches = candidates.filter_map do |supporter|
+          mismatch_types = dpg_gec_mismatch_types(supporter)
+          [ supporter, mismatch_types ] if mismatch_types.any?
+        end
+        supporters = mismatches.map(&:first)
+        latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
+        mismatches.each do |supporter, mismatch_types|
+          sheet.add_row dpg_gec_mismatch_values(supporter, latest_contact_attempt: latest_contact_attempts[supporter.id], mismatch_types: mismatch_types)
+        end
+      end
+      sheet.column_widths(*Array.new(headers.length, 18))
+    end
+
+    { package: package, filename: "dpg-gec-mismatches-#{date_today}.xlsx" }
   end
 
   # ── Preview Helpers ───────────────────────────────────────────
@@ -734,9 +760,32 @@ class ReportGenerator
     total_count = scope.count
 
     {
-      columns: [ "Last Name", "First Name", "DOB", "Birth Year", "Address", "Village", "Precinct", "Voter Reg #", "GEC List Date", "Status" ],
+      columns: [ "GEC Voter ID", "Last Name", "First Name", "DOB", "Birth Year", "Address", "Village", "Precinct", "Voter Reg #", "GEC List Date", "Status" ],
       rows: scope.limit(@preview_limit).map { |voter| gec_voter_cross_reference_values(voter) },
       total_count: total_count
+    }
+  end
+
+  def preview_dpg_gec_mismatches
+    mismatches = []
+    each_ordered_dpg_gec_mismatch_batch do |candidates|
+      candidates.each do |supporter|
+        mismatch_types = dpg_gec_mismatch_types(supporter)
+        next if mismatch_types.empty?
+
+        mismatches << [ supporter, mismatch_types ]
+        break if mismatches.length >= @preview_limit
+      end
+      break if mismatches.length >= @preview_limit
+    end
+    supporters = mismatches.map(&:first)
+    latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
+
+    {
+      columns: dpg_gec_mismatch_headers,
+      rows: mismatches.map do |supporter, mismatch_types|
+        dpg_gec_mismatch_values(supporter, latest_contact_attempt: latest_contact_attempts[supporter.id], mismatch_types: mismatch_types)
+      end
     }
   end
 
@@ -787,6 +836,7 @@ class ReportGenerator
 
   def supporter_cross_reference_headers(include_gec_columns:, include_match_note:)
     headers = [
+      "Contact ID",
       "Last Name",
       "First Name",
       "DOB",
@@ -797,22 +847,28 @@ class ReportGenerator
       "Precinct",
       "Classification",
       "Support Status",
-      "Membership",
       "Volunteer Status",
+      "Self-Reported Voter Status",
+      "Campaign Requests",
+      "Origin",
+      "QR/Source Code",
+      "Created Date",
       "Verification",
       "Cross-Reference Status",
+      "Suggested Action",
       "Last Contact Method",
       "Last Contact Outcome",
       "Last Contact Date",
       "Last Contact Note"
     ]
-    headers += [ "GEC Reg #", "GEC Village", "GEC Precinct", "GEC Birth Year" ] if include_gec_columns
+    headers += [ "GEC Voter ID", "GEC Reg #", "GEC Village", "GEC Precinct", "GEC Address", "GEC Birth Year" ] if include_gec_columns
     headers << "Match Review Note" if include_match_note
     headers
   end
 
   def supporter_cross_reference_values(supporter, include_gec_columns:, status_label:, include_match_note:, latest_contact_attempt: nil)
     values = [
+      supporter.id,
       supporter.last_name,
       supporter.first_name,
       format_date(supporter.dob),
@@ -823,10 +879,15 @@ class ReportGenerator
       supporter.precinct&.number,
       supporter.contact_classification&.humanize,
       supporter.support_status&.humanize,
-      supporter.membership_status&.humanize,
       supporter.volunteer_status&.humanize,
+      supporter.registered_voter_status&.humanize,
+      support_request_summary(supporter),
+      source_label(supporter),
+      supporter.leader_code,
+      format_date(supporter.created_at),
       supporter.verification_status&.humanize,
       status_label,
+      cross_reference_suggested_action(supporter, status_label: status_label, include_match_note: include_match_note),
       latest_contact_attempt&.channel&.humanize,
       latest_contact_attempt&.outcome&.humanize,
       format_date(latest_contact_attempt&.recorded_at),
@@ -836,9 +897,11 @@ class ReportGenerator
     if include_gec_columns
       voter = supporter.gec_voter
       values += [
+        voter&.id,
         voter&.voter_registration_number,
         voter&.village_name,
         voter&.precinct_number,
+        voter&.address,
         voter&.birth_year
       ]
     end
@@ -858,8 +921,116 @@ class ReportGenerator
     ].compact.join(" · ")
   end
 
+  def dpg_gec_mismatch_relation
+    dpg_contacts_linked_to_gec_scope.includes(:gec_voter, :village, :precinct).order(:last_name, :first_name, :id)
+  end
+
+  def each_ordered_dpg_gec_mismatch_batch(batch_size: 100)
+    offset = 0
+    loop do
+      batch = dpg_gec_mismatch_relation.offset(offset).limit(batch_size).to_a
+      break if batch.empty?
+
+      yield batch
+      offset += batch_size
+    end
+  end
+
+  def dpg_gec_mismatch_headers
+    [
+      "Contact ID",
+      "GEC Voter ID",
+      "Last Name",
+      "First Name",
+      "Phone",
+      "Email",
+      "DPG Address",
+      "GEC Address",
+      "DPG Village",
+      "GEC Village",
+      "DPG Precinct",
+      "GEC Precinct",
+      "GEC Voter Reg #",
+      "Mismatch Type",
+      "Suggested Action",
+      "Support Status",
+      "Volunteer Status",
+      "Last Contact Method",
+      "Last Contact Outcome",
+      "Last Contact Date",
+      "Last Contact Note"
+    ]
+  end
+
+  def dpg_gec_mismatch_values(supporter, latest_contact_attempt: nil, mismatch_types: nil)
+    voter = supporter.gec_voter
+    mismatch_types ||= dpg_gec_mismatch_types(supporter)
+    [
+      supporter.id,
+      voter&.id,
+      supporter.last_name,
+      supporter.first_name,
+      supporter.contact_number,
+      supporter.email,
+      supporter.street_address,
+      voter&.address,
+      supporter.village&.name,
+      voter&.village_name,
+      supporter.precinct&.number,
+      voter&.precinct_number,
+      voter&.voter_registration_number,
+      mismatch_types.join(", "),
+      dpg_gec_mismatch_suggested_action(types: mismatch_types),
+      supporter.support_status&.humanize,
+      supporter.volunteer_status&.humanize,
+      latest_contact_attempt&.channel&.humanize,
+      latest_contact_attempt&.outcome&.humanize,
+      format_date(latest_contact_attempt&.recorded_at),
+      latest_contact_attempt&.note
+    ]
+  end
+
+  def dpg_gec_mismatch_types(supporter)
+    voter = supporter.gec_voter
+    return [] unless voter
+
+    types = []
+    types << "Village" if supporter.village&.name.present? && voter.village_name.present? && supporter.village.name.casecmp?(voter.village_name) == false
+    types << "Precinct" if supporter.precinct&.number.present? && voter.precinct_number.present? && supporter.precinct.number.to_s.casecmp?(voter.precinct_number.to_s) == false
+    types << "Address" if address_mismatch?(supporter, voter)
+    types
+  end
+
+  def address_mismatch?(supporter, voter)
+    return false if supporter.street_address.blank? || voter.address.blank?
+
+    dpg_key = AddressNormalizer.canonical_address(supporter.street_address, village_name: supporter.village&.name)
+    gec_key = AddressNormalizer.canonical_address(voter.address, village_name: voter.village_name)
+    dpg_key.present? && gec_key.present? && dpg_key != gec_key
+  end
+
+  def dpg_gec_mismatch_suggested_action(types:)
+    actions = []
+    actions << "Confirm whether DPG contact address/village needs updating" if (types & [ "Address", "Village" ]).any?
+    actions << "Review precinct assignment before field or Election Day work" if types.include?("Precinct")
+    actions.presence&.join("; ") || "Review linked GEC record"
+  end
+
+  def cross_reference_suggested_action(supporter, status_label:, include_match_note:)
+    return "Review possible GEC candidates and confirm the correct voter" if include_match_note
+    return "Use official GEC voter fields for voter-file reporting; keep DPG-entered fields visible" if status_label == "Linked to GEC"
+    return "Search/link GEC voter or follow up for registration help" if supporter.needs_voter_registration_help || supporter.registered_voter_status != "yes"
+
+    "Search/link GEC voter or keep in manual review"
+  end
+
+  def source_label(supporter)
+    supporter.attribution_method.presence&.humanize || supporter.source.presence&.humanize
+  end
+
   def gec_voter_cross_reference_values(voter)
     [
+      voter.id,
       voter.last_name,
       voter.first_name,
       format_date(voter.dob),

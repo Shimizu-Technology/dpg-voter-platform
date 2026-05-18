@@ -226,7 +226,9 @@ module Api
         when "gec_voters_not_in_dpg"
           "GEC Voters Not In DPG Contacts"
         when "possible_gec_matches"
-          "Possible GEC Matches"
+          "Possible GEC Matches Needing Review"
+        when "dpg_gec_mismatches"
+          "DPG/GEC Address Or Village Mismatches"
         else
           type.humanize.titleize
         end
@@ -254,6 +256,8 @@ module Api
           "Current public GEC voters without any linked DPG contact"
         when "possible_gec_matches"
           "Flagged DPG contacts with possible GEC matches for manual review"
+        when "dpg_gec_mismatches"
+          "Linked DPG contacts where the DPG-entered address, village, or precinct differs from the official GEC voter-file record"
         end
       end
 
