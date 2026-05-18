@@ -577,13 +577,15 @@ class ReportGenerator
     package = Axlsx::Package.new
     wb = package.workbook
     headers = dpg_gec_mismatch_headers
-    supporters = dpg_gec_mismatch_supporters.to_a
-    latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
 
     wb.add_worksheet(name: "DPG GEC Mismatches") do |sheet|
       sheet.add_row headers, style: header_style(wb)
-      supporters.each do |supporter|
-        sheet.add_row dpg_gec_mismatch_values(supporter, latest_contact_attempt: latest_contact_attempts[supporter.id])
+      each_ordered_dpg_gec_mismatch_batch do |candidates|
+        supporters = candidates.select { |supporter| dpg_gec_mismatch_types(supporter).any? }
+        latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
+        supporters.each do |supporter|
+          sheet.add_row dpg_gec_mismatch_values(supporter, latest_contact_attempt: latest_contact_attempts[supporter.id])
+        end
       end
       sheet.column_widths(*Array.new(headers.length, 18))
     end
@@ -762,11 +764,14 @@ class ReportGenerator
 
   def preview_dpg_gec_mismatches
     supporters = []
-    each_ordered_dpg_gec_mismatch_candidate do |supporter|
-      next if dpg_gec_mismatch_types(supporter).empty?
+    each_ordered_dpg_gec_mismatch_batch do |candidates|
+      candidates.each do |supporter|
+        next if dpg_gec_mismatch_types(supporter).empty?
 
-      supporters << supporter
-      supporters.length < @preview_limit
+        supporters << supporter
+        break if supporters.length >= @preview_limit
+      end
+      break if supporters.length >= @preview_limit
     end
     latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
 
@@ -914,22 +919,15 @@ class ReportGenerator
     dpg_contacts_linked_to_gec_scope.includes(:gec_voter, :village, :precinct).order(:last_name, :first_name)
   end
 
-  def each_ordered_dpg_gec_mismatch_candidate(batch_size: 100)
+  def each_ordered_dpg_gec_mismatch_batch(batch_size: 100)
     offset = 0
     loop do
       batch = dpg_gec_mismatch_relation.offset(offset).limit(batch_size).to_a
       break if batch.empty?
 
-      batch.each do |supporter|
-        result = yield supporter
-        return if result == false
-      end
+      yield batch
       offset += batch_size
     end
-  end
-
-  def dpg_gec_mismatch_supporters
-    dpg_gec_mismatch_relation.select { |supporter| dpg_gec_mismatch_types(supporter).any? }
   end
 
   def dpg_gec_mismatch_headers
