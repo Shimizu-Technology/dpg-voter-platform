@@ -99,7 +99,8 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
     preview = ReportGenerator.new(report_type: "dpg_contacts_linked_to_gec").preview
 
     assert_equal 1, preview[:total_count]
-    assert_equal "Maria", preview[:rows].first[1]
+    assert_equal @linked_contact.id, preview[:rows].first[0]
+    assert_equal "Maria", preview[:rows].first[2]
     assert_includes preview[:columns], "GEC Reg #"
     assert_includes preview[:columns], "Last Contact Outcome"
     assert_includes preview[:rows].first, @linked_voter.voter_registration_number
@@ -111,7 +112,7 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
     preview = ReportGenerator.new(report_type: "dpg_contacts_unlinked_from_gec").preview
 
     assert_equal 2, preview[:total_count]
-    names = preview[:rows].map { |row| row[1] }
+    names = preview[:rows].map { |row| row[2] }
     assert_includes names, @unlinked_contact.first_name
     assert_includes names, @possible_match.first_name
   end
@@ -120,15 +121,33 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
     preview = ReportGenerator.new(report_type: "gec_voters_not_in_dpg").preview
 
     assert_equal 1, preview[:total_count]
-    assert_equal @unlinked_voter.voter_registration_number, preview[:rows].first[7]
+    assert_equal @unlinked_voter.voter_registration_number, preview[:rows].first[8]
   end
 
   test "possible GEC matches report exposes manual review notes" do
     preview = ReportGenerator.new(report_type: "possible_gec_matches").preview
 
     assert_equal 1, preview[:total_count]
-    assert_equal @possible_match.first_name, preview[:rows].first[1]
+    assert_equal @possible_match.first_name, preview[:rows].first[2]
     assert_match "Candidates: 2", preview[:rows].first.last
+  end
+
+  test "DPG GEC mismatch report shows linked contacts with conflicting DPG and official geography" do
+    dpg_village = Village.find_or_create_by!(name: "Barrigada")
+    dpg_precinct = Precinct.find_or_create_by!(village: dpg_village, number: "15C")
+    @linked_contact.update!(street_address: "999 Different Address", village: dpg_village, precinct: dpg_precinct)
+
+    preview = ReportGenerator.new(report_type: "dpg_gec_mismatches").preview
+
+    assert_equal 1, preview[:total_count]
+    row = preview[:rows].first
+    assert_includes preview[:columns], "Mismatch Type"
+    assert_equal @linked_contact.id, row[0]
+    assert_equal @linked_voter.id, row[1]
+    assert_includes row[13], "Village"
+    assert_includes row[13], "Precinct"
+    assert_includes row[13], "Address"
+    assert_match "Review", row[14]
   end
 
   test "support list separates DPG assignment from linked GEC geography" do

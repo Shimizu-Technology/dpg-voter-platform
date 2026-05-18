@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getReportsList, getVillages, getDistricts, getPrecincts, getReportPreview, downloadReport } from '../../lib/api';
 import { captureAnalyticsEvent } from '../../lib/analytics';
@@ -17,10 +18,10 @@ import {
   Eye,
   Link2,
   SearchCheck,
+  MapPinned,
 } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
 import {
-  MEMBERSHIP_STATUS_OPTIONS,
   SUPPORT_STATUS_OPTIONS,
   VOLUNTEER_STATUS_OPTIONS,
 } from '../../lib/relationshipStatus';
@@ -36,19 +37,21 @@ const reportIcons: Record<string, React.ComponentType<{ className?: string }>> =
   dpg_contacts_unlinked_from_gec: UserX,
   gec_voters_not_in_dpg: Database,
   possible_gec_matches: SearchCheck,
+  dpg_gec_mismatches: MapPinned,
 };
 
 const reportDescriptions: Record<string, string> = {
-  support_list: 'All approved official supporters by village. One sheet per village. Includes name, DOB, phone, address, voter reg #, and verification status.',
-  purge_list: 'Voters who were removed from the GEC list (deceased or purged). Includes last known village and last list date.',
+  support_list: 'Approved DPG supporters, active volunteers, and future official member-roster matches by village. Use this for the current relationship list, not raw intake.',
+  purge_list: 'Voters who were removed from the GEC list. Includes last known village and last list date.',
   transfer_list: 'GEC voters whose official village changed between list versions. Shows previous village, current village, and latest list date.',
-  referral_list: 'Official supporters submitted under one village but matched to a different GEC village. Shows submitted village versus actual registration.',
+  referral_list: 'Supporter records submitted under one village but currently assigned to another. Use this for village handoff cleanup.',
   mapping_issues_list: 'GEC voters whose latest village could not be mapped cleanly to an official village. Shows previous village, current mapping, and latest list date.',
-  supporter_summary: 'Per-village supporter summary with approved counts, GEC matches, pending public signups, and review status.',
-  dpg_contacts_linked_to_gec: 'DPG contacts already connected to public GEC voter records. Use this to understand how much of the contact file is voter-file matched.',
-  dpg_contacts_unlinked_from_gec: 'DPG contacts that do not yet have a linked GEC voter record. Use this for registration follow-up and manual matching work.',
+  supporter_summary: 'Per-village summary with approved supporter/contact counts, GEC matches, public signups, and review status.',
+  dpg_contacts_linked_to_gec: 'DPG contacts connected to official public GEC voter records. Use this to understand how much of DPG’s contact file is voter-file matched.',
+  dpg_contacts_unlinked_from_gec: 'DPG contacts without a confirmed GEC voter link. Use this for registration follow-up, cleanup, and manual matching work.',
   gec_voters_not_in_dpg: 'Current public GEC voters with no linked DPG contact. Use this to find outreach gaps by village or precinct.',
-  possible_gec_matches: 'Flagged DPG contacts with possible GEC matches that need manual review before they should be treated as linked.',
+  possible_gec_matches: 'DPG contacts with likely GEC candidates that staff should review before confirming a voter-file link.',
+  dpg_gec_mismatches: 'Linked DPG contacts where the DPG-entered address, village, or precinct differs from the official GEC voter-file record.',
 };
 
 const SUPPORTER_REPORT_TYPES = new Set([
@@ -57,6 +60,7 @@ const SUPPORTER_REPORT_TYPES = new Set([
   'dpg_contacts_linked_to_gec',
   'dpg_contacts_unlinked_from_gec',
   'possible_gec_matches',
+  'dpg_gec_mismatches',
 ]);
 
 export default function TeamReportsPage() {
@@ -66,7 +70,6 @@ export default function TeamReportsPage() {
   const [selectedPrecinct, setSelectedPrecinct] = useState('');
   const [registeredStatusFilter, setRegisteredStatusFilter] = useState('');
   const [supportStatusFilter, setSupportStatusFilter] = useState('');
-  const [membershipStatusFilter, setMembershipStatusFilter] = useState('');
   const [volunteerStatusFilter, setVolunteerStatusFilter] = useState('');
   const [supportNeedFilter, setSupportNeedFilter] = useState('');
   const [registrationFollowUpFilter, setRegistrationFollowUpFilter] = useState('');
@@ -83,7 +86,6 @@ export default function TeamReportsPage() {
     if (SUPPORTER_REPORT_TYPES.has(reportType)) {
       if (registeredStatusFilter) params.registered_voter_status = registeredStatusFilter;
       if (supportStatusFilter) params.support_status = supportStatusFilter;
-      if (membershipStatusFilter) params.membership_status = membershipStatusFilter;
       if (volunteerStatusFilter) params.volunteer_status = volunteerStatusFilter;
       if (supportNeedFilter) params.support_need = supportNeedFilter;
       if (registrationFollowUpFilter) params.registration_outreach_status = registrationFollowUpFilter;
@@ -102,7 +104,7 @@ export default function TeamReportsPage() {
     queryFn: () => getPrecincts(selectedVillage ? { village_id: selectedVillage } : undefined),
   });
   const { data: preview, isLoading: previewLoading } = useQuery({
-    queryKey: ['report-preview', selectedReport, selectedDistrict, selectedVillage, selectedPrecinct, registeredStatusFilter, supportStatusFilter, membershipStatusFilter, volunteerStatusFilter, supportNeedFilter, registrationFollowUpFilter, supportFollowUpFilter],
+    queryKey: ['report-preview', selectedReport, selectedDistrict, selectedVillage, selectedPrecinct, registeredStatusFilter, supportStatusFilter, volunteerStatusFilter, supportNeedFilter, registrationFollowUpFilter, supportFollowUpFilter],
     queryFn: () => getReportPreview(selectedReport, buildReportParams(selectedReport, true)),
     enabled: Boolean(selectedReport),
   });
@@ -118,7 +120,6 @@ export default function TeamReportsPage() {
         precinct_id: selectedPrecinct ? Number(selectedPrecinct) : undefined,
         registered_voter_status: SUPPORTER_REPORT_TYPES.has(reportType) ? registeredStatusFilter || undefined : undefined,
         support_status: SUPPORTER_REPORT_TYPES.has(reportType) ? supportStatusFilter || undefined : undefined,
-        membership_status: SUPPORTER_REPORT_TYPES.has(reportType) ? membershipStatusFilter || undefined : undefined,
         volunteer_status: SUPPORTER_REPORT_TYPES.has(reportType) ? volunteerStatusFilter || undefined : undefined,
         support_need: SUPPORTER_REPORT_TYPES.has(reportType) ? supportNeedFilter || undefined : undefined,
         registration_outreach_status: SUPPORTER_REPORT_TYPES.has(reportType) ? registrationFollowUpFilter || undefined : undefined,
@@ -132,6 +133,9 @@ export default function TeamReportsPage() {
   };
 
   const quickStats = reportsList?.quick_stats;
+  const selectedReportInfo = (reportsList?.available_reports || []).find((report: Record<string, unknown>) => report.type === selectedReport) as Record<string, unknown> | undefined;
+  const selectedReportName = (selectedReportInfo?.name as string | undefined) || selectedReport.replace(/_/g, ' ');
+  const selectedReportDescription = reportDescriptions[selectedReport] || (selectedReportInfo?.description as string | undefined);
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -142,12 +146,13 @@ export default function TeamReportsPage() {
 
       {/* Quick Stats */}
       {quickStats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-10 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-11 gap-3">
           <MiniStat label="Official Supporters" value={quickStats.official_supporters ?? quickStats.total_active} />
           <MiniStat label="Matched To Voter List" value={quickStats.matched_to_gec ?? quickStats.total_verified} />
           <MiniStat label="Unlinked Contacts" value={quickStats.dpg_contacts_unlinked_from_gec ?? 0} />
           <MiniStat label="GEC Outreach Gaps" value={quickStats.gec_voters_not_in_dpg ?? 0} />
           <MiniStat label="Possible Matches" value={quickStats.possible_gec_matches ?? 0} />
+          <MiniStat label="DPG/GEC Mismatches" value={quickStats.dpg_gec_mismatches ?? 0} />
           <MiniStat label="Village Changes" value={quickStats.transfer_list_size ?? quickStats.transfers} />
           <MiniStat label="Referral List Size" value={quickStats.referral_list_size ?? 0} />
           <MiniStat label="Mapping Issues" value={quickStats.mapping_issues_list_size ?? 0} />
@@ -229,16 +234,6 @@ export default function TeamReportsPage() {
               ))}
             </select>
             <select
-              value={membershipStatusFilter}
-              onChange={e => setMembershipStatusFilter(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All membership statuses</option>
-              {MEMBERSHIP_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select
               value={volunteerStatusFilter}
               onChange={e => setVolunteerStatusFilter(e.target.value)}
               className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -283,7 +278,7 @@ export default function TeamReportsPage() {
             </select>
           </div>
           <p className="text-xs text-gray-500">
-            Supporter filters apply to supporter-based reports like Support List and Referral List. Voter-list reports continue to use geography filters only.
+            Supporter filters apply to DPG contact/supporter reports. Membership roster reporting is intentionally reserved until DPG provides actual official roster files.
           </p>
         </div>
       )}
@@ -338,8 +333,11 @@ export default function TeamReportsPage() {
             <div>
               <h2 className="text-sm font-semibold text-gray-900">Report Preview</h2>
               <p className="text-xs text-gray-500 mt-1">
-                Showing up to 100 rows for <span className="font-medium text-gray-700">{selectedReport.replace(/_/g, ' ')}</span> before export.
+                Showing up to 100 rows for <span className="font-medium text-gray-700">{selectedReportName}</span> before export.
               </p>
+              {selectedReportDescription && (
+                <p className="mt-2 max-w-3xl text-xs leading-relaxed text-gray-500">{selectedReportDescription}</p>
+              )}
             </div>
             {preview?.total_count !== undefined && (
               <span className="text-xs text-gray-500">
@@ -369,11 +367,14 @@ export default function TeamReportsPage() {
               <tbody>
                 {(preview.rows || []).map((row: unknown[], index: number) => (
                   <tr key={index} className="border-b border-gray-50">
-                    {row.map((cell: unknown, cellIndex: number) => (
-                      <td key={`${index}-${cellIndex}`} className="py-3 px-4 text-gray-700 whitespace-nowrap">
-                        {cell === null || cell === undefined || cell === '' ? '-' : String(cell)}
-                      </td>
-                    ))}
+                    {row.map((cell: unknown, cellIndex: number) => {
+                      const column = String((preview.columns || [])[cellIndex] || '');
+                      return (
+                        <td key={`${index}-${cellIndex}`} className="py-3 px-4 text-gray-700 whitespace-nowrap">
+                          {renderPreviewCell(column, cell)}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -403,6 +404,20 @@ export default function TeamReportsPage() {
       )}
     </WorkspacePage>
   );
+}
+
+function renderPreviewCell(column: string, cell: unknown) {
+  if (cell === null || cell === undefined || cell === '') return '-';
+
+  const value = String(cell);
+  if (column === 'Contact ID') {
+    return <Link to={`/admin/supporters/${value}`} className="font-semibold text-blue-700 hover:underline">{value}</Link>;
+  }
+  if (column === 'GEC Voter ID') {
+    return <Link to={`/admin/gec-voters?q=${encodeURIComponent(value)}`} className="font-semibold text-blue-700 hover:underline">{value}</Link>;
+  }
+
+  return value;
 }
 
 function MiniStat({ label, value }: { label: string; value: number }) {

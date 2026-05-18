@@ -171,6 +171,7 @@ module Api
           dpg_contacts_unlinked_from_gec: 0,
           gec_voters_not_in_dpg: 0,
           possible_gec_matches: 0,
+          dpg_gec_mismatches: 0,
           transfer_list_size: 0,
           mapping_issues_list_size: 0,
           transfers: 0,
@@ -188,6 +189,7 @@ module Api
             dpg_contacts_linked_to_gec: scoped_cross_reference_contacts.where.not(gec_voter_id: nil).count,
             dpg_contacts_unlinked_from_gec: scoped_cross_reference_contacts.where(gec_voter_id: nil).count,
             possible_gec_matches: scoped_cross_reference_contacts.where(gec_voter_id: nil, verification_status: "flagged").count,
+            dpg_gec_mismatches: ReportGenerator.new(report_type: "dpg_gec_mismatches").preview[:total_count],
             gec_voters_not_in_dpg: scoped_cross_reference_gec_voters
               .where.not(id: scoped_cross_reference_contacts.where.not(gec_voter_id: nil).select(:gec_voter_id))
               .count
@@ -226,7 +228,9 @@ module Api
         when "gec_voters_not_in_dpg"
           "GEC Voters Not In DPG Contacts"
         when "possible_gec_matches"
-          "Possible GEC Matches"
+          "Possible GEC Matches Needing Review"
+        when "dpg_gec_mismatches"
+          "DPG/GEC Address Or Village Mismatches"
         else
           type.humanize.titleize
         end
@@ -254,6 +258,8 @@ module Api
           "Current public GEC voters without any linked DPG contact"
         when "possible_gec_matches"
           "Flagged DPG contacts with possible GEC matches for manual review"
+        when "dpg_gec_mismatches"
+          "Linked DPG contacts where the DPG-entered address, village, or precinct differs from the official GEC voter-file record"
         end
       end
 
