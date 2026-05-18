@@ -162,6 +162,8 @@ export default function TeamReportsPage() {
   });
 
   const handleDownload = async (reportType: string) => {
+    if (!reportType) return;
+
     setDownloadingReport(reportType);
     try {
       await downloadReport(reportType, buildReportParams(reportType));
@@ -319,7 +321,7 @@ export default function TeamReportsPage() {
                 <button
                   type="button"
                   onClick={() => void handleDownload(selectedReport)}
-                  disabled={isDownloadingSelected}
+                  disabled={!selectedReport || isDownloadingSelected}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
                 >
                   {isDownloadingSelected ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -439,7 +441,7 @@ export default function TeamReportsPage() {
                 <button
                   type="button"
                   onClick={() => void handleDownload(selectedReport)}
-                  disabled={isDownloadingSelected}
+                  disabled={!selectedReport || isDownloadingSelected}
                   className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
                 >
                   {isDownloadingSelected ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
