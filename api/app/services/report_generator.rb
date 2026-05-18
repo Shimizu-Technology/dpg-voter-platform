@@ -581,10 +581,14 @@ class ReportGenerator
     wb.add_worksheet(name: "DPG GEC Mismatches") do |sheet|
       sheet.add_row headers, style: header_style(wb)
       each_ordered_dpg_gec_mismatch_batch do |candidates|
-        supporters = candidates.select { |supporter| dpg_gec_mismatch_types(supporter).any? }
+        mismatches = candidates.filter_map do |supporter|
+          mismatch_types = dpg_gec_mismatch_types(supporter)
+          [ supporter, mismatch_types ] if mismatch_types.any?
+        end
+        supporters = mismatches.map(&:first)
         latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
-        supporters.each do |supporter|
-          sheet.add_row dpg_gec_mismatch_values(supporter, latest_contact_attempt: latest_contact_attempts[supporter.id])
+        mismatches.each do |supporter, mismatch_types|
+          sheet.add_row dpg_gec_mismatch_values(supporter, latest_contact_attempt: latest_contact_attempts[supporter.id], mismatch_types: mismatch_types)
         end
       end
       sheet.column_widths(*Array.new(headers.length, 18))
@@ -763,22 +767,24 @@ class ReportGenerator
   end
 
   def preview_dpg_gec_mismatches
-    supporters = []
+    mismatches = []
     each_ordered_dpg_gec_mismatch_batch do |candidates|
       candidates.each do |supporter|
-        next if dpg_gec_mismatch_types(supporter).empty?
+        mismatch_types = dpg_gec_mismatch_types(supporter)
+        next if mismatch_types.empty?
 
-        supporters << supporter
-        break if supporters.length >= @preview_limit
+        mismatches << [ supporter, mismatch_types ]
+        break if mismatches.length >= @preview_limit
       end
-      break if supporters.length >= @preview_limit
+      break if mismatches.length >= @preview_limit
     end
+    supporters = mismatches.map(&:first)
     latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
 
     {
       columns: dpg_gec_mismatch_headers,
-      rows: supporters.map do |supporter|
-        dpg_gec_mismatch_values(supporter, latest_contact_attempt: latest_contact_attempts[supporter.id])
+      rows: mismatches.map do |supporter, mismatch_types|
+        dpg_gec_mismatch_values(supporter, latest_contact_attempt: latest_contact_attempts[supporter.id], mismatch_types: mismatch_types)
       end
     }
   end
@@ -956,9 +962,9 @@ class ReportGenerator
     ]
   end
 
-  def dpg_gec_mismatch_values(supporter, latest_contact_attempt: nil)
+  def dpg_gec_mismatch_values(supporter, latest_contact_attempt: nil, mismatch_types: nil)
     voter = supporter.gec_voter
-    mismatch_types = dpg_gec_mismatch_types(supporter)
+    mismatch_types ||= dpg_gec_mismatch_types(supporter)
     [
       supporter.id,
       voter&.id,
