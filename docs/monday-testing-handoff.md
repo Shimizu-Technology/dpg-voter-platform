@@ -8,11 +8,11 @@ This app is the Democratic Party of Guam voter engagement platform. It is a DPG-
 
 ## Message frame for DPG
 
-DPG can start clicking around now to get familiar with the foundation. The current build should be treated as a guided review and QA build, not the final DPG operating workflow.
+DPG can start clicking around now to get familiar with the foundation. Leon has already completed an initial production QA pass, and Auntie Stephanie has access and confirmed it. The current build should still be treated as a guided review build, not the final DPG operating workflow.
 
 The strongest message is that the app is customizable for DPG. Because the system is built by Shimizu Technology instead of locked into an off-the-shelf product, labels, roles, reports, and workflows can be improved around DPG's real office and field process as they test it.
 
-Be clear that the deployed app has not yet had a full admin-side browser smoke test. We should walk DPG through it, watch where the workflow feels confusing, and then tune the system around them.
+Be clear that the deployed app has had an initial technical QA pass, but not the full DPG workflow validation pass. We should walk DPG through it, watch where the workflow feels confusing, and then tune the system around them.
 
 ## What is ready for familiarization
 
@@ -24,28 +24,32 @@ Testers can review:
 4. Intake/new contact classification
 5. Contact detail editing
 6. Contact History timeline
-7. Manual staff entry
-8. Contact import preview/confirm
-9. Duplicate review
-10. GEC Voter List search/import workspace
-11. Create/link DPG contacts from GEC voters
-12. Household/address search
-13. Follow-Up Queue
-14. Queue-card contact logging
-15. Reports/export basics
-16. Users/roles
-17. Audit logs
-18. SMS/email dry-run recipient previews
+7. Contact History correction by Administrator/Data Manager, with audit logging
+8. Manual staff entry
+9. Contact import preview/confirm
+10. Duplicate review
+11. GEC Voter List search/import workspace
+12. Possible GEC match review before confirmation
+13. Create/link DPG contacts from GEC voters
+14. Household/address search
+15. Household canvass logging and address normalization behavior
+16. QR/signup-link attribution, active toggles, and per-link signup lists
+17. Follow-Up Queue
+18. Queue-card contact logging and follow-up status updates
+19. Reports/export basics and DPG/GEC cross-reference reports
+20. Users/roles
+21. Audit logs
+22. SMS/email dry-run recipient previews
 
 Live SMS/email sends should only be tested with controlled DPG-approved recipients/content.
 
 ## What testers should not assume is final
 
-- Role names still use some inherited labels, such as `campaign_admin`.
+- Database role values still use legacy internal names, but the UI now shows DPG-facing labels: Administrator, Data Manager, Field Organizer, Village Coordinator, and Canvasser.
 - Explicit DPG member/registered-Democrat/supporter list types are not finished.
-- DPG/GEC cross-reference reports are not finished.
+- DPG/GEC contact cross-reference reports are implemented; official member-roster and registered-Democrat list-lineage reports still need real DPG list samples.
 - Support/lean/donation tracking is not finished.
-- QR download/share attribution is not finished.
+- QR/share attribution is implemented; print-ready/downloadable QR assets are not finished.
 - Election Day, poll watcher, turnout, and war-room workflows are not built yet.
 - Maps/GIS, autodialer, OCR, and ID/photo intake are later add-ons.
 
@@ -67,8 +71,9 @@ Live SMS/email sends should only be tested with controlled DPG-approved recipien
 - Open Intake.
 - Search for the test signup by name, phone, email, and address if available.
 - Open the contact detail page.
-- Change classification from New Intake to Supporter, Member, Volunteer, or Active Contact.
+- Change record status, support status, and volunteer interest.
 - Save and refresh to confirm persistence.
+- For a possible GEC match, open the contact and confirm the candidate shown before marking the person matched to GEC.
 
 ### Contact history
 
@@ -79,6 +84,8 @@ Live SMS/email sends should only be tested with controlled DPG-approved recipien
   - note
   - timestamp
 - Confirm the attempt appears in the timeline.
+- If logged in as Administrator/Data Manager, edit a test contact attempt.
+- Confirm the correction is saved and the Audit History records the change.
 
 ### Manual entry
 
@@ -110,6 +117,9 @@ Live SMS/email sends should only be tested with controlled DPG-approved recipien
 - Search a test address.
 - Confirm the page shows GEC voters and DPG contacts separately.
 - Open related contacts and confirm links behave as expected.
+- Try address variants such as `123 Chalan Example`, `123 Chalan Example Rd`, and the same street with the village included.
+- Confirm obvious street suffix/locality variants group more cleanly without hiding the original entered address on the contact.
+- Log a household canvass update on a safe test contact and confirm the Contact History timeline updates.
 
 ### Follow-Up Queue
 
@@ -117,10 +127,12 @@ Live SMS/email sends should only be tested with controlled DPG-approved recipien
 - Confirm queue cards show latest contact attempts when present.
 - Log a call/SMS/in-person attempt from a queue card.
 - Confirm the contact detail timeline updates.
+- Confirm untouched registration or voter-help follow-up lanes move from "no outcome/progress set" to "started" after the first real contact attempt, while the final task outcome still requires a follow-up status update.
 
 ### Roles/settings
 
 - Confirm Users page loads.
+- Confirm the role matrix uses DPG-facing labels and explains what each role can do.
 - Confirm a test user can be created/updated if appropriate.
 - Confirm Districts and Precincts pages load.
 - Confirm SMS/Public Settings page loads.
@@ -146,7 +158,8 @@ Live SMS/email sends should only be tested with controlled DPG-approved recipien
 - Contact-history logging works from detail and Follow-Up Queue.
 - SMS/email dry-run governance works.
 - No other campaign names, assets, or proprietary workflows are visible.
-- Auntie Stephanie has a `campaign_admin` account using her preferred email.
+- Auntie Stephanie has access and confirmed it.
+- The UI uses the DPG-facing Administrator label for the highest-access role.
 
 ## Recommended feedback request to DPG
 
@@ -163,10 +176,9 @@ Ask testers to send:
 ## Known deferred modules
 
 - Explicit list types for official DPG member rosters, registered Democrats, supporters/contacts, and other custom lists.
-- DPG/GEC cross-reference reports.
+- Official member-roster and registered-Democrat list-lineage reports after DPG provides real list samples.
 - Support/lean/donation tracking.
 - Print-ready/downloadable QR assets beyond the current QR/share-link attribution workflow.
-- DPG role-name cleanup and permission polish.
 - Advanced canvassing route/assignment tooling.
 - Election Day command center.
 - Poll-site observer operations.
@@ -182,6 +194,9 @@ Ask testers to send:
 - Phase 1 DPG workflow reset is merged.
 - Phase 2 GEC Voter List workspace is merged.
 - Phase 3 contact history and household workspace is merged.
+- QR/share-link attribution is merged.
+- Role/permission polish is merged.
+- Contact-attempt correction, address normalization, GEC candidate review, and follow-up status sync are merged.
 - Outreach queue latest-attempt display and inline logging are merged.
 - Communications governance for SMS/email blasts is merged.
-- The next recommended product phase is explicit list types plus DPG/GEC cross-reference reporting, after deployed admin QA.
+- The next recommended product phase is guided DPG workflow review plus real list-sample collection, then explicit list types and roster/registered-Democrat list-lineage reporting.

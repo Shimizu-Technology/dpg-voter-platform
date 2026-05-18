@@ -1,13 +1,13 @@
 # DPG Deployment And QA Checklist
 
-**Last updated:** May 14, 2026
-**Current verified branch:** `feature/intake-relationship-household-polish`
+**Last updated:** May 18, 2026
+**Current verified branch:** `main` at `fc96d72` after PR #37
 
 ## Current deployment status
 
-The DPG app has been deployed online. This checklist now tracks what must be confirmed on the deployed environment before the app is treated as production-ready for broad DPG staff use.
+The DPG app has been deployed online and Leon has completed an initial production QA pass. This checklist now tracks what must still be confirmed before the app is treated as production-ready for broad DPG staff use.
 
-The main remaining risk is not missing code for the current foundation. It is that most admin-side flows have not yet been thoroughly tested in a real deployed browser session with DPG auth, DPG database, DPG URLs, and DPG provider credentials.
+The main remaining risk is not missing code for the current foundation. It is DPG workflow validation and operational readiness: Auntie Stephanie/Ethan should walk through the live app, confirm the language and role model, test with safe records, and confirm backups, auth settings, domain, and outreach sender policy before broad staff rollout.
 
 ## Environment isolation
 
@@ -41,7 +41,7 @@ The main remaining risk is not missing code for the current foundation. It is th
 
 ## CI and source verification
 
-Latest merged Phase 5 PR passed:
+Latest merged PR #37 passed:
 
 - [x] `api_lint`
 - [x] `api_scan_ruby`
@@ -49,11 +49,14 @@ Latest merged Phase 5 PR passed:
 - [x] `web_lint_build`
 - [x] Greptile review
 
-Latest local backend verification during Phase 5 review:
+Latest local PR #37 verification:
 
-- [x] Rails tests passed: `197 runs, 748 assertions, 0 failures`.
-- [x] RuboCop passed: `194 files inspected, no offenses`.
-- [x] Bundler audit passed: no vulnerabilities.
+- [x] Rails focused cross-reference report tests passed.
+- [x] Rails full test suite passed before merge.
+- [x] Rails zeitwerk check passed.
+- [x] RuboCop passed.
+- [x] Web lint passed.
+- [x] Web build passed, with the existing Vite large chunk warning.
 
 Local repo note:
 
@@ -159,9 +162,9 @@ These are the highest priority because the admin side has not yet been thoroughl
 ## Known deferred modules
 
 - Explicit DPG list types: official DPG member rosters, registered Democrat list, contacts/supporters, other/custom.
-- DPG supporter and member-roster vs GEC cross-reference reports.
+- Official DPG member-roster and registered-Democrat list-lineage reports after DPG provides real list samples.
 - Membership stays hidden from the active manual UI until DPG defines the official member-roster workflow; the backend field is reserved for that future work.
-- DPG role-name cleanup and stricter export/delete permission rules.
+- Any remaining permission/export/delete tuning after DPG tests the current DPG-facing role model.
 - Print-ready/downloadable QR assets beyond the current in-browser QR/share-link attribution workflow.
 - Support/lean/donation tracking.
 - DPG-defined district grouping.

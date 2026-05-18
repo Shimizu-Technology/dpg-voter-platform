@@ -28,18 +28,19 @@ This app should become a DPG-owned platform centered on:
 - role-scoped party operations
 - later Election Day operations
 
-The Phase 1 DPG workflow reset is now implemented. Public signups, staff entries, and contact imports are visible immediately as DPG contacts and default into Intake for review. The active staff workflow focuses on whether DPG has contacted the person, what happened, and whether the person supports DPG. A legacy `membership_status` field still exists in the database/model for future official member-roster import or cross-reference work, but membership is intentionally hidden from the manual UI until DPG defines that roster workflow.
+The core DPG voter-engagement foundation is now implemented and merged to `main`: public signup, QR/share-link attribution, Contacts/Intake, GEC voter-list import/search/linking, household/address lookup, contact history, Follow-Up Queue, governed SMS/email outreach, reports/export, users/roles, audit logs, and DPG/GEC cross-reference reporting. Public signups, staff entries, and contact imports are visible immediately as DPG contacts and default into Intake for review. A legacy `membership_status` field still exists in the database/model for future official member-roster import or cross-reference work, but membership is intentionally hidden from the manual UI until DPG defines that roster workflow.
 
 ## Starter functionality
 
 - Public signup
 - Supporter/contact CRM
-- Address/email search foundation
+- GEC voter-list import/search/linking
+- Household/address lookup
 - Voter-help follow-up
 - Manual staff entry
-- Spreadsheet import
+- Spreadsheet contact import
 - Duplicate review
-- Reports
+- Reports and DPG/GEC cross-reference exports
 - Users and roles
 - Districts, villages, and precincts
 - SMS/email settings and outbound messaging
@@ -47,10 +48,10 @@ The Phase 1 DPG workflow reset is now implemented. Public signups, staff entries
 
 ## Key next build priorities
 
-1. Restore/build the GEC voter-list workspace as public voter-file infrastructure.
-2. Add GEC voter search by name, address, village, and precinct.
-3. Add structured contact history and household/address canvassing workflows.
-4. Add list-type-specific imports for GEC voter list, DPG contacts/supporters, official DPG member rosters, and registered Democrat lists.
+1. Run a guided walkthrough with Auntie Stephanie and a small DPG tester group.
+2. Confirm production readiness items: Clerk production settings, backups, environment isolation, and controlled SMS/email sender policy.
+3. Collect real DPG list samples before building schema-specific importers.
+4. Add explicit list types for DPG contacts/supporters, official DPG member rosters, registered Democrat lists, and custom lists once samples exist.
 5. Continue refining labels, reports, roles, and workflows with DPG office feedback.
 
 ## Boundary
