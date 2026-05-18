@@ -146,7 +146,7 @@ export default function TeamReportsPage() {
 
       {/* Quick Stats */}
       {quickStats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-11 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-10 gap-3">
           <MiniStat label="Official Supporters" value={quickStats.official_supporters ?? quickStats.total_active} />
           <MiniStat label="Matched To Voter List" value={quickStats.matched_to_gec ?? quickStats.total_verified} />
           <MiniStat label="Unlinked Contacts" value={quickStats.dpg_contacts_unlinked_from_gec ?? 0} />
