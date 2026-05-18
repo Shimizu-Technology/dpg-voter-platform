@@ -1,6 +1,6 @@
 # DPG Product Blueprint
 
-**Last updated:** May 16, 2026  
+**Last updated:** May 18, 2026
 **Purpose:** Source-of-truth plan for turning the current DPG fork into the Democratic Party of Guam voter engagement and election operations platform.
 
 ## Product goal
@@ -18,15 +18,19 @@ This should not be a patched copy of a campaign tracker. It should reuse Shimizu
 
 ## Current implementation checkpoint
 
-As of May 12, 2026, the DPG platform is deployed online and the first core build phases are merged to `main`:
+As of May 18, 2026, the DPG platform is deployed online and the first core build phases are merged to `main`. Leon completed an initial production QA pass on the Render/Netlify/Neon deployment, Auntie Stephanie has been sent access and confirmed it, and the next validation step is a guided in-person DPG walkthrough when she is back from travel.
 
 - Phase 1: DPG foundation reset and unified `/admin` workspace.
 - Phase 2: GEC voter-list workspace.
-- Phase 3: contact history and household/address workspace.
-- Outreach queue logging enhancement: latest contact attempt display and inline attempt logging from the Follow-Up Queue.
+- Phase 3: contact history, editable audited contact-attempt corrections, household/address workspace, conservative address normalization, and household canvass logging.
+- QR/share attribution: admin-managed source links, large in-browser QR previews, active/inactive toggles, per-link signup lists, and QR attribution on contact detail.
+- Role/permission polish: DPG-facing role labels, tighter export/import access, QR access for field roles, and contact-history editing limited to Administrator/Data Manager.
+- GEC match review: possible-match candidates are shown before staff confirm a GEC link, and DPG-entered contact fields remain separate from official GEC voter fields.
+- Outreach queue logging enhancement: latest contact attempt display, inline attempt logging from the Follow-Up Queue, and first-contact follow-up status sync.
 - Communications governance: SMS/email dry-run recipient review, starter templates, and blast contact-attempt logging.
+- Reports workspace: grouped report library, contextual filters, preview/export workspace, and expanded DPG/GEC cross-reference reports including linked contacts, unlinked contacts, GEC outreach gaps, possible matches, and DPG/GEC address/village/precinct mismatches.
 
-The code has been reviewed and covered by focused backend/frontend checks, but the admin side still needs a full deployed browser QA pass before we should treat it as production-validated for DPG staff.
+The code has been reviewed and covered by focused backend/frontend checks. The app is ready for a guided DPG review, but not yet for broad unsupervised staff rollout.
 
 ## Core product principles
 
@@ -67,6 +71,8 @@ Sources:
 - canvassing/contact from a GEC voter record
 
 This should be the default visible record type. A contact is not automatically a supporter.
+
+DPG-entered identity/address fields and official GEC voter-file fields must stay transparent rather than silently overwriting each other. When staff confirm a GEC match, the system links the DPG Contact to that voter record and can show the official GEC name, village, precinct, address, and registration number, while preserving what the person or staff originally entered on the DPG Contact.
 
 ### Intake
 
@@ -112,6 +118,8 @@ Possible statuses:
 - address/village mismatch
 - moved/transfer suspected
 
+For possible matches, staff should see the candidate voter record before confirming. If there are multiple plausible matches, staff should choose the correct GEC voter from the candidate list or keep the contact flagged for review.
+
 ### Household / Address
 
 DPG needs to search an address and see people associated with that location.
@@ -140,6 +148,8 @@ Fields:
 - next follow-up date/status when needed
 
 This supports the workflow where staff can see that Leon sent SMS, Kami emailed, and Stassie visited in person.
+
+Contact History is the factual timeline of calls, texts, emails, and visits. Follow-up statuses are task/outcome lanes. Logging a first real contact can mark untouched follow-up work as started, but the actual registration-help or voter-help result still lives in the follow-up fields.
 
 ### Outreach Need
 
@@ -202,6 +212,8 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 3. Staff can match to GEC voter immediately if search is available.
 4. Contact history begins from the entry/contact event.
 
+If the staff-entered or self-reported village/address differs from the GEC voter file, keep both facts visible. DPG field work should use the DPG Contact's current entered village/address unless staff intentionally updates it, while voter-file reporting should show the official GEC village/precinct from the linked voter record.
+
 ### GEC/address canvassing workflow
 
 1. Staff searches an address, village, precinct, or voter name in GEC Voter List.
@@ -226,6 +238,8 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 6. Imported records go to the appropriate workspace:
    - GEC records into GEC Voter List
    - DPG records into Contacts/Intake
+
+GEC importing is implemented because DPG has real GEC files. Other schema-specific imports should wait until DPG provides actual files or sample columns for official member rosters, registered Democrat lists, supporter/contact lists, or custom lists.
 
 ## Priority plan
 
@@ -265,7 +279,7 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 - Add address/household grouping from GEC data. **Implemented as address lookup that shows GEC voters and existing DPG contacts at matching addresses.**
 - Add DPG contact to GEC voter matching. **Implemented for creating a DPG contact from a GEC voter and linking existing DPG contacts from the GEC workspace UI.**
 - Add skipped-row/import-error review if needed.
-- Post-PR #31 hardening target: compare the DPG importer against the campaign-tracker importer for large-PDF progress visibility, recoverability from interrupted jobs, skipped-row/source-artifact review, import-diff review, and re-vetting visibility. Keep only generic public-GEC infrastructure; do not import Josh/Tina-specific operating assumptions.
+- GEC import hardening target: compare the DPG importer against the campaign-tracker importer for large-PDF progress visibility, recoverability from interrupted jobs, skipped-row/source-artifact review, import-diff review, and re-vetting visibility. Keep only generic public-GEC infrastructure; do not import Josh/Tina-specific operating assumptions.
 
 ### Phase 3: Contact/Household/Outreach Operations
 
@@ -273,11 +287,11 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
   - classification **Implemented.**
   - GEC match **Implemented.**
   - household/address **Implemented through household lookup and GEC/contact linking.**
-  - contact history **Implemented for call, SMS, email blast, and in-person attempts.**
-  - support needs **Not fully implemented; should be designed with DPG labels and workflows.**
-- Build Contact Attempt logging. **Implemented on contact detail, Follow-Up Queue cards, and SMS/email blast jobs.**
-- Build Household/Address workspace. **Implemented as `/admin/households`.**
-- Build Outreach queues for registration, absentee, homebound, ride, volunteer, and future official member-roster follow-up if DPG defines it. **Partially implemented through the Follow-Up Queue, classification filters, latest-attempt summaries, and inline attempt logging; richer DPG-specific queue labels and support-need workflows remain.**
+  - contact history **Implemented for call, SMS, email blast, and in-person attempts, with audited corrections limited to Administrator/Data Manager.**
+  - support needs **Partially implemented through registration, voter-help, and volunteer follow-up lanes; DPG should validate labels during walkthrough.**
+- Build Contact Attempt logging. **Implemented on contact detail, Follow-Up Queue cards, household canvass logging, and SMS/email blast jobs.**
+- Build Household/Address workspace. **Implemented as `/admin/households`, with GEC voters and DPG contacts shown separately, contact links, household canvass logging, and address normalization for cleaner grouping.**
+- Build Outreach queues for registration, absentee, homebound, ride, volunteer, and future official member-roster follow-up if DPG defines it. **Partially implemented through the Follow-Up Queue, classification filters, latest-attempt summaries, first-contact status sync, and inline attempt logging; DPG should validate the final queue labels and operating process.**
 - Keep GEC possible-match review separate from outreach follow-up. Possible matches are voter-check/data-review work handled through Intake, GEC Voters, and Contact Detail, while the Follow-Up Queue is for contacting people about registration, voter help, and volunteer/support needs.
 - Surface latest contact attempts in the Follow-Up Queue and let staff log call/SMS/in-person touches from each queue card. **Implemented in the outreach queue so queue work updates the shared contact-history timeline.**
 
@@ -290,11 +304,13 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
   - registered Democrat list **Not implemented as a first-class list type yet.**
 - Track source/list type on records. **Partially implemented through existing source/origin fields; needs explicit DPG list-type modeling.**
 - Add cross-reference reports:
-  - DPG contacts not matched to GEC
-  - GEC voters marked as supporters
-  - official member-roster records needing registration help, once that list type exists
-  - address/village mismatch
-  - **Not fully implemented yet; this is the next core product phase.**
+  - DPG contacts linked to GEC **Implemented.**
+  - DPG contacts not matched to GEC **Implemented.**
+  - GEC voters not in DPG contacts / outreach gaps **Implemented.**
+  - possible GEC matches needing review **Implemented.**
+  - DPG-entered address/village/precinct vs official GEC mismatch **Implemented.**
+  - official member-roster records needing registration help, once that list type exists **Deferred until DPG provides real roster files.**
+  - registered Democrat/supporter/list-lineage reports **Deferred until DPG provides real list samples.**
 
 ### Phase 5: Communications
 
@@ -315,28 +331,35 @@ Current Phase 1 implementation note: public signups, staff entries, and contact 
 
 ## Immediate next implementation recommendation
 
-The next step should be operational confidence before more feature expansion.
+The next step should be DPG workflow confidence before more feature expansion. Because the app is already deployed and the QR/role/contact/household/reporting polish has merged, the highest-value move is to walk Auntie Stephanie and a small DPG tester group through the actual deployment, capture confusion, and collect real list samples.
 
 Recommended order:
 
-1. Run a full deployed admin QA pass using the live site:
+1. Run a guided DPG walkthrough using the live site:
    - public signup to Intake/Contacts
+   - QR signup links and attribution
    - manual entry/import
-   - GEC import/search/link/create-contact
-   - household lookup
-   - contact detail logging
-   - Follow-Up Queue logging
-   - SMS/email dry runs
-   - reports, users, audit log
+   - GEC import/search/link/create-contact and possible-match confirmation
+   - household lookup and household canvassing
+   - contact detail logging and audited contact-attempt correction
+   - Follow-Up Queue logging and follow-up status updates
+   - reports, users/roles, audit log
+   - SMS/email dry runs only
    - mobile/tablet layouts
-2. Create Auntie Stephanie as the main admin once she gives the preferred email.
-3. Hand off to a small DPG tester group for familiarization and workflow feedback.
-4. Build Phase 4 explicit list types and cross-reference reports:
+2. Confirm production operational setup:
+   - Clerk users/roles are correct
+   - Neon backups/retention are acceptable
+   - Render/Netlify environment variables are correct
+   - broad SMS/email sending remains dry-run/governed until DPG approves sender language and recipient policy
+3. Collect actual DPG list samples before building schema-specific importers:
    - DPG contacts/supporters
    - official DPG member rosters
    - registered Democrat list
-   - GEC matched/unmatched reports
-   - supporter and future member-roster registration status reports
-5. Polish DPG role labels and permission descriptions.
-6. Polish QR signup attribution based on DPG testing; the first QR/share-link attribution slice is implemented on PR #35.
-7. Scope richer support-need queues and election-day operations with DPG after they have used the deployed foundation.
+   - custom lists DPG already uses
+4. Build Phase 4 explicit list types and cross-reference reports only after those samples exist:
+   - GEC matched/unmatched contacts
+   - official member-roster records needing registration help
+   - registered Democrat/supporter overlap
+   - list-origin and list-date reporting
+5. Polish print-ready QR assets and field instructions after DPG tests the current QR workflow.
+6. Scope richer support-need queues and election-day operations with DPG after they have used the deployed foundation.

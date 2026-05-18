@@ -1,14 +1,14 @@
 # DPG Voter Platform - Current Project Status
 
-**Last updated:** May 16, 2026
-**Current branch:** `codex/dpg-role-contact-workflow-polish`
-**Base commit:** `main` after PR #35 merged, adding DPG QR/signup-link attribution and membership UI simplification
+**Last updated:** May 18, 2026
+**Current branch:** `main`
+**Base commit:** `fc96d72` after PR #37 merged DPG/GEC cross-reference reporting and Reports workspace polish
 
 ## One-line status
 
-The Democratic Party of Guam app is now deployed and has the core voter-engagement foundation in place: public signup, a unified admin workspace, Contacts/Intake, GEC voter-list search/import, household/address lookup, create/link contact actions from GEC and household results, contact history, follow-up queue logging, DPG/GEC cross-reference reports, users/roles, and governed SMS/email outreach.
+The Democratic Party of Guam app is deployed on the Render/Netlify/Neon stack and now has the core voter-engagement foundation in place: public signup, QR/share-link attribution, a unified admin workspace, Contacts/Intake, GEC voter-list search/import, household/address lookup, create/link contact actions from GEC and household results, contact history with editable audited corrections, follow-up queue logging, a redesigned Reports workspace with DPG/GEC cross-reference reports, users/roles, and governed SMS/email outreach.
 
-The important caveat is that most admin-side workflows have been verified through automated tests, code review, and limited live endpoint checks, not through a full real-user browser smoke test with a DPG admin account. Treat the deployed app as ready for guided internal QA/familiarization, not as fully production-validated for broad DPG operations yet.
+Leon completed an initial production QA pass and confirmed the deployed app works. Auntie Stephanie has already been sent access and confirmed receipt. The next milestone is a guided in-person walkthrough with Auntie Stephanie when she returns from her trip, followed by DPG-provided list samples and workflow feedback before broad staff rollout.
 
 ## Product frame
 
@@ -41,7 +41,7 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - village/precinct/location organization
 - address/household search for canvassing
 - contact/canvassing history by method
-- support/lean/donation/latest-notes tracking
+- support/volunteer/latest-contact tracking now, with support/lean/donation details to scope with DPG if they still want them
 - SMS and email outreach
 - QR/mobile signup
 - role and permission scoping for admins, party members, and field users
@@ -60,9 +60,10 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - DPG branding and public copy are active.
 - DPG docs and clean-room guardrails exist.
 - Active Josh/Tina branding/data/workflow surfaces have been removed or disabled.
-- The app is deployed online, but deployment isolation details and full staging QA should still be checked against `docs/deployment-checklist.md`.
+- The app is deployed online on the intended Render/Netlify/Neon stack.
 - Live public URL currently used for review: `https://dpg-voter-platform.netlify.app/`.
 - Live backend health and public API checks have been reported as passing, including Netlify-to-Render CORS and protected endpoint auth blocking.
+- Leon completed a production QA pass and reported the core deployed flows working.
 
 ### Public signup and Intake
 
@@ -72,22 +73,22 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - New records appear in Contacts and Intake immediately.
 - New records do not count as supporters until reviewed and marked with support status by staff.
 - Local browser smoke testing previously covered landing, signup, village selection, submit, and thank-you redirect.
-- Deployed public signup still needs a fresh staging smoke test after the latest merged phases.
+- Deployed public signup has passed Leon's initial production QA. Keep it in the guided DPG walkthrough so Auntie Stephanie can confirm the language and intake expectations.
 
 ### Unified admin workspace
 
 - The active internal experience is `/admin`.
 - Legacy `/data` and `/team` routes redirect into `/admin`.
 - Sidebar navigation includes Dashboard, Contacts, Intake, GEC Voters, Households, New Entry, Import Contacts, Follow-Up, SMS Blasts, Email Blasts, Reports, Duplicates, Activity Log, Users, Districts, Precincts, and SMS/Public Settings.
-- Admin-side pages are covered by route/API/tests, but most deployed browser workflows still need hands-on QA.
+- Admin-side pages are covered by route/API/tests and Leon's initial production QA. They still need a guided DPG staff walkthrough before broad rollout.
 
 ### Admin/staff access
 
 - Clerk-backed admin/staff access exists.
 - User management exists.
 - Current highest-level role is still stored as `campaign_admin` in the database, but the active UI now labels it as Administrator.
-- Recommendation: create Auntie Stephanie as Administrator (`campaign_admin`) for now.
 - Auntie Stephanie provided the preferred admin email on May 11: `Sgflores@gmail.com`.
+- Access has been sent to Auntie Stephanie and she confirmed receipt.
 - Users/roles, scoped permissions, and audit logs exist. Current DPG-facing labels are Administrator, Data Manager, Field Organizer, Village Coordinator, and Canvasser. Poll Watcher remains future work.
 - Export is now limited to Administrator/Data Manager. Bulk contact import is limited to Administrator/Data Manager/Field Organizer. Canvassers and Village Coordinators can still work assigned-village contacts and log canvass/contact outcomes.
 - Clerk sign-in reportedly still shows a development-mode label; acceptable for guided testing, but should be cleaned up before broad staff rollout.
@@ -95,7 +96,7 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 ### Contacts and Intake CRM
 
 - Contact list and contact detail exist.
-- Pending Intake now has a structured reviewer workflow on this branch:
+- Pending Intake has a structured reviewer workflow:
   - approve or reject intake
   - set record status as active contact, duplicate, invalid, or archived
   - separately set support status as not reviewed, supporter, undecided, or not supporting
@@ -115,7 +116,8 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
   - outreach/contacted status: derived from contact-attempt history, not from the relationship fields
 - The legacy `membership_status` field still exists in the database/model and API contract for compatibility and future official member-roster work, but it is intentionally hidden from the active manual UI until DPG defines that roster workflow.
 - Manual staff entry exists.
-- QR/signup-link attribution exists on PR #35: admins can create village/canvasser/outreach/custom signup links, copy/open them, scan generated QR codes, toggle active/inactive state, and view paginated signups per link.
+- QR/signup-link attribution is implemented: admins can create village/canvasser/outreach/custom signup links, copy/open them, scan generated QR codes, toggle active/inactive state, and view paginated signups per link.
+- QR-attributed contacts retain the referral code/link relationship. Inactive links are ignored for new signups so stale printed links fall back to normal public signup attribution.
 - Search/filter basics exist, including name, phone, email, village, precinct, origin, opt-in, voter-check, record status, support status, and address-style lookup.
 - Village/precinct fields exist.
 - Voter-help/support fields exist:
@@ -126,6 +128,7 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
   - ride help
   - referral name
   - email/text opt-in
+- Contact names, statuses, and linked GEC/contact references now use DPG-facing copy and link through to the contact detail page where practical.
 
 ### Import/data workflow
 
@@ -145,22 +148,27 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Staff can link existing DPG contacts to GEC voter records from the GEC workspace.
 - GEC voter and household results now surface linked contacts and likely DPG matches.
 - Household lookup is now actionable: staff can create/link contacts from household search results.
+- GEC possible-match review is clearer: Contact Detail can show ranked GEC match candidates, staff can confirm a specific shown GEC voter, and the app links that DPG contact to the official GEC record.
+- Confirming a GEC match does **not** overwrite the DPG contact-entered name, phone, address, or village. It links the records and stores the official GEC voter relationship so the UI/reports can distinguish "DPG contact village/address" from "official GEC voter village/precinct/address."
 - GEC import history/list-date handling exists.
-- Async PDF preview/import support exists from PR #31.
+- Async PDF preview/import support exists.
 - Richer GEC import QA screens now exist for several import-review paths, but monthly production import confidence still needs live QA with real/safe files before DPG relies on it operationally.
 
 ### Contact, household, and outreach operations
 
 - Contact detail includes a structured Contact History timeline.
 - Staff can log in-person, call, and SMS attempts with outcome, timestamp, note, and staff attribution.
+- Administrators and Data Managers can edit/correct contact attempts. Corrections are permission-gated, transactional, and audit logged with before/after data.
 - Contact-attempt logging is village-scoped through existing DPG contact permissions.
 - `/admin/households` searches addresses across GEC voters and DPG contacts.
+- Address matching now uses `AddressNormalizer`, which collapses common street suffix variants, trailing Guam locality words, and PO Box variants so household grouping is less fragile.
 - Household lookup can now create/link contacts from household results.
 - Household DPG records now show the latest contact attempt or a clear Not contacted yet state, and can log a canvassing update directly from the household view.
 - Household canvassing updates can set support/volunteer status and log method/outcome/note in one atomic action. Membership is intentionally not part of this manual canvass workflow.
 - `/admin/outreach` Follow-Up Queue shows latest contact attempt per card.
 - Staff can log call/SMS/in-person attempts from queue cards without leaving the queue.
 - The Follow-Up Queue is for outreach work: registration outreach, voter-help requests, and volunteer follow-up. Possible GEC match review is intentionally handled through Intake/GEC Voters/Contact Detail voter-check workflows instead of this queue.
+- Follow-up status sync now ties the two related workflows together without merging them: Contact History is the actual call/text/email/visit log, while registration and voter-help/volunteer follow-up fields are task outcome/progress lanes. Logging the first real contact attempt automatically starts untouched follow-up lanes when appropriate, but it does not mark registration or voter-help as resolved.
 - Contact detail pages now include GEC check, follow-up workflow, latest-contact summary, contact history, audit history, record status, support status, QR attribution, and volunteer status.
 
 ### SMS/email outreach
@@ -187,23 +195,31 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
   - DPG contacts not linked to GEC
   - GEC voters not in DPG contacts
   - possible GEC matches
+  - DPG/GEC address or village mismatches
   - supporter list
   - referral list
   - village changes
   - mapping issues
   - purge list
-- DPG/GEC contact cross-reference exports now include latest contact method, outcome, date, and note.
+- DPG/GEC contact cross-reference exports now include Contact ID, GEC Voter ID, origin/source attribution, campaign requests, suggested action, latest contact method, outcome, date, note, and official GEC voter fields where applicable.
 - Cross-reference exports and previews now include separate record status, support status, and volunteer status columns. Membership should return here as an official member-roster signal once DPG defines that list workflow.
+- The Reports page now uses a grouped report library, selected-report workspace, contextual filters, compact summary stats, and integrated preview/export actions.
 - Explicit list-type imports are still needed so these reports can distinguish official DPG member rosters, registered Democrats, supporters/contacts, and custom lists cleanly.
 
 ### Tests/checks
 
-Latest branch validation:
+Latest PR #37 validation before merge:
 
-- Rails full test suite: `233 runs, 951 assertions, 0 failures, 0 errors`
-- RuboCop: passing
-- Web lint: passing
-- Web build: passing, with existing local Node version warning from Vite (`Node.js 22.0.0`; Vite prefers `20.19+` or `22.12+`)
+- GitHub `api_lint`: passing
+- GitHub `api_scan_ruby`: passing
+- GitHub `api_test`: passing
+- GitHub `web_lint_build`: passing
+- Greptile review: 5/5, safe to merge
+- Local `cd api && bundle exec rails test`: passing
+- Local `cd api && bundle exec rails zeitwerk:check`: passing
+- Local `cd api && bundle exec rubocop`: passing
+- Local `npm --prefix web run lint`: passing
+- Local `npm --prefix web run build`: passing, with the existing Vite large chunk warning
 
 Earlier reported validation:
 
@@ -217,9 +233,9 @@ Earlier reported validation:
 
 Previous local backend verification during Phase 5 review also passed RuboCop and Bundler audit.
 
-## Still needs real deployed QA
+## Still needs guided DPG QA
 
-We have not yet thoroughly browser-tested the deployed admin side. Before handing this to DPG as more than a familiarization build, run a guided deployed QA pass:
+Leon has completed initial production QA and confirmed the app works on the deployed stack. Before broad DPG operations, run a guided walkthrough with Auntie Stephanie and a small DPG tester group:
 
 - public landing page
 - public signup and thank-you
@@ -243,6 +259,7 @@ We have not yet thoroughly browser-tested the deployed admin side. Before handin
 - controlled single-recipient live SMS/email tests only when intentionally approved
 - confirm Clerk production/development-mode configuration
 - confirm database backup schedule before real operational data entry
+- collect actual DPG list samples before building schema-specific importers beyond GEC and generic contact import
 
 ## Intentionally deferred
 
@@ -259,8 +276,7 @@ These are important, but should be implemented deliberately:
 - richer list-lineage-aware report filtering after explicit list types exist
 - support/lean/donation tracking
 - DPG-specific district grouping
-- role rename and permissions polish
-- stronger export/delete restrictions for non-admin users
+- any remaining permission tuning after DPG tests the role model
 - richer canvassing route/assignment tooling beyond address search
 - print-ready/downloadable QR assets beyond the current in-browser QR/share-link workflow
 - poll watcher workflow
@@ -272,28 +288,25 @@ These are important, but should be implemented deliberately:
 
 ## Recommended next work
 
-Because the app is already deployed, the next move should be guided QA plus one workflow-polish sprint. The best next sequence is:
+Because the app is already deployed and the QR/role/contact/household/reporting polish has merged, the next move should be guided DPG walkthrough plus list-sample discovery. The best next sequence is:
 
-1. **Deployed admin QA pass**
-   Confirm the admin side actually works end-to-end in the live environment, especially auth, mutations, imports, GEC workflows, reports, and outreach dry-runs.
+1. **Guided Auntie Stephanie walkthrough**
+   Show the deployed app in person, walk through public signup, QR links, Contacts, Intake, GEC Voters, Households, Follow-Up, reports, users/roles, and SMS/email dry-runs. Capture what feels confusing in DPG language.
 
-2. **Create Auntie Stephanie's admin account**
-   Use `Sgflores@gmail.com` and assign the current highest role, `campaign_admin`.
+2. **Small DPG tester pass**
+   Let a small DPG group test with fake/safe records before broad staff rollout. Confirm role scoping, import/export expectations, and which field users should see which villages.
 
-3. **Prepare a short DPG tester handoff**
-   Tell DPG what to click first, what is safe to test, what not to live-send yet, and what feedback to send.
+3. **Collect real DPG list samples**
+   DPG requested official member roster, registered Democrat, supporter/contact, and custom list cross-reference work. Do not build schema-specific importers until DPG provides actual files or sample columns. GEC import is the exception because we already have real GEC files.
 
-4. **Next product PR: Intake Review + Relationship Classification polish**
-   Make Intake a true reviewer workflow: approve, reject, mark duplicate/invalid, classify support status, capture volunteer interest, confirm/link GEC match, and optionally log an initial note/outreach outcome. Keep membership out of the manual workflow until DPG defines official member-roster handling.
+4. **Next product phase: explicit list types + list-lineage reporting**
+   Add DPG contacts/supporters, official member roster, registered Democrat, and custom list imports once samples exist. Then refine cross-reference reports so list origin, DPG support status, future official membership status, and GEC voter status are clear.
 
-5. **Next product phase: list types + list-lineage reporting**
-   Build explicit DPG supporter/contact, official member-roster, registered-Democrat, and custom list imports and refine reports so list origin and relationship type are clear.
+5. **Operational hardening**
+   Confirm backups, Clerk production labeling, controlled live SMS/email, production import confidence, and any remaining role/delete/export concerns.
 
-6. **Permissions polish**
-   Rename roles into DPG language and tighten export/delete/scope behavior for non-admin staff.
-
-7. **Field workflow phase**
-   Evolve household lookup into canvassing workflow, polish QR/signup attribution based on DPG feedback, and scope election-day tools with DPG.
+6. **Election Day discovery**
+   Scope poll watcher, voted/not-voted, war-room reporting, and maps with DPG after they have used the foundation.
 
 ## Related docs
 
