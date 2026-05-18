@@ -762,11 +762,11 @@ class ReportGenerator
 
   def preview_dpg_gec_mismatches
     supporters = []
-    dpg_gec_mismatch_relation.find_each(batch_size: 100) do |supporter|
+    each_ordered_dpg_gec_mismatch_candidate do |supporter|
       next if dpg_gec_mismatch_types(supporter).empty?
 
       supporters << supporter
-      break if supporters.length >= @preview_limit
+      supporters.length < @preview_limit
     end
     latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
 
@@ -912,6 +912,20 @@ class ReportGenerator
 
   def dpg_gec_mismatch_relation
     dpg_contacts_linked_to_gec_scope.includes(:gec_voter, :village, :precinct).order(:last_name, :first_name)
+  end
+
+  def each_ordered_dpg_gec_mismatch_candidate(batch_size: 100)
+    offset = 0
+    loop do
+      batch = dpg_gec_mismatch_relation.offset(offset).limit(batch_size).to_a
+      break if batch.empty?
+
+      batch.each do |supporter|
+        result = yield supporter
+        return if result == false
+      end
+      offset += batch_size
+    end
   end
 
   def dpg_gec_mismatch_supporters
