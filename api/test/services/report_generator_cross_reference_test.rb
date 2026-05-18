@@ -139,7 +139,7 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
 
     preview = ReportGenerator.new(report_type: "dpg_gec_mismatches").preview
 
-    assert_equal 1, preview[:total_count]
+    refute preview.key?(:total_count)
     row = preview[:rows].first
     assert_includes preview[:columns], "Mismatch Type"
     assert_equal @linked_contact.id, row[0]

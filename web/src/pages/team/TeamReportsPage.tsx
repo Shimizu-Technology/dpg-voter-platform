@@ -152,7 +152,6 @@ export default function TeamReportsPage() {
           <MiniStat label="Unlinked Contacts" value={quickStats.dpg_contacts_unlinked_from_gec ?? 0} />
           <MiniStat label="GEC Outreach Gaps" value={quickStats.gec_voters_not_in_dpg ?? 0} />
           <MiniStat label="Possible Matches" value={quickStats.possible_gec_matches ?? 0} />
-          <MiniStat label="DPG/GEC Mismatches" value={quickStats.dpg_gec_mismatches ?? 0} />
           <MiniStat label="Village Changes" value={quickStats.transfer_list_size ?? quickStats.transfers} />
           <MiniStat label="Referral List Size" value={quickStats.referral_list_size ?? 0} />
           <MiniStat label="Mapping Issues" value={quickStats.mapping_issues_list_size ?? 0} />

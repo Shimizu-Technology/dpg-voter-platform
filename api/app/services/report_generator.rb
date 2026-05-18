@@ -761,17 +761,20 @@ class ReportGenerator
   end
 
   def preview_dpg_gec_mismatches
-    supporters_with_mismatches = dpg_gec_mismatch_supporters
-    total_count = supporters_with_mismatches.length
-    supporters = supporters_with_mismatches.first(@preview_limit)
+    supporters = []
+    dpg_gec_mismatch_relation.find_each(batch_size: 100) do |supporter|
+      next if dpg_gec_mismatch_types(supporter).empty?
+
+      supporters << supporter
+      break if supporters.length >= @preview_limit
+    end
     latest_contact_attempts = LatestSupporterContactAttempts.call(supporters)
 
     {
       columns: dpg_gec_mismatch_headers,
       rows: supporters.map do |supporter|
         dpg_gec_mismatch_values(supporter, latest_contact_attempt: latest_contact_attempts[supporter.id])
-      end,
-      total_count: total_count
+      end
     }
   end
 
@@ -907,9 +910,12 @@ class ReportGenerator
     ].compact.join(" · ")
   end
 
+  def dpg_gec_mismatch_relation
+    dpg_contacts_linked_to_gec_scope.includes(:gec_voter, :village, :precinct).order(:last_name, :first_name)
+  end
+
   def dpg_gec_mismatch_supporters
-    scope = dpg_contacts_linked_to_gec_scope.includes(:gec_voter).order(:last_name, :first_name)
-    scope.select { |supporter| dpg_gec_mismatch_types(supporter).any? }
+    dpg_gec_mismatch_relation.select { |supporter| dpg_gec_mismatch_types(supporter).any? }
   end
 
   def dpg_gec_mismatch_headers
@@ -940,6 +946,7 @@ class ReportGenerator
 
   def dpg_gec_mismatch_values(supporter, latest_contact_attempt: nil)
     voter = supporter.gec_voter
+    mismatch_types = dpg_gec_mismatch_types(supporter)
     [
       supporter.id,
       voter&.id,
@@ -954,8 +961,8 @@ class ReportGenerator
       supporter.precinct&.number,
       voter&.precinct_number,
       voter&.voter_registration_number,
-      dpg_gec_mismatch_types(supporter).join(", "),
-      dpg_gec_mismatch_suggested_action(supporter),
+      mismatch_types.join(", "),
+      dpg_gec_mismatch_suggested_action(types: mismatch_types),
       supporter.support_status&.humanize,
       supporter.volunteer_status&.humanize,
       latest_contact_attempt&.channel&.humanize,
@@ -984,8 +991,7 @@ class ReportGenerator
     dpg_key.present? && gec_key.present? && dpg_key != gec_key
   end
 
-  def dpg_gec_mismatch_suggested_action(supporter)
-    types = dpg_gec_mismatch_types(supporter)
+  def dpg_gec_mismatch_suggested_action(types:)
     actions = []
     actions << "Confirm whether DPG contact address/village needs updating" if (types & [ "Address", "Village" ]).any?
     actions << "Review precinct assignment before field or Election Day work" if types.include?("Precinct")
