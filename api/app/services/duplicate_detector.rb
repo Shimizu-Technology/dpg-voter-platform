@@ -362,7 +362,8 @@ class DuplicateDetector
   end
 
   private_class_method def self.same_address?(left, right)
-    canonical_address_key(left).present? && canonical_address_key(left) == canonical_address_key(right)
+    left_key = canonical_address_key(left)
+    left_key.present? && left_key == canonical_address_key(right)
   end
 
   private_class_method def self.build_notes(supporter, duplicates)
@@ -428,11 +429,13 @@ class DuplicateDetector
   end
 
   private_class_method def self.copy_blank_fields!(source, into:)
-    %w[email contact_number street_address dob registered_voter gec_voter_id verification_reason verification_reason_metadata].each do |field|
+    %w[email contact_number street_address dob gec_voter_id verification_reason verification_reason_metadata].each do |field|
       next unless into.public_send(field).blank? && source.public_send(field).present?
 
       into.public_send("#{field}=", source.public_send(field))
     end
+
+    into.registered_voter = source.registered_voter if into.registered_voter.nil? && !source.registered_voter.nil?
 
     if into.verification_status != "verified" && source.verification_status == "verified"
       into.verification_status = source.verification_status
