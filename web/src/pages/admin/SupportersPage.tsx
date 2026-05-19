@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getSupporters, exportSupporters, getVillages, reviewIntakeSupporter, updateSupporter } from '../../lib/api';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle, MessageSquare, X } from 'lucide-react';
+import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle, MessageSquare, X, AlertTriangle } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { formatDateTime } from '../../lib/datetime';
 import { gecMatchClass, gecMatchLabel } from '../../lib/gecMatch';
@@ -512,6 +512,11 @@ export default function SupportersPage() {
 
   const submitIntakeReview = () => {
     if (!reviewingSupporter) return;
+    if (reviewingSupporter.potential_duplicate && reviewDraft.decision === 'approve') {
+      setActionMessage(null);
+      setActionError('Resolve or dismiss the duplicate warning before approving this contact into DPG records. You can also reject this intake as Duplicate.');
+      return;
+    }
     if (hasAnyIntakeContactAttemptField(reviewDraft) && !hasCompleteIntakeContactAttempt(reviewDraft)) {
       setActionMessage(null);
       setActionError('Choose both a contact method and outcome for outreach, or leave outreach blank.');
@@ -1283,6 +1288,21 @@ export default function SupportersPage() {
                     </label>
                   </div>
 
+                {reviewingSupporter.potential_duplicate && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                      <div>
+                        <div className="font-semibold">Potential duplicate contact</div>
+                        <p className="mt-1">Resolve or dismiss this warning before approving the contact into DPG records, or classify this intake as Duplicate if it is the same person.</p>
+                        <Link to={`/admin/duplicates?focus_supporter_id=${reviewingSupporter.id}`} className="mt-2 inline-flex text-xs font-semibold text-amber-800 underline">
+                          Open duplicate review
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`app-chip ${contactClassificationChipClass(reviewDraft.contact_classification)}`}>
@@ -1363,7 +1383,7 @@ export default function SupportersPage() {
                 <button
                   type="button"
                   onClick={submitIntakeReview}
-                  disabled={reviewIntakeMutation.isPending}
+                  disabled={reviewIntakeMutation.isPending || (reviewingSupporter.potential_duplicate && reviewDraft.decision === 'approve')}
                   className="app-btn-primary justify-center disabled:opacity-50"
                 >
                   <CheckCircle className="h-4 w-4" />

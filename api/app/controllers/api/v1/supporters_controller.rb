@@ -207,6 +207,13 @@ module Api
             code: "invalid_intake_review_decision_classification"
           )
         end
+        if decision == "approve" && supporter.potential_duplicate?
+          return render_api_error(
+            message: "Resolve or dismiss the duplicate warning before approving this contact into DPG records",
+            status: :unprocessable_entity,
+            code: "duplicate_review_required"
+          )
+        end
 
         attempt = nil
         old_review_state = supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status")

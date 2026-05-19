@@ -102,7 +102,7 @@ export default function StaffEntryPage() {
         const result = await checkDuplicate(name.trim(), Number(villageId), firstName, lastName);
         if (result.duplicates && result.duplicates.length > 0) {
           const villageName = villages.find(v => v.id === Number(villageId))?.name || 'this village';
-          setDuplicateWarning(`A supporter with this name already exists in ${villageName}`);
+          setDuplicateWarning(`A DPG contact with this name already exists in ${villageName}`);
         } else {
           setDuplicateWarning('');
         }

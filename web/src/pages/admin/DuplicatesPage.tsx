@@ -113,7 +113,7 @@ function SupporterCard({
           </div>
         </div>
         <p className="text-sm text-[var(--text-secondary)] mt-1">{s.contact_number}</p>
-        <p className="text-xs text-[var(--text-muted)] mt-2">Limited info shown here. Open the full record for more detail.</p>
+        <p className="text-xs text-[var(--text-muted)] mt-2">Limited info shown here. Open the full contact record for more detail.</p>
       </div>
     );
   }
@@ -154,6 +154,7 @@ function SupporterCard({
 
 export default function DuplicatesPage() {
   const [villageFilter, setVillageFilter] = useState<string>('');
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { data: sessionData } = useSession();
   const [searchParams] = useSearchParams();
@@ -174,7 +175,7 @@ export default function DuplicatesPage() {
     mutationFn: scanDuplicates,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['duplicates'] });
-      alert(`Scan complete: ${data.flagged_count} new duplicates found`);
+      setScanMessage(`Scan complete: ${data.flagged_count} new duplicate contact warning${data.flagged_count === 1 ? '' : 's'} found.`);
     },
   });
 
@@ -246,9 +247,9 @@ export default function DuplicatesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">Duplicate Review</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">Duplicate Contact Review</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
-            {groups.length} potential duplicate group{groups.length !== 1 ? 's' : ''} ({totalCount} records flagged)
+            {groups.length} potential duplicate contact group{groups.length !== 1 ? 's' : ''} ({totalCount} records flagged)
           </p>
         </div>
         <button
@@ -257,8 +258,18 @@ export default function DuplicatesPage() {
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl min-h-[44px] hover:bg-[#15305a] disabled:opacity-50"
         >
           <Search className="w-4 h-4" />
-          {scanMutation.isPending ? 'Scanning...' : 'Scan for Duplicates'}
+          {scanMutation.isPending ? 'Scanning...' : 'Scan for Duplicate Contacts'}
         </button>
+      </div>
+
+      {scanMessage && (
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
+          {scanMessage}
+        </div>
+      )}
+
+      <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+        Use this queue to clean up cases where the same DPG contact may have been entered more than once through public signup, QR links, staff entry, GEC create-contact, or imports. Address/village differences between a DPG contact and the official GEC voter file are handled in the DPG/GEC mismatch report, not here.
       </div>
 
       {/* Filter */}
@@ -283,7 +294,7 @@ export default function DuplicatesPage() {
         <div className="app-card p-12 text-center">
           <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
           <h3 className="text-lg font-medium text-[var(--text-primary)]">No Duplicates Found</h3>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">All supporters look unique. Run a scan to check again.</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">All DPG contacts look unique. Run a scan to check again.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -311,7 +322,7 @@ export default function DuplicatesPage() {
                 {/* Match reason header */}
                 <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  <span className="text-sm font-medium text-amber-800">Potential Duplicate</span>
+                  <span className="text-sm font-medium text-amber-800">Potential Duplicate Contact</span>
                   {s.duplicate_notes && (
                     <span className="text-xs text-amber-600 ml-2">{s.duplicate_notes}</span>
                   )}
@@ -358,7 +369,7 @@ export default function DuplicatesPage() {
                           disabled={resolveMutation.isPending}
                           className="inline-flex items-center gap-1 px-3 py-2 text-sm bg-primary text-white rounded-xl min-h-[44px] hover:bg-[#15305a]"
                         >
-                          Keep Left
+                          Keep Left Contact
                         </button>
                         <button
                           onClick={() => {
@@ -368,7 +379,7 @@ export default function DuplicatesPage() {
                           disabled={resolveMutation.isPending}
                           className="inline-flex items-center gap-1 px-3 py-2 text-sm bg-cta text-white rounded-xl min-h-[44px] hover:bg-[#a3182f]"
                         >
-                          Keep Right
+                          Keep Right Contact
                         </button>
                       </>
                     )}

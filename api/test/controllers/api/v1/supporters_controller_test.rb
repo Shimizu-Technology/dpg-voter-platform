@@ -310,6 +310,100 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "intake_reviewed", AuditLog.where(auditable: supporter).last.action
   end
 
+  test "review intake requires duplicate warning resolution before approval" do
+    village = Village.find_or_create_by!(name: "Barrigada")
+    existing = Supporter.create!(
+      first_name: "Duplicate",
+      last_name: "Review",
+      contact_number: "+16715551001",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      review_status: "approved",
+      status: "active"
+    )
+    supporter = Supporter.create!(
+      first_name: "Duplicate",
+      last_name: "Review",
+      contact_number: "+16715551002",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      public_review_status: "pending",
+      status: "active"
+    )
+
+    assert existing.reload.potential_duplicate?
+    assert supporter.reload.potential_duplicate?
+
+    patch "/api/v1/supporters/#{supporter.id}/review_intake",
+      params: {
+        intake_review: {
+          decision: "approve",
+          contact_classification: "active_contact",
+          support_status: "supporter"
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "duplicate_review_required", response.parsed_body["code"]
+    supporter.reload
+    assert_equal "new_intake", supporter.contact_classification
+    assert_equal "pending", supporter.review_status
+  end
+
+  test "review intake can classify unresolved duplicate as duplicate" do
+    village = Village.find_or_create_by!(name: "Dededo")
+    Supporter.create!(
+      first_name: "Duplicate",
+      last_name: "Reject",
+      contact_number: "+16715551003",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "active"
+    )
+    supporter = Supporter.create!(
+      first_name: "Duplicate",
+      last_name: "Reject",
+      contact_number: "+16715551004",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      review_status: "pending",
+      public_review_status: "pending",
+      status: "active"
+    )
+
+    assert supporter.reload.potential_duplicate?
+
+    patch "/api/v1/supporters/#{supporter.id}/review_intake",
+      params: {
+        intake_review: {
+          decision: "reject",
+          contact_classification: "duplicate",
+          note: "Same person as existing record."
+        }
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    supporter.reload
+    assert_equal "duplicate", supporter.contact_classification
+    assert_equal "duplicate", supporter.status
+    assert_equal "rejected", supporter.review_status
+  end
+
   test "review intake can reject invalid records" do
     village = Village.find_or_create_by!(name: "Yigo")
     supporter = Supporter.create!(

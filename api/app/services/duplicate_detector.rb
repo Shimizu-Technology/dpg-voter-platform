@@ -24,22 +24,46 @@ class DuplicateDetector
                   .each { |id| match_ids << id }
     end
 
-    # 3. Name + village match (uses composite index)
-    if supporter.first_name.present? && supporter.last_name.present? && supporter.village_id.present?
+    # 3. Same confirmed GEC voter link. This is the strongest signal because
+    # staff may create a contact from the voter list and the same person may
+    # later sign up publicly or through a QR code.
+    if supporter.gec_voter_id.present?
+      active_scope.where(gec_voter_id: supporter.gec_voter_id)
+                  .pluck(:id)
+                  .each { |id| match_ids << id }
+    end
+
+    # 4. Name-based matches. Name + village is intentionally broad for intake
+    # cleanup, while name + DOB or name + normalized address can catch cases
+    # where the person signs up under a different village from the GEC/contact
+    # record but is still likely the same person.
+    if supporter.first_name.present? && supporter.last_name.present?
       fn = supporter.first_name.downcase.strip
       ln = supporter.last_name.downcase.strip
 
       # Exact name match in same village
-      active_scope.where(village_id: supporter.village_id)
-                  .where("LOWER(TRIM(first_name)) = ? AND LOWER(TRIM(last_name)) = ?", fn, ln)
-                  .pluck(:id)
-                  .each { |id| match_ids << id }
+      if supporter.village_id.present?
+        active_scope.where(village_id: supporter.village_id)
+                    .where("LOWER(TRIM(first_name)) = ? AND LOWER(TRIM(last_name)) = ?", fn, ln)
+                    .pluck(:id)
+                    .each { |id| match_ids << id }
 
-      # Swapped name match (First <-> Last) in same village
-      active_scope.where(village_id: supporter.village_id)
-                  .where("LOWER(TRIM(first_name)) = ? AND LOWER(TRIM(last_name)) = ?", ln, fn)
-                  .pluck(:id)
-                  .each { |id| match_ids << id }
+        # Swapped name match (First <-> Last) in same village
+        active_scope.where(village_id: supporter.village_id)
+                    .where("LOWER(TRIM(first_name)) = ? AND LOWER(TRIM(last_name)) = ?", ln, fn)
+                    .pluck(:id)
+                    .each { |id| match_ids << id }
+      end
+
+      if supporter.dob.present?
+        active_scope.where(dob: supporter.dob)
+                    .where("LOWER(TRIM(first_name)) = ? AND LOWER(TRIM(last_name)) = ?", fn, ln)
+                    .pluck(:id)
+                    .each { |id| match_ids << id }
+      end
+
+      address_duplicate_ids(supporter, active_scope: active_scope, first_name: fn, last_name: ln)
+        .each { |id| match_ids << id }
     end
 
     Supporter.duplicate_review_candidates.where(id: match_ids.to_a)
@@ -157,7 +181,69 @@ class DuplicateDetector
       GROUP BY s1.id
     SQL
 
-    # Phase 3: Find name+village duplicates in bulk via SQL
+    # Phase 3: Find shared GEC voter links in bulk via SQL
+    gec_link_dupes = ActiveRecord::Base.connection.execute(<<-SQL)
+      SELECT s1.id AS supporter_id, MIN(s2.id) AS match_id, 'same GEC voter' AS match_type
+      FROM supporters s1
+      JOIN supporters s2
+        ON s1.gec_voter_id = s2.gec_voter_id
+        AND s1.id > s2.id
+        AND s1.gec_voter_id IS NOT NULL
+      WHERE s1.status = 'active'
+        AND s2.status = 'active'
+        AND s1.review_status != 'rejected'
+        AND s2.review_status != 'rejected'
+        AND s1.public_review_status != 'rejected'
+        AND s2.public_review_status != 'rejected'
+      GROUP BY s1.id
+    SQL
+
+    # Phase 4: Find name + DOB duplicates in bulk via SQL
+    dob_dupes = ActiveRecord::Base.connection.execute(<<-SQL)
+      SELECT s1.id AS supporter_id, MIN(s2.id) AS match_id, 'name+dob' AS match_type
+      FROM supporters s1
+      JOIN supporters s2
+        ON s1.dob = s2.dob
+        AND LOWER(TRIM(s1.first_name)) = LOWER(TRIM(s2.first_name))
+        AND LOWER(TRIM(s1.last_name)) = LOWER(TRIM(s2.last_name))
+        AND s1.id > s2.id
+        AND s1.dob IS NOT NULL
+      WHERE s1.status = 'active'
+        AND s2.status = 'active'
+        AND s1.review_status != 'rejected'
+        AND s2.review_status != 'rejected'
+        AND s1.public_review_status != 'rejected'
+        AND s2.public_review_status != 'rejected'
+        AND s1.first_name IS NOT NULL
+        AND s1.last_name IS NOT NULL
+      GROUP BY s1.id
+    SQL
+
+    # Phase 5: Find name + exact street-address duplicates in bulk via SQL.
+    # Per-record checks use AddressNormalizer; this exact bulk scan is a
+    # conservative catch-up pass for existing data.
+    address_dupes = ActiveRecord::Base.connection.execute(<<-SQL)
+      SELECT s1.id AS supporter_id, MIN(s2.id) AS match_id, 'name+address' AS match_type
+      FROM supporters s1
+      JOIN supporters s2
+        ON LOWER(TRIM(s1.street_address)) = LOWER(TRIM(s2.street_address))
+        AND LOWER(TRIM(s1.first_name)) = LOWER(TRIM(s2.first_name))
+        AND LOWER(TRIM(s1.last_name)) = LOWER(TRIM(s2.last_name))
+        AND s1.id > s2.id
+        AND s1.street_address IS NOT NULL
+        AND s1.street_address != ''
+      WHERE s1.status = 'active'
+        AND s2.status = 'active'
+        AND s1.review_status != 'rejected'
+        AND s2.review_status != 'rejected'
+        AND s1.public_review_status != 'rejected'
+        AND s2.public_review_status != 'rejected'
+        AND s1.first_name IS NOT NULL
+        AND s1.last_name IS NOT NULL
+      GROUP BY s1.id
+    SQL
+
+    # Phase 6: Find name+village duplicates in bulk via SQL
     name_dupes = ActiveRecord::Base.connection.execute(<<-SQL)
       SELECT s1.id AS supporter_id, MIN(s2.id) AS match_id, 'name+village' AS match_type
       FROM supporters s1
@@ -177,7 +263,7 @@ class DuplicateDetector
       GROUP BY s1.id
     SQL
 
-    # Phase 4: Also check swapped names (First entered as Last, etc.)
+    # Phase 7: Also check swapped names (First entered as Last, etc.)
     swapped_dupes = ActiveRecord::Base.connection.execute(<<-SQL)
       SELECT s1.id AS supporter_id, MIN(s2.id) AS match_id, 'name+village (swapped)' AS match_type
       FROM supporters s1
@@ -197,7 +283,7 @@ class DuplicateDetector
     # Track each match_id separately so notes accurately reflect which record
     # matched on which criteria.
     all_dupes = {}
-    [ phone_dupes, email_dupes, name_dupes, swapped_dupes ].each do |result_set|
+    [ phone_dupes, email_dupes, gec_link_dupes, dob_dupes, address_dupes, name_dupes, swapped_dupes ].each do |result_set|
       result_set.each do |row|
         sid = row["supporter_id"]
         mid = row["match_id"]
@@ -254,12 +340,40 @@ class DuplicateDetector
     count
   end
 
+  private_class_method def self.address_duplicate_ids(supporter, active_scope:, first_name:, last_name:)
+    return [] if supporter.street_address.blank?
+
+    supporter_key = canonical_address_key(supporter)
+    return [] if supporter_key.blank?
+
+    active_scope.where.not(street_address: [ nil, "" ])
+                .where("LOWER(TRIM(first_name)) = ? AND LOWER(TRIM(last_name)) = ?", first_name, last_name)
+                .includes(:village)
+                .select { |candidate| canonical_address_key(candidate) == supporter_key }
+                .map(&:id)
+  end
+
+  private_class_method def self.canonical_address_key(supporter)
+    AddressNormalizer.canonical_address(supporter.street_address, village_name: supporter.village&.name)
+  end
+
+  private_class_method def self.same_name?(left, right)
+    left.first_name&.downcase == right.first_name&.downcase && left.last_name&.downcase == right.last_name&.downcase
+  end
+
+  private_class_method def self.same_address?(left, right)
+    canonical_address_key(left).present? && canonical_address_key(left) == canonical_address_key(right)
+  end
+
   private_class_method def self.build_notes(supporter, duplicates)
     reasons = []
     duplicates.each do |dup|
       matching = []
       matching << "phone" if dup.normalized_phone.present? && dup.normalized_phone == supporter.normalized_phone
       matching << "email" if dup.email.present? && supporter.email.present? && dup.email.downcase == supporter.email.downcase
+      matching << "same GEC voter" if supporter.gec_voter_id.present? && dup.gec_voter_id == supporter.gec_voter_id
+      matching << "name+dob" if supporter.dob.present? && dup.dob == supporter.dob && same_name?(supporter, dup)
+      matching << "name+address" if same_name?(supporter, dup) && same_address?(supporter, dup)
       matching << "name+village" if dup.village_id == supporter.village_id &&
                                      dup.first_name&.downcase == supporter.first_name&.downcase &&
                                      dup.last_name&.downcase == supporter.last_name&.downcase
@@ -304,29 +418,57 @@ class DuplicateDetector
     # Transfer contact attempts
     source.supporter_contact_attempts.update_all(supporter_id: into.id)
 
-    # Merge fields with field-specific rules:
-    # - text fields copy into blank slots
-    # - authoritative voter lookup only fills nil
-    # - self-reported/preferences preserve any affirmative signal
-    mergeable = %w[email registered_voter self_reported_registered_voter opt_in_email opt_in_text]
-    mergeable.each do |field|
-      into_val = into.send(field)
-      source_val = source.send(field)
-
-      should_copy =
-        case field
-        when "email"
-          into_val.blank? && source_val.present?
-        when "registered_voter"
-          into_val.nil? && !source_val.nil?
-        else
-          (source_val == true && into_val != true) || (into_val.nil? && !source_val.nil?)
-        end
-
-      if should_copy
-        into.send("#{field}=", source_val)
-      end
-    end
+    # Preserve useful DPG contact intelligence from both records. A duplicate
+    # signup often contains newer help requests or opt-ins, so merging should
+    # not accidentally lose voter-help/volunteer signals.
+    copy_blank_fields!(source, into: into)
+    preserve_affirmative_signals!(source, into: into)
+    preserve_stronger_statuses!(source, into: into)
     into.save! if into.changed?
+  end
+
+  private_class_method def self.copy_blank_fields!(source, into:)
+    %w[email contact_number street_address dob registered_voter gec_voter_id verification_reason verification_reason_metadata].each do |field|
+      next unless into.public_send(field).blank? && source.public_send(field).present?
+
+      into.public_send("#{field}=", source.public_send(field))
+    end
+
+    if into.verification_status != "verified" && source.verification_status == "verified"
+      into.verification_status = source.verification_status
+      into.verified_at = source.verified_at if source.verified_at.present?
+      into.verified_by_user_id = source.verified_by_user_id if source.verified_by_user_id.present?
+    end
+  end
+
+  private_class_method def self.preserve_affirmative_signals!(source, into:)
+    %w[
+      self_reported_registered_voter
+      opt_in_email
+      opt_in_text
+      wants_to_volunteer
+      needs_absentee_ballot_help
+      needs_homebound_voting_help
+      needs_voter_registration_help
+      needs_election_day_ride
+    ].each do |field|
+      into.public_send("#{field}=", true) if source.public_send(field) == true && into.public_send(field) != true
+    end
+  end
+
+  private_class_method def self.preserve_stronger_statuses!(source, into:)
+    if into.support_status == "unknown" && source.support_status.present? && source.support_status != "unknown"
+      into.support_status = source.support_status
+    end
+
+    volunteer_rank = { "unknown" => 0, "not_interested" => 1, "interested" => 2, "active" => 3 }
+    if volunteer_rank.fetch(source.volunteer_status, 0) > volunteer_rank.fetch(into.volunteer_status, 0)
+      into.volunteer_status = source.volunteer_status
+    end
+
+    registration_rank = { "not_sure" => 0, "no" => 1, "yes" => 2 }
+    if registration_rank.fetch(source.registered_voter_status, 0) > registration_rank.fetch(into.registered_voter_status, 0)
+      into.registered_voter_status = source.registered_voter_status
+    end
   end
 end
