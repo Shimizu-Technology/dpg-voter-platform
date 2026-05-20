@@ -46,6 +46,7 @@ export const createReferralCode = (data: JsonRecord) =>
   api.post('/referral_codes', { referral_code: data }).then(r => r.data);
 export const updateReferralCode = (id: number, data: JsonRecord) =>
   api.patch(`/referral_codes/${id}`, { referral_code: data }).then(r => r.data);
+export const deleteReferralCode = (id: number) => api.delete(`/referral_codes/${id}`).then(r => r.data);
 
 // Supporters
 export const createSupporter = (

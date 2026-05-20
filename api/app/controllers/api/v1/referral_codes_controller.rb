@@ -86,6 +86,29 @@ module Api
         end
       end
 
+      # DELETE /api/v1/referral_codes/:id
+      def destroy
+        code = find_referral_code
+        return unless code
+
+        signup_count = code.supporters.count
+        if signup_count.zero?
+          snapshot = referral_code_json(code)
+          log_audit!(code, action: "signup_link_deleted", changed_data: snapshot)
+          code.destroy!
+          render json: { message: "Signup link deleted", deleted: true }
+        else
+          code.update!(active: false)
+          log_audit!(code, action: "signup_link_archived", changed_data: { "active" => [ true, false ], "signup_count" => signup_count }, normalize: true)
+          render json: {
+            message: "Signup link archived because it already has signup history",
+            deleted: false,
+            referral_code: referral_code_json(code.reload),
+            signup_base_url: signup_base_url
+          }
+        end
+      end
+
       # GET /api/v1/referral_codes/:id/supporters
       def supporters
         code = find_referral_code

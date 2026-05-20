@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Plus, QrCode, Share2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, Plus, QrCode, Share2, Trash2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import WorkspacePage from '../../components/WorkspacePage';
 import { useSession } from '../../hooks/useSession';
-import { createReferralCode, getReferralCodeSupporters, getReferralCodes, getUsers, getVillages, updateReferralCode } from '../../lib/api';
+import { createReferralCode, deleteReferralCode, getReferralCodeSupporters, getReferralCodes, getUsers, getVillages, updateReferralCode } from '../../lib/api';
 
 interface VillageOption {
   id: number;
@@ -254,6 +254,17 @@ export default function SignupLinksPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: ({ id }: { id: number }) => deleteReferralCode(id),
+    onSuccess: (result: { deleted?: boolean; message?: string }) => {
+      setNotice({ type: 'success', message: result.message || (result.deleted ? 'Signup link deleted.' : 'Signup link archived.') });
+      void queryClient.invalidateQueries({ queryKey: ['referral-codes'] });
+    },
+    onError: () => {
+      setNotice({ type: 'error', message: 'Could not remove this signup link. Refresh and try again.' });
+    },
+  });
+
   const copyUrl = async (key: string, url: string) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -263,6 +274,28 @@ export default function SignupLinksPage() {
     } catch {
       setNotice({ type: 'error', message: 'Could not copy the link. Select and copy the URL manually.' });
     }
+  };
+
+  const downloadQrImage = async (url: string, filename: string) => {
+    try {
+      const dataUrl = await QRCode.toDataURL(url, { margin: 1, width: 1200, color: { dark: '#0f2a5b', light: '#ffffff' } });
+      const anchor = document.createElement('a');
+      anchor.href = dataUrl;
+      anchor.download = filename;
+      anchor.click();
+    } catch {
+      setNotice({ type: 'error', message: 'Could not download this QR code. Refresh and try again.' });
+    }
+  };
+
+  const downloadQrCode = (link: SignupLink) => downloadQrImage(link.signup_url, `dpg-signup-${link.code.toLowerCase()}.png`);
+
+  const removeSignupLink = (link: SignupLink) => {
+    const message = link.signup_count > 0
+      ? `Archive "${link.display_name}"? It already has ${link.signup_count} signup${link.signup_count === 1 ? '' : 's'}, so the link will be deactivated and attribution history will stay intact.`
+      : `Delete "${link.display_name}"? This link has no signups yet.`;
+    if (!window.confirm(message)) return;
+    deleteMutation.mutate({ id: link.id });
   };
 
   const canCreate = draft.display_name.trim().length > 1 &&
@@ -300,6 +333,10 @@ export default function SignupLinksPage() {
                 <button type="button" className="app-btn-secondary inline-flex items-center gap-2" onClick={() => copyUrl('general', generalSignupUrl)}>
                   {copied === 'general' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   {copied === 'general' ? 'Copied' : 'Copy'}
+                </button>
+                <button type="button" className="app-btn-secondary inline-flex items-center gap-2" onClick={() => void downloadQrImage(generalSignupUrl, 'dpg-general-signup.png')}>
+                  <Download className="h-4 w-4" />
+                  Download QR
                 </button>
               </div>
             </div>
@@ -477,6 +514,10 @@ export default function SignupLinksPage() {
                       <ExternalLink className="h-4 w-4" />
                       Open
                     </a>
+                    <button type="button" className="app-btn-secondary inline-flex items-center justify-center gap-2" onClick={() => void downloadQrCode(link)}>
+                      <Download className="h-4 w-4" />
+                      Download QR
+                    </button>
                     <button
                       type="button"
                       className="app-btn-secondary inline-flex items-center justify-center gap-2"
@@ -493,6 +534,15 @@ export default function SignupLinksPage() {
                     >
                       <Share2 className="h-4 w-4" />
                       {toggleMutation.isPending && toggleMutation.variables?.id === link.id ? 'Updating...' : link.active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button
+                      type="button"
+                      className="app-btn-secondary inline-flex items-center justify-center gap-2 text-red-700 hover:bg-red-50"
+                      disabled={deleteMutation.isPending && deleteMutation.variables?.id === link.id}
+                      onClick={() => removeSignupLink(link)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deleteMutation.isPending && deleteMutation.variables?.id === link.id ? 'Removing...' : link.signup_count > 0 ? 'Archive' : 'Delete'}
                     </button>
                   </div>
                 </div>

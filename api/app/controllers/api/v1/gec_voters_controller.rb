@@ -94,16 +94,14 @@ module Api
           )
         end
 
-        voters = scoped_gec_voters(GecVoter.active.includes(:village, :precinct))
-          .where("LOWER(gec_voters.address) LIKE ?", "%#{ActiveRecord::Base.sanitize_sql_like(query.downcase)}%")
+        voters = apply_address_search(scoped_gec_voters(GecVoter.active.includes(:village, :precinct)), "gec_voters.address", query)
           .order(:village_name, :address, :last_name, :first_name)
           .limit(250)
           .to_a
         linked_contacts_by_voter = linked_contacts_by_voter(voters.map(&:id))
         possible_contacts_by_voter = possible_contacts_by_voter(voters)
 
-        contacts = scope_supporters(Supporter.contacts.includes(:village, :precinct, :gec_voter))
-          .where("LOWER(supporters.street_address) LIKE ?", "%#{ActiveRecord::Base.sanitize_sql_like(query.downcase)}%")
+        contacts = apply_address_search(scope_supporters(Supporter.contacts.includes(:village, :precinct, :gec_voter)), "supporters.street_address", query)
           .order(:street_address, :last_name, :first_name)
           .limit(250)
           .to_a
@@ -675,24 +673,57 @@ module Api
       end
 
       def apply_search(scope, query)
-        terms = query.to_s.downcase.strip.split(/\s+/).first(6)
+        terms = normalized_search_terms(query).first(6)
         return scope if terms.empty?
 
         terms.reduce(scope) do |memo, term|
           pattern = "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
           memo.where(
             <<~SQL.squish,
-              LOWER(gec_voters.first_name) LIKE :pattern
-              OR LOWER(gec_voters.middle_name) LIKE :pattern
-              OR LOWER(gec_voters.last_name) LIKE :pattern
-              OR LOWER(gec_voters.address) LIKE :pattern
-              OR LOWER(gec_voters.village_name) LIKE :pattern
-              OR LOWER(gec_voters.precinct_number) LIKE :pattern
-              OR LOWER(gec_voters.voter_registration_number) LIKE :pattern
+              #{normalized_sql("gec_voters.first_name")} LIKE :pattern
+              OR #{normalized_sql("gec_voters.middle_name")} LIKE :pattern
+              OR #{normalized_sql("gec_voters.last_name")} LIKE :pattern
+              OR #{normalized_sql("gec_voters.first_name || ' ' || COALESCE(gec_voters.middle_name, '') || ' ' || gec_voters.last_name")} LIKE :pattern
+              OR #{normalized_sql("gec_voters.first_name || ' ' || gec_voters.last_name")} LIKE :pattern
+              OR #{normalized_sql("gec_voters.last_name || ' ' || gec_voters.first_name")} LIKE :pattern
+              OR #{normalized_sql("gec_voters.address")} LIKE :pattern
+              OR #{normalized_sql("gec_voters.village_name")} LIKE :pattern
+              OR #{normalized_sql("gec_voters.precinct_number")} LIKE :pattern
+              OR #{normalized_sql("gec_voters.voter_registration_number")} LIKE :pattern
             SQL
             pattern: pattern
           )
         end
+      end
+
+      def normalized_search_terms(query)
+        query.to_s.downcase.gsub(/[^\p{Alnum}]+/, " ").squish.split
+      end
+
+      def normalized_search_compact(query)
+        normalized_search_terms(query).join
+      end
+
+      def normalized_sql(expression)
+        "REGEXP_REPLACE(LOWER(COALESCE((#{expression})::text, '')), '[^a-z0-9]+', '', 'g')"
+      end
+
+      def apply_address_search(scope, column, query)
+        binds = {
+          raw_pattern: "%#{ActiveRecord::Base.sanitize_sql_like(query.to_s.downcase.strip)}%",
+          normalized_pattern: "%#{ActiveRecord::Base.sanitize_sql_like(normalized_search_compact(query))}%"
+        }
+        normalized_address = normalized_sql(column)
+        conditions = [ "LOWER(#{column}) LIKE :raw_pattern", "#{normalized_address} LIKE :normalized_pattern" ]
+
+        token_conditions = normalized_search_terms(query).first(6).map.with_index do |term, index|
+          key = "address_term_#{index}".to_sym
+          binds[key] = "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
+          "#{normalized_address} LIKE :#{key}"
+        end
+        conditions << token_conditions.join(" AND ") if token_conditions.any?
+
+        scope.where(conditions.map { |condition| "(#{condition})" }.join(" OR "), binds)
       end
 
       def apply_linked_filter(scope, linked_status)
