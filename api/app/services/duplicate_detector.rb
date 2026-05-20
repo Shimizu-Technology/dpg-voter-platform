@@ -70,6 +70,21 @@ class DuplicateDetector
     Supporter.duplicate_review_candidates.where(id: filtered_match_ids)
   end
 
+  def self.review_group_count(scope = Supporter.potential_duplicates_only.active)
+    keys = Set.new
+
+    scope.pluck(:id, :duplicate_of_id).each do |id, duplicate_of_id|
+      key = if duplicate_of_id.present?
+        [ id, duplicate_of_id ].minmax.join("-")
+      else
+        "solo-#{id}"
+      end
+      keys << key
+    end
+
+    keys.size
+  end
+
   # Flag a supporter as potential duplicate and record which supporter it matches.
   def self.flag_if_duplicate!(supporter)
     duplicates = find_duplicates(supporter)
@@ -373,27 +388,27 @@ class DuplicateDetector
 
   private_class_method def self.dismiss_duplicate_pair!(supporter, resolved_by: nil)
     now = Time.current
-    related_ids = [ supporter.id, supporter.duplicate_of_id ].compact
-    related_ids.concat(Supporter.where(duplicate_of_id: supporter.id).pluck(:id))
-    related_ids = related_ids.uniq
+    dismissed_match_ids = [ supporter.duplicate_of_id ].compact
+    dismissed_match_ids = Supporter.where(duplicate_of_id: supporter.id).pluck(:id) if dismissed_match_ids.empty?
+    dismissed_match_ids = dismissed_match_ids.uniq
 
-    related_ids.each do |related_id|
-      next if related_id == supporter.id
-
+    dismissed_match_ids.each do |match_id|
       DuplicatePairDismissal.create_for_pair!(
         supporter.id,
-        related_id,
+        match_id,
         resolved_by: resolved_by,
         note: "Dismissed — not a duplicate"
       )
     end
 
-    Supporter.where(id: related_ids).update_all(
+    supporter.update_columns(
       potential_duplicate: false,
       duplicate_of_id: nil,
       duplicate_checked_at: now,
       duplicate_notes: "Dismissed — not a duplicate"
     )
+
+    reconcile_duplicate_candidates!(dismissed_match_ids)
   end
 
   private_class_method def self.address_duplicate_ids(supporter, active_scope:, first_name:, last_name:)

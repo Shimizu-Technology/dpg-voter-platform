@@ -170,6 +170,40 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert_equal false, newer.reload.potential_duplicate?
   end
 
+  test "review_group_count counts duplicate review pairs instead of flagged records" do
+    original = Supporter.create!(**@base_attrs, first_name: "Group", last_name: "Count", contact_number: "671-777-0005", village: @village1)
+    newer = Supporter.create!(**@base_attrs, first_name: "Group", last_name: "Count", contact_number: "671-777-0006", village: @village1)
+
+    original.reload
+    newer.reload
+    assert original.potential_duplicate?
+    assert newer.potential_duplicate?
+    assert_equal 2, Supporter.where(id: [ original.id, newer.id ]).potential_duplicates_only.count
+    assert_equal 1, DuplicateDetector.review_group_count(Supporter.where(id: [ original.id, newer.id ]).potential_duplicates_only)
+  end
+
+  test "dismiss preserves unrelated duplicate warnings on matched record" do
+    a = Supporter.create!(**@base_attrs, first_name: "ChainA", last_name: "Dismiss", contact_number: "671-777-0111", village: @village1)
+    b = Supporter.create!(**@base_attrs, first_name: "ChainB", last_name: "Dismiss", contact_number: "671-777-0111", village: @village1)
+    c = Supporter.create!(**@base_attrs, first_name: "ChainC", last_name: "Dismiss", contact_number: "671-777-0111", village: @village1)
+
+    a.reload
+    b.reload
+    c.reload
+    assert a.potential_duplicate?
+    assert b.potential_duplicate?
+    assert c.potential_duplicate?
+
+    DuplicateDetector.resolve!(c, action: "dismiss")
+
+    a.reload
+    b.reload
+    c.reload
+    assert_equal false, c.potential_duplicate?
+    assert b.potential_duplicate?, "Matched record should stay flagged because it still matches another unresolved record"
+    assert_includes DuplicateDetector.find_duplicates(b).pluck(:id), a.id
+  end
+
   test "dismiss clears both sides of a duplicate warning" do
     original = Supporter.create!(**@base_attrs, first_name: "Not", last_name: "Duplicate", contact_number: "671-777-0101", village: @village1)
     newer = Supporter.create!(**@base_attrs, first_name: "Not", last_name: "Duplicate", contact_number: "671-777-0102", village: @village1)
@@ -187,7 +221,7 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert_equal false, newer.potential_duplicate?
     assert_nil original.duplicate_of_id
     assert_nil newer.duplicate_of_id
-    assert_equal "Dismissed — not a duplicate", original.duplicate_notes
+    assert_nil original.duplicate_notes
     assert_equal "Dismissed — not a duplicate", newer.duplicate_notes
   end
 

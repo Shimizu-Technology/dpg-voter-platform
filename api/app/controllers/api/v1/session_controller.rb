@@ -40,7 +40,8 @@ module Api
             flagged_supporters: contact_scope.flagged.count,
             public_signups_pending: intake_scope.public_origin.count,
             official_supporters: official_scope.count,
-            duplicate_contacts: duplicate_scope.count
+            duplicate_contacts: duplicate_scope.count,
+            duplicate_contact_reviews: DuplicateDetector.review_group_count(duplicate_scope)
           },
           permissions: {
             can_manage_users: can_manage_users?,

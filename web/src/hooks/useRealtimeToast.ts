@@ -13,11 +13,11 @@ function eventToToast(event: CampaignEvent): { message: string; type: Toast['typ
   switch (event.type) {
     case 'new_supporter':
       return {
-        message: `New supporter: ${data.print_name ?? 'Unknown'} (${data.village_name ?? 'Unknown'})`,
+        message: `New contact: ${data.print_name ?? 'Unknown'} (${data.village_name ?? 'Unknown'})`,
         type: 'success',
       };
     case 'supporter_updated': {
-      const name = data.print_name ?? `Supporter #${data.supporter_id ?? '?'}`;
+      const name = data.print_name ?? `Contact #${data.supporter_id ?? '?'}`;
       const village = data.village_name ? ` (${data.village_name})` : '';
       const action = String(data.action ?? 'updated');
       const status = String(data.status ?? '');
@@ -38,13 +38,13 @@ function eventToToast(event: CampaignEvent): { message: string; type: Toast['typ
 
       if (status === 'removed') {
         return {
-          message: `Supporter removed from active lists: ${name}${village}`,
+          message: `Contact removed from active lists: ${name}${village}`,
           type: 'warning',
         };
       }
 
       return {
-        message: `Supporter record updated: ${name}${village}`,
+        message: `Contact record updated: ${name}${village}`,
         type: 'info',
       };
     }
