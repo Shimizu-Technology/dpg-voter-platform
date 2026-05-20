@@ -175,6 +175,7 @@ export default function DuplicatesPage() {
     mutationFn: scanDuplicates,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['duplicates'] });
+      queryClient.invalidateQueries({ queryKey: ['session'] });
       setScanMessage(`Scan complete: ${data.flagged_count} new duplicate contact warning${data.flagged_count === 1 ? '' : 's'} found.`);
     },
   });
@@ -184,6 +185,7 @@ export default function DuplicatesPage() {
       resolveDuplicate(id, resolution, mergeIntoId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['duplicates'] });
+      queryClient.invalidateQueries({ queryKey: ['session'] });
     },
   });
 
