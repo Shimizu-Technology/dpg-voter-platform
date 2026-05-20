@@ -395,8 +395,12 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
       contact_number: "671-777-1002",
       village: @village1,
       review_status: "approved",
-      public_review_status: "not_applicable",
-      self_reported_registered_voter: false
+      public_review_status: "not_applicable"
+    )
+    approved.update_columns(
+      self_reported_registered_voter: false,
+      registered_voter: nil,
+      registered_voter_status: "not_sure"
     )
     public_signup = Supporter.create!(
       **@base_attrs,
@@ -411,7 +415,9 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
 
     DuplicateDetector.resolve!(public_signup, action: "merge", merge_into: approved)
 
-    assert_equal false, approved.reload.self_reported_registered_voter
+    approved.reload
+    assert_equal false, approved.self_reported_registered_voter
+    assert_equal "not_sure", approved.registered_voter_status
   end
 
   test "merge preserves affirmative self-reported voter signal when kept record is unknown" do
