@@ -542,7 +542,7 @@ class DuplicateDetector
       into.volunteer_status = source.volunteer_status
     end
 
-    if into.self_reported_registered_voter.nil? && [ nil, "", "not_sure" ].include?(into.registered_voter_status) && source.registered_voter_status.present? && source.registered_voter_status != "not_sure"
+    if into.registered_voter != false && into.self_reported_registered_voter.nil? && [ nil, "", "not_sure" ].include?(into.registered_voter_status) && source.registered_voter_status.present? && source.registered_voter_status != "not_sure"
       into.registered_voter_status = source.registered_voter_status
     end
   end

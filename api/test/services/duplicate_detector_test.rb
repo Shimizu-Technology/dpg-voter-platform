@@ -387,6 +387,36 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert_equal "yes", approved.reload.registered_voter_status
   end
 
+  test "merge does not copy yes registration status over explicit registered voter false" do
+    approved = Supporter.create!(
+      **@base_attrs,
+      first_name: "Registration",
+      last_name: "False Unknown",
+      contact_number: "671-777-1008",
+      village: @village1,
+      review_status: "approved",
+      public_review_status: "not_applicable",
+      registered_voter: false,
+      registered_voter_status: "not_sure"
+    )
+    public_signup = Supporter.create!(
+      **@base_attrs,
+      first_name: "Registration",
+      last_name: "False Unknown",
+      contact_number: "671-777-1008",
+      village: @village1,
+      review_status: "pending",
+      public_review_status: "approved",
+      registered_voter_status: "yes"
+    )
+
+    DuplicateDetector.resolve!(public_signup, action: "merge", merge_into: approved)
+
+    approved.reload
+    assert_equal false, approved.registered_voter
+    assert_equal "not_sure", approved.registered_voter_status
+  end
+
   test "merge preserves explicit false self-reported voter signal" do
     approved = Supporter.create!(
       **@base_attrs,
