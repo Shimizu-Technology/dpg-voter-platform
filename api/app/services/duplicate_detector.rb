@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class DuplicateDetector
+  class ResolutionError < StandardError; end
+
   # Finds potential duplicates for a given supporter using indexed SQL queries.
   # Checks: normalized phone match, exact email match, name + village match.
   # Returns an ActiveRecord relation of matching supporters (excludes self).
@@ -395,6 +397,7 @@ class DuplicateDetector
       Supporter.where(duplicate_of_id: supporter.id).order(:created_at, :id).limit(1).pluck(:id)
     end
     dismissed_match_ids = dismissed_match_ids.compact.uniq
+    raise ResolutionError, "dismiss action requires an identifiable duplicate match" if dismissed_match_ids.empty?
 
     dismissed_match_ids.each do |match_id|
       DuplicatePairDismissal.create_for_pair!(

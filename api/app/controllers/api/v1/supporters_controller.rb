@@ -729,7 +729,16 @@ module Api
           end
         end
 
-        DuplicateDetector.resolve!(supporter, action: action, merge_into: merge_into, dismissed_match: dismissed_match, resolved_by: current_user)
+        begin
+          DuplicateDetector.resolve!(supporter, action: action, merge_into: merge_into, dismissed_match: dismissed_match, resolved_by: current_user)
+        rescue DuplicateDetector::ResolutionError => e
+          return render_api_error(
+            message: e.message,
+            status: :unprocessable_entity,
+            code: "duplicate_match_required"
+          )
+        end
+
         supporter.reload
         merge_into.reload if merge_into
 

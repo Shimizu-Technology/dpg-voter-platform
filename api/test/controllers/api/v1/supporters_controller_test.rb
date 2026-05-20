@@ -358,6 +358,32 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "pending", supporter.review_status
   end
 
+  test "resolve duplicate dismiss requires identifiable match" do
+    village = Village.find_or_create_by!(name: "Barrigada")
+    supporter = Supporter.create!(
+      first_name: "Orphan",
+      last_name: "Warning",
+      contact_number: "+16715551900",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "active",
+      potential_duplicate: true,
+      duplicate_of_id: nil
+    )
+
+    patch "/api/v1/supporters/#{supporter.id}/resolve_duplicate",
+      params: { resolution: "dismiss" },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "duplicate_match_required", response.parsed_body["code"]
+    assert supporter.reload.potential_duplicate?
+  end
+
   test "resolve duplicate rejects self-referential dismiss match" do
     village = Village.find_or_create_by!(name: "Barrigada")
     supporter = Supporter.create!(
