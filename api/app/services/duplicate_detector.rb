@@ -66,7 +66,8 @@ class DuplicateDetector
         .each { |id| match_ids << id }
     end
 
-    Supporter.duplicate_review_candidates.where(id: match_ids.to_a)
+    filtered_match_ids = match_ids.to_a - DuplicatePairDismissal.match_ids_for(supporter.id, match_ids.to_a)
+    Supporter.duplicate_review_candidates.where(id: filtered_match_ids)
   end
 
   # Flag a supporter as potential duplicate and record which supporter it matches.
@@ -95,7 +96,7 @@ class DuplicateDetector
   def self.resolve!(supporter, action:, merge_into: nil, resolved_by: nil)
     case action
     when "dismiss"
-      dismiss_duplicate_pair!(supporter)
+      dismiss_duplicate_pair!(supporter, resolved_by: resolved_by)
     when "merge"
       raise ArgumentError, "merge_into required for merge action" unless merge_into
 
@@ -147,6 +148,11 @@ class DuplicateDetector
       JOIN supporters s2
         ON s1.normalized_phone = s2.normalized_phone
         AND s1.id > s2.id
+        AND NOT EXISTS (
+          SELECT 1 FROM duplicate_pair_dismissals dpd
+          WHERE dpd.supporter_id = s2.id
+            AND dpd.dismissed_supporter_id = s1.id
+        )
         AND s1.normalized_phone IS NOT NULL
         AND s1.normalized_phone != ''
       WHERE s1.status = 'active'
@@ -165,6 +171,11 @@ class DuplicateDetector
       JOIN supporters s2
         ON LOWER(s1.email) = LOWER(s2.email)
         AND s1.id > s2.id
+        AND NOT EXISTS (
+          SELECT 1 FROM duplicate_pair_dismissals dpd
+          WHERE dpd.supporter_id = s2.id
+            AND dpd.dismissed_supporter_id = s1.id
+        )
         AND s1.email IS NOT NULL
         AND s1.email != ''
       WHERE s1.status = 'active'
@@ -183,6 +194,11 @@ class DuplicateDetector
       JOIN supporters s2
         ON s1.gec_voter_id = s2.gec_voter_id
         AND s1.id > s2.id
+        AND NOT EXISTS (
+          SELECT 1 FROM duplicate_pair_dismissals dpd
+          WHERE dpd.supporter_id = s2.id
+            AND dpd.dismissed_supporter_id = s1.id
+        )
         AND s1.gec_voter_id IS NOT NULL
       WHERE s1.status = 'active'
         AND s2.status = 'active'
@@ -202,6 +218,11 @@ class DuplicateDetector
         AND LOWER(TRIM(s1.first_name)) = LOWER(TRIM(s2.first_name))
         AND LOWER(TRIM(s1.last_name)) = LOWER(TRIM(s2.last_name))
         AND s1.id > s2.id
+        AND NOT EXISTS (
+          SELECT 1 FROM duplicate_pair_dismissals dpd
+          WHERE dpd.supporter_id = s2.id
+            AND dpd.dismissed_supporter_id = s1.id
+        )
         AND s1.dob IS NOT NULL
       WHERE s1.status = 'active'
         AND s2.status = 'active'
@@ -225,6 +246,11 @@ class DuplicateDetector
         AND LOWER(TRIM(s1.first_name)) = LOWER(TRIM(s2.first_name))
         AND LOWER(TRIM(s1.last_name)) = LOWER(TRIM(s2.last_name))
         AND s1.id > s2.id
+        AND NOT EXISTS (
+          SELECT 1 FROM duplicate_pair_dismissals dpd
+          WHERE dpd.supporter_id = s2.id
+            AND dpd.dismissed_supporter_id = s1.id
+        )
         AND s1.street_address IS NOT NULL
         AND s1.street_address != ''
       WHERE s1.status = 'active'
@@ -247,6 +273,11 @@ class DuplicateDetector
         AND LOWER(TRIM(s1.first_name)) = LOWER(TRIM(s2.first_name))
         AND LOWER(TRIM(s1.last_name)) = LOWER(TRIM(s2.last_name))
         AND s1.id > s2.id
+        AND NOT EXISTS (
+          SELECT 1 FROM duplicate_pair_dismissals dpd
+          WHERE dpd.supporter_id = s2.id
+            AND dpd.dismissed_supporter_id = s1.id
+        )
       WHERE s1.status = 'active'
         AND s2.status = 'active'
         AND s1.review_status != 'rejected'
@@ -267,6 +298,11 @@ class DuplicateDetector
         AND LOWER(TRIM(s1.first_name)) = LOWER(TRIM(s2.last_name))
         AND LOWER(TRIM(s1.last_name)) = LOWER(TRIM(s2.first_name))
         AND s1.id > s2.id
+        AND NOT EXISTS (
+          SELECT 1 FROM duplicate_pair_dismissals dpd
+          WHERE dpd.supporter_id = s2.id
+            AND dpd.dismissed_supporter_id = s1.id
+        )
       WHERE s1.status = 'active'
         AND s2.status = 'active'
         AND s1.first_name IS NOT NULL
@@ -335,12 +371,24 @@ class DuplicateDetector
     count
   end
 
-  private_class_method def self.dismiss_duplicate_pair!(supporter)
+  private_class_method def self.dismiss_duplicate_pair!(supporter, resolved_by: nil)
     now = Time.current
     related_ids = [ supporter.id, supporter.duplicate_of_id ].compact
     related_ids.concat(Supporter.where(duplicate_of_id: supporter.id).pluck(:id))
+    related_ids = related_ids.uniq
 
-    Supporter.where(id: related_ids.uniq).update_all(
+    related_ids.each do |related_id|
+      next if related_id == supporter.id
+
+      DuplicatePairDismissal.create_for_pair!(
+        supporter.id,
+        related_id,
+        resolved_by: resolved_by,
+        note: "Dismissed — not a duplicate"
+      )
+    end
+
+    Supporter.where(id: related_ids).update_all(
       potential_duplicate: false,
       duplicate_of_id: nil,
       duplicate_checked_at: now,

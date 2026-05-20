@@ -149,6 +149,27 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert s1.potential_duplicate?, "Original should also be flagged"
   end
 
+  test "dismiss persists ignored pair so scans do not reflag it" do
+    original = Supporter.create!(**@base_attrs, first_name: "Ignored", last_name: "Pair", contact_number: "671-777-0003", village: @village1)
+    newer = Supporter.create!(**@base_attrs, first_name: "Ignored", last_name: "Pair", contact_number: "671-777-0004", village: @village1)
+
+    original.reload
+    newer.reload
+    assert original.potential_duplicate?
+    assert newer.potential_duplicate?
+
+    assert_difference -> { DuplicatePairDismissal.count }, 1 do
+      DuplicateDetector.resolve!(newer, action: "dismiss")
+    end
+
+    assert_empty DuplicateDetector.find_duplicates(newer.reload).pluck(:id)
+
+    DuplicateDetector.scan_all!
+
+    assert_equal false, original.reload.potential_duplicate?
+    assert_equal false, newer.reload.potential_duplicate?
+  end
+
   test "dismiss clears both sides of a duplicate warning" do
     original = Supporter.create!(**@base_attrs, first_name: "Not", last_name: "Duplicate", contact_number: "671-777-0101", village: @village1)
     newer = Supporter.create!(**@base_attrs, first_name: "Not", last_name: "Duplicate", contact_number: "671-777-0102", village: @village1)

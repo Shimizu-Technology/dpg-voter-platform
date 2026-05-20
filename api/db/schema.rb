@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_14_193000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_20_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -107,6 +107,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_14_193000) do
     t.string "public_review_status"
     t.string "review_status"
     t.index ["supporter_id"], name: "index_dpg_supporter_review_flow_backups_on_supporter_id", unique: true
+  end
+
+  create_table "duplicate_pair_dismissals", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "dismissed_supporter_id", null: false
+    t.text "note"
+    t.bigint "resolved_by_id"
+    t.bigint "supporter_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["dismissed_supporter_id"], name: "index_duplicate_pair_dismissals_on_dismissed_supporter_id"
+    t.index ["resolved_by_id"], name: "index_duplicate_pair_dismissals_on_resolved_by_id"
+    t.index ["supporter_id", "dismissed_supporter_id"], name: "index_duplicate_pair_dismissals_on_pair", unique: true
+    t.index ["supporter_id"], name: "index_duplicate_pair_dismissals_on_supporter_id"
+    t.check_constraint "supporter_id < dismissed_supporter_id", name: "duplicate_pair_dismissals_ordered_pair"
   end
 
   create_table "event_rsvps", force: :cascade do |t|
@@ -733,6 +747,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_14_193000) do
   add_foreign_key "blocks", "villages"
   add_foreign_key "cable_token_nonces", "users"
   add_foreign_key "districts", "campaigns"
+  add_foreign_key "duplicate_pair_dismissals", "supporters"
+  add_foreign_key "duplicate_pair_dismissals", "supporters", column: "dismissed_supporter_id"
+  add_foreign_key "duplicate_pair_dismissals", "users", column: "resolved_by_id"
   add_foreign_key "event_rsvps", "events"
   add_foreign_key "event_rsvps", "supporters"
   add_foreign_key "events", "campaigns"
