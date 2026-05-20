@@ -108,10 +108,10 @@ class DuplicateDetector
   end
 
   # Resolve a duplicate: mark as reviewed, optionally merge into another record.
-  def self.resolve!(supporter, action:, merge_into: nil, resolved_by: nil)
+  def self.resolve!(supporter, action:, merge_into: nil, dismissed_match: nil, resolved_by: nil)
     case action
     when "dismiss"
-      dismiss_duplicate_pair!(supporter, resolved_by: resolved_by)
+      dismiss_duplicate_pair!(supporter, dismissed_match: dismissed_match, resolved_by: resolved_by)
     when "merge"
       raise ArgumentError, "merge_into required for merge action" unless merge_into
 
@@ -386,11 +386,15 @@ class DuplicateDetector
     count
   end
 
-  private_class_method def self.dismiss_duplicate_pair!(supporter, resolved_by: nil)
-    now = Time.current
-    dismissed_match_ids = [ supporter.duplicate_of_id ].compact
-    dismissed_match_ids = Supporter.where(duplicate_of_id: supporter.id).pluck(:id) if dismissed_match_ids.empty?
-    dismissed_match_ids = dismissed_match_ids.uniq
+  private_class_method def self.dismiss_duplicate_pair!(supporter, dismissed_match: nil, resolved_by: nil)
+    dismissed_match_ids = if dismissed_match
+      [ dismissed_match.id ]
+    elsif supporter.duplicate_of_id.present?
+      [ supporter.duplicate_of_id ]
+    else
+      Supporter.where(duplicate_of_id: supporter.id).order(:created_at, :id).limit(1).pluck(:id)
+    end
+    dismissed_match_ids = dismissed_match_ids.compact.uniq
 
     dismissed_match_ids.each do |match_id|
       DuplicatePairDismissal.create_for_pair!(
@@ -401,14 +405,9 @@ class DuplicateDetector
       )
     end
 
-    supporter.update_columns(
-      potential_duplicate: false,
-      duplicate_of_id: nil,
-      duplicate_checked_at: now,
-      duplicate_notes: "Dismissed — not a duplicate"
-    )
-
-    reconcile_duplicate_candidates!(dismissed_match_ids)
+    impacted_ids = [ supporter.id ] + dismissed_match_ids
+    impacted_ids.concat(Supporter.where(duplicate_of_id: impacted_ids).pluck(:id))
+    reconcile_duplicate_candidates!(impacted_ids.uniq)
   end
 
   private_class_method def self.address_duplicate_ids(supporter, active_scope:, first_name:, last_name:)

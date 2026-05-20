@@ -691,6 +691,7 @@ module Api
         end
 
         merge_into = nil
+        dismissed_match = nil
         if action == "merge"
           merge_into = scope_supporters(Supporter).find_by(id: params[:merge_into_id])
           unless merge_into
@@ -701,9 +702,18 @@ module Api
             )
           end
           merge_target_snapshot = merge_into.attributes.slice(*duplicate_merge_audit_fields)
+        elsif params[:duplicate_match_id].present?
+          dismissed_match = scope_supporters(Supporter).find_by(id: params[:duplicate_match_id])
+          unless dismissed_match
+            return render_api_error(
+              message: "duplicate_match_id supporter not found",
+              status: :not_found,
+              code: "duplicate_match_not_found"
+            )
+          end
         end
 
-        DuplicateDetector.resolve!(supporter, action: action, merge_into: merge_into, resolved_by: current_user)
+        DuplicateDetector.resolve!(supporter, action: action, merge_into: merge_into, dismissed_match: dismissed_match, resolved_by: current_user)
         supporter.reload
         merge_into.reload if merge_into
 

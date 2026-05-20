@@ -182,10 +182,11 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert_equal 1, DuplicateDetector.review_group_count(Supporter.where(id: [ original.id, newer.id ]).potential_duplicates_only)
   end
 
-  test "dismiss preserves unrelated duplicate warnings on matched record" do
+  test "dismiss reconciles reverse-pointing records without clearing unrelated warnings" do
     a = Supporter.create!(**@base_attrs, first_name: "ChainA", last_name: "Dismiss", contact_number: "671-777-0111", village: @village1)
     b = Supporter.create!(**@base_attrs, first_name: "ChainB", last_name: "Dismiss", contact_number: "671-777-0111", village: @village1)
     c = Supporter.create!(**@base_attrs, first_name: "ChainC", last_name: "Dismiss", contact_number: "671-777-0111", village: @village1)
+    DuplicateDetector.scan_all!
 
     a.reload
     b.reload
@@ -193,15 +194,18 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert a.potential_duplicate?
     assert b.potential_duplicate?
     assert c.potential_duplicate?
+    assert_equal a.id, c.duplicate_of_id
 
-    DuplicateDetector.resolve!(c, action: "dismiss")
+    DuplicateDetector.resolve!(a, action: "dismiss", dismissed_match: b)
 
     a.reload
     b.reload
     c.reload
-    assert_equal false, c.potential_duplicate?
-    assert b.potential_duplicate?, "Matched record should stay flagged because it still matches another unresolved record"
-    assert_includes DuplicateDetector.find_duplicates(b).pluck(:id), a.id
+    assert DuplicatePairDismissal.dismissed?(a.id, b.id)
+    assert a.potential_duplicate?, "Dismissed record should stay flagged because it still matches a third unresolved record"
+    assert b.potential_duplicate?, "Matched record should stay flagged because it still matches a third unresolved record"
+    assert c.potential_duplicate?, "Reverse-pointing record should be reconciled, not silently cleared"
+    assert_includes DuplicateDetector.find_duplicates(c).pluck(:id), a.id
   end
 
   test "dismiss clears both sides of a duplicate warning" do
@@ -222,7 +226,7 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert_nil original.duplicate_of_id
     assert_nil newer.duplicate_of_id
     assert_nil original.duplicate_notes
-    assert_equal "Dismissed — not a duplicate", newer.duplicate_notes
+    assert_nil newer.duplicate_notes
   end
 
   test "merge clears stale duplicate flag from kept record when no active duplicates remain" do

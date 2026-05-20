@@ -181,8 +181,8 @@ export default function DuplicatesPage() {
   });
 
   const resolveMutation = useMutation({
-    mutationFn: ({ id, resolution, mergeIntoId }: { id: number; resolution: string; mergeIntoId?: number }) =>
-      resolveDuplicate(id, resolution, mergeIntoId),
+    mutationFn: ({ id, resolution, mergeIntoId, duplicateMatchId }: { id: number; resolution: string; mergeIntoId?: number; duplicateMatchId?: number }) =>
+      resolveDuplicate(id, resolution, mergeIntoId, duplicateMatchId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['duplicates'] });
       queryClient.invalidateQueries({ queryKey: ['session'] });
@@ -354,7 +354,7 @@ export default function DuplicatesPage() {
                   {/* Actions */}
                   <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-[var(--border-soft)]">
                     <button
-                      onClick={() => resolveMutation.mutate({ id: s.id, resolution: 'dismiss' })}
+                      onClick={() => resolveMutation.mutate({ id: s.id, resolution: 'dismiss', duplicateMatchId: match?.id })}
                       disabled={resolveMutation.isPending}
                       className="inline-flex items-center gap-1 px-3 py-2 text-sm border border-[var(--border-soft)] rounded-xl min-h-[44px] hover:bg-[var(--surface-bg)] text-[var(--text-primary)]"
                     >
