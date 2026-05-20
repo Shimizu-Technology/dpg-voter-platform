@@ -15,6 +15,7 @@ module Api
         intake_scope = scope_supporters(Supporter.intake)
         official_scope = scope_supporters(Supporter.official_supporters)
         matched_scope = contact_scope.verified
+        duplicate_scope = scope_supporters(Supporter.potential_duplicates_only.active)
 
         render json: {
           user: {
@@ -38,7 +39,9 @@ module Api
             pending_vetting: intake_scope.count,
             flagged_supporters: contact_scope.flagged.count,
             public_signups_pending: intake_scope.public_origin.count,
-            official_supporters: official_scope.count
+            official_supporters: official_scope.count,
+            duplicate_contacts: duplicate_scope.count,
+            duplicate_contact_reviews: DuplicateDetector.review_group_count(duplicate_scope)
           },
           permissions: {
             can_manage_users: can_manage_users?,

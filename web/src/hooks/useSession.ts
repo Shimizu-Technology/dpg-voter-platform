@@ -25,6 +25,8 @@ export interface SessionResponse {
     public_signups_pending: number;
     official_supporters: number;
     matched_to_gec: number;
+    duplicate_contacts: number;
+    duplicate_contact_reviews: number;
   };
   permissions: {
     can_manage_users: boolean;

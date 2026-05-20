@@ -75,8 +75,8 @@ export const bulkVerifySupporters = (ids: number[], status: string) =>
   api.post('/supporters/bulk_verify', { supporter_ids: ids, verification_status: status }).then(r => r.data);
 export const getDuplicates = (villageId?: number) =>
   api.get('/supporters/duplicates', { params: villageId ? { village_id: villageId } : {} }).then(r => r.data);
-export const resolveDuplicate = (id: number, resolution: string, mergeIntoId?: number) =>
-  api.patch(`/supporters/${id}/resolve_duplicate`, { resolution, merge_into_id: mergeIntoId }).then(r => r.data);
+export const resolveDuplicate = (id: number, resolution: string, mergeIntoId?: number, duplicateMatchId?: number) =>
+  api.patch(`/supporters/${id}/resolve_duplicate`, { resolution, merge_into_id: mergeIntoId, duplicate_match_id: duplicateMatchId }).then(r => r.data);
 export const scanDuplicates = () =>
   api.post('/supporters/scan_duplicates').then(r => r.data);
 export const getOutreachSupporters = (params?: QueryParams) =>

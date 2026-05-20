@@ -65,6 +65,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         ...(permissions?.can_view_supporters ? [ { to: '/admin/intake', label: 'Intake', icon: ClipboardCheck, badge: sessionData?.counts?.new_intake } ] : []),
         ...(permissions?.can_view_supporters ? [ { to: '/admin/gec-voters', label: 'GEC Voters', icon: Database } ] : []),
         ...(permissions?.can_view_supporters ? [ { to: '/admin/households', label: 'Households', icon: Home } ] : []),
+        ...(permissions?.can_access_duplicates ? [ { to: '/admin/duplicates', label: 'Duplicates', icon: Copy, badge: sessionData?.counts?.duplicate_contact_reviews } ] : []),
       ],
     },
     {
@@ -87,7 +88,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       label: 'Review',
       items: [
         ...(permissions?.can_access_reports ? [ { to: '/admin/reports', label: 'Reports', icon: FileSpreadsheet } ] : []),
-        ...(permissions?.can_access_duplicates ? [ { to: '/admin/duplicates', label: 'Duplicates', icon: Copy } ] : []),
         ...(permissions?.can_access_audit_logs ? [ { to: '/admin/audit-logs', label: 'Activity Log', icon: ScrollText } ] : []),
       ],
     },

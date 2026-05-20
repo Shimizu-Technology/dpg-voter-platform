@@ -207,6 +207,13 @@ module Api
             code: "invalid_intake_review_decision_classification"
           )
         end
+        if decision == "approve" && supporter.potential_duplicate?
+          return render_api_error(
+            message: "Resolve or dismiss the duplicate warning before approving this contact into DPG records",
+            status: :unprocessable_entity,
+            code: "duplicate_review_required"
+          )
+        end
 
         attempt = nil
         old_review_state = supporter.slice("contact_classification", "support_status", "membership_status", "volunteer_status", "review_status", "public_review_status", "status")
@@ -684,7 +691,16 @@ module Api
         end
 
         merge_into = nil
+        dismissed_match = nil
         if action == "merge"
+          if params[:merge_into_id].to_i == supporter.id
+            return render_api_error(
+              message: "merge_into_id must differ from the supporter being resolved",
+              status: :unprocessable_entity,
+              code: "merge_target_self_reference"
+            )
+          end
+
           merge_into = scope_supporters(Supporter).find_by(id: params[:merge_into_id])
           unless merge_into
             return render_api_error(
@@ -694,9 +710,35 @@ module Api
             )
           end
           merge_target_snapshot = merge_into.attributes.slice(*duplicate_merge_audit_fields)
+        elsif params[:duplicate_match_id].present?
+          if params[:duplicate_match_id].to_i == supporter.id
+            return render_api_error(
+              message: "duplicate_match_id must differ from the supporter being resolved",
+              status: :unprocessable_entity,
+              code: "duplicate_match_self_reference"
+            )
+          end
+
+          dismissed_match = scope_supporters(Supporter).find_by(id: params[:duplicate_match_id])
+          unless dismissed_match
+            return render_api_error(
+              message: "duplicate_match_id supporter not found",
+              status: :not_found,
+              code: "duplicate_match_not_found"
+            )
+          end
         end
 
-        DuplicateDetector.resolve!(supporter, action: action, merge_into: merge_into, resolved_by: current_user)
+        begin
+          DuplicateDetector.resolve!(supporter, action: action, merge_into: merge_into, dismissed_match: dismissed_match, resolved_by: current_user)
+        rescue DuplicateDetector::ResolutionError => e
+          return render_api_error(
+            message: e.message,
+            status: :unprocessable_entity,
+            code: "duplicate_match_required"
+          )
+        end
+
         supporter.reload
         merge_into.reload if merge_into
 
