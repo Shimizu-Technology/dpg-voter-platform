@@ -9,6 +9,28 @@ module Api
       include AuditLoggable
 
       MAX_GEC_UPLOAD_BYTES = 50.megabytes
+      GEC_SEARCH_SQL = <<~SQL.squish.freeze
+        REGEXP_REPLACE(LOWER(COALESCE((gec_voters.first_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.middle_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.last_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.first_name || ' ' || COALESCE(gec_voters.middle_name, '') || ' ' || gec_voters.last_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.first_name || ' ' || gec_voters.last_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.last_name || ' ' || gec_voters.first_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.address)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.village_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.precinct_number)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.voter_registration_number)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+      SQL
+      ADDRESS_SEARCH_COLUMNS = {
+        gec_address: {
+          raw: "gec_voters.address",
+          normalized: "REGEXP_REPLACE(LOWER(COALESCE((gec_voters.address)::text, '')), '[^a-z0-9]+', '', 'g')"
+        },
+        supporter_street_address: {
+          raw: "supporters.street_address",
+          normalized: "REGEXP_REPLACE(LOWER(COALESCE((supporters.street_address)::text, '')), '[^a-z0-9]+', '', 'g')"
+        }
+      }.freeze
 
       before_action :authenticate_request
       before_action :require_supporter_access!, only: [ :index, :stats, :households, :create_contact, :link_contact ]
@@ -94,14 +116,14 @@ module Api
           )
         end
 
-        voters = apply_address_search(scoped_gec_voters(GecVoter.active.includes(:village, :precinct)), "gec_voters.address", query)
+        voters = apply_address_search(scoped_gec_voters(GecVoter.active.includes(:village, :precinct)), :gec_address, query)
           .order(:village_name, :address, :last_name, :first_name)
           .limit(250)
           .to_a
         linked_contacts_by_voter = linked_contacts_by_voter(voters.map(&:id))
         possible_contacts_by_voter = possible_contacts_by_voter(voters)
 
-        contacts = apply_address_search(scope_supporters(Supporter.contacts.includes(:village, :precinct, :gec_voter)), "supporters.street_address", query)
+        contacts = apply_address_search(scope_supporters(Supporter.contacts.includes(:village, :precinct, :gec_voter)), :supporter_street_address, query)
           .order(:street_address, :last_name, :first_name)
           .limit(250)
           .to_a
@@ -678,21 +700,7 @@ module Api
 
         terms.reduce(scope) do |memo, term|
           pattern = "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
-          memo.where(
-            <<~SQL.squish,
-              #{normalized_sql("gec_voters.first_name")} LIKE :pattern
-              OR #{normalized_sql("gec_voters.middle_name")} LIKE :pattern
-              OR #{normalized_sql("gec_voters.last_name")} LIKE :pattern
-              OR #{normalized_sql("gec_voters.first_name || ' ' || COALESCE(gec_voters.middle_name, '') || ' ' || gec_voters.last_name")} LIKE :pattern
-              OR #{normalized_sql("gec_voters.first_name || ' ' || gec_voters.last_name")} LIKE :pattern
-              OR #{normalized_sql("gec_voters.last_name || ' ' || gec_voters.first_name")} LIKE :pattern
-              OR #{normalized_sql("gec_voters.address")} LIKE :pattern
-              OR #{normalized_sql("gec_voters.village_name")} LIKE :pattern
-              OR #{normalized_sql("gec_voters.precinct_number")} LIKE :pattern
-              OR #{normalized_sql("gec_voters.voter_registration_number")} LIKE :pattern
-            SQL
-            pattern: pattern
-          )
+          memo.where(GEC_SEARCH_SQL, pattern: pattern)
         end
       end
 
@@ -704,17 +712,14 @@ module Api
         normalized_search_terms(query).join
       end
 
-      def normalized_sql(expression)
-        "REGEXP_REPLACE(LOWER(COALESCE((#{expression})::text, '')), '[^a-z0-9]+', '', 'g')"
-      end
-
-      def apply_address_search(scope, column, query)
+      def apply_address_search(scope, column_key, query)
+        column = ADDRESS_SEARCH_COLUMNS.fetch(column_key)
         binds = {
           raw_pattern: "%#{ActiveRecord::Base.sanitize_sql_like(query.to_s.downcase.strip)}%",
           normalized_pattern: "%#{ActiveRecord::Base.sanitize_sql_like(normalized_search_compact(query))}%"
         }
-        normalized_address = normalized_sql(column)
-        conditions = [ "LOWER(#{column}) LIKE :raw_pattern", "#{normalized_address} LIKE :normalized_pattern" ]
+        normalized_address = column.fetch(:normalized)
+        conditions = [ "LOWER(#{column.fetch(:raw)}) LIKE :raw_pattern", "#{normalized_address} LIKE :normalized_pattern" ]
 
         token_conditions = normalized_search_terms(query).first(6).map.with_index do |term, index|
           key = "address_term_#{index}".to_sym

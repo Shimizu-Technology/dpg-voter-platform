@@ -94,8 +94,10 @@ module Api
         signup_count = code.supporters.count
         if signup_count.zero?
           snapshot = referral_code_json(code)
-          log_audit!(code, action: "signup_link_deleted", changed_data: snapshot)
-          code.destroy!
+          ActiveRecord::Base.transaction do
+            code.destroy!
+            log_audit!(code, action: "signup_link_deleted", changed_data: snapshot)
+          end
           render json: { message: "Signup link deleted", deleted: true }
         else
           code.update!(active: false)

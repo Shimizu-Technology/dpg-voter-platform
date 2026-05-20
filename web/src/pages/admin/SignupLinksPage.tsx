@@ -282,7 +282,10 @@ export default function SignupLinksPage() {
       const anchor = document.createElement('a');
       anchor.href = dataUrl;
       anchor.download = filename;
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
       anchor.click();
+      document.body.removeChild(anchor);
     } catch {
       setNotice({ type: 'error', message: 'Could not download this QR code. Refresh and try again.' });
     }
