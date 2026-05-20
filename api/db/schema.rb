@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_20_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_20_104500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -648,8 +648,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_20_100000) do
     t.string "volunteer_status", default: "unknown", null: false
     t.boolean "wants_to_volunteer", default: false, null: false
     t.boolean "yard_sign"
+    t.index "dob, lower(TRIM(BOTH FROM first_name)), lower(TRIM(BOTH FROM last_name))", name: "index_supporters_on_dob_and_lower_trimmed_names", where: "((dob IS NOT NULL) AND (first_name IS NOT NULL) AND (last_name IS NOT NULL))"
     t.index "lower((email)::text)", name: "index_supporters_on_lower_email", where: "(email IS NOT NULL)"
     t.index "lower((print_name)::text) gin_trgm_ops", name: "index_supporters_on_lower_print_name_trgm", using: :gin
+    t.index "lower(TRIM(BOTH FROM street_address)), lower(TRIM(BOTH FROM first_name)), lower(TRIM(BOTH FROM last_name))", name: "index_supporters_on_lower_trimmed_address_and_names", where: "((street_address IS NOT NULL) AND ((street_address)::text <> ''::text) AND (first_name IS NOT NULL) AND (last_name IS NOT NULL))"
     t.index "village_id, lower(TRIM(BOTH FROM first_name)), lower(TRIM(BOTH FROM last_name))", name: "index_supporters_on_village_lower_first_last_name"
     t.index ["attribution_method"], name: "index_supporters_on_attribution_method"
     t.index ["block_id"], name: "index_supporters_on_block_id"
