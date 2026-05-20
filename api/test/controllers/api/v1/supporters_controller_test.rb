@@ -358,6 +358,58 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "pending", supporter.review_status
   end
 
+  test "resolve duplicate rejects self-referential dismiss match" do
+    village = Village.find_or_create_by!(name: "Barrigada")
+    supporter = Supporter.create!(
+      first_name: "Self",
+      last_name: "Reference",
+      contact_number: "+16715551901",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "active"
+    )
+
+    patch "/api/v1/supporters/#{supporter.id}/resolve_duplicate",
+      params: {
+        resolution: "dismiss",
+        duplicate_match_id: supporter.id
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "duplicate_match_self_reference", response.parsed_body["code"]
+  end
+
+  test "resolve duplicate rejects self-referential merge target" do
+    village = Village.find_or_create_by!(name: "Barrigada")
+    supporter = Supporter.create!(
+      first_name: "Self",
+      last_name: "Merge",
+      contact_number: "+16715551902",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "active"
+    )
+
+    patch "/api/v1/supporters/#{supporter.id}/resolve_duplicate",
+      params: {
+        resolution: "merge",
+        merge_into_id: supporter.id
+      },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "merge_target_self_reference", response.parsed_body["code"]
+  end
+
   test "review intake can classify unresolved duplicate as duplicate" do
     village = Village.find_or_create_by!(name: "Dededo")
     Supporter.create!(

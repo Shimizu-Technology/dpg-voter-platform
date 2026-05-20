@@ -693,6 +693,14 @@ module Api
         merge_into = nil
         dismissed_match = nil
         if action == "merge"
+          if params[:merge_into_id].to_i == supporter.id
+            return render_api_error(
+              message: "merge_into_id must differ from the supporter being resolved",
+              status: :unprocessable_entity,
+              code: "merge_target_self_reference"
+            )
+          end
+
           merge_into = scope_supporters(Supporter).find_by(id: params[:merge_into_id])
           unless merge_into
             return render_api_error(
@@ -703,6 +711,14 @@ module Api
           end
           merge_target_snapshot = merge_into.attributes.slice(*duplicate_merge_audit_fields)
         elsif params[:duplicate_match_id].present?
+          if params[:duplicate_match_id].to_i == supporter.id
+            return render_api_error(
+              message: "duplicate_match_id must differ from the supporter being resolved",
+              status: :unprocessable_entity,
+              code: "duplicate_match_self_reference"
+            )
+          end
+
           dismissed_match = scope_supporters(Supporter).find_by(id: params[:duplicate_match_id])
           unless dismissed_match
             return render_api_error(
