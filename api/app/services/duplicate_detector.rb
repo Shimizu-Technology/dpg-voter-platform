@@ -95,12 +95,7 @@ class DuplicateDetector
   def self.resolve!(supporter, action:, merge_into: nil, resolved_by: nil)
     case action
     when "dismiss"
-      supporter.update!(
-        potential_duplicate: false,
-        duplicate_of_id: nil,
-        duplicate_checked_at: Time.current,
-        duplicate_notes: "Dismissed — not a duplicate"
-      )
+      dismiss_duplicate_pair!(supporter)
     when "merge"
       raise ArgumentError, "merge_into required for merge action" unless merge_into
 
@@ -338,6 +333,19 @@ class DuplicateDetector
     end
 
     count
+  end
+
+  private_class_method def self.dismiss_duplicate_pair!(supporter)
+    now = Time.current
+    related_ids = [ supporter.id, supporter.duplicate_of_id ].compact
+    related_ids.concat(Supporter.where(duplicate_of_id: supporter.id).pluck(:id))
+
+    Supporter.where(id: related_ids.uniq).update_all(
+      potential_duplicate: false,
+      duplicate_of_id: nil,
+      duplicate_checked_at: now,
+      duplicate_notes: "Dismissed — not a duplicate"
+    )
   end
 
   private_class_method def self.address_duplicate_ids(supporter, active_scope:, first_name:, last_name:)

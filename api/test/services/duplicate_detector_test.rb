@@ -149,6 +149,27 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert s1.potential_duplicate?, "Original should also be flagged"
   end
 
+  test "dismiss clears both sides of a duplicate warning" do
+    original = Supporter.create!(**@base_attrs, first_name: "Not", last_name: "Duplicate", contact_number: "671-777-0101", village: @village1)
+    newer = Supporter.create!(**@base_attrs, first_name: "Not", last_name: "Duplicate", contact_number: "671-777-0102", village: @village1)
+
+    original.reload
+    newer.reload
+    assert original.potential_duplicate?
+    assert newer.potential_duplicate?
+
+    DuplicateDetector.resolve!(newer, action: "dismiss")
+
+    original.reload
+    newer.reload
+    assert_equal false, original.potential_duplicate?
+    assert_equal false, newer.potential_duplicate?
+    assert_nil original.duplicate_of_id
+    assert_nil newer.duplicate_of_id
+    assert_equal "Dismissed — not a duplicate", original.duplicate_notes
+    assert_equal "Dismissed — not a duplicate", newer.duplicate_notes
+  end
+
   test "merge clears stale duplicate flag from kept record when no active duplicates remain" do
     original = Supporter.create!(**@base_attrs, first_name: "Talia", last_name: "Example", contact_number: "671-777-0001", village: @village1)
     newer = Supporter.create!(**@base_attrs, first_name: "Talia", last_name: "Example", contact_number: "671-777-0002", village: @village1)
