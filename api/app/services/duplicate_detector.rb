@@ -148,7 +148,8 @@ class DuplicateDetector
   # Scan all supporters for duplicates using bulk SQL queries.
   # Returns the number of newly flagged duplicates.
   def self.scan_all!
-    count = 0
+    ActiveRecord::Base.transaction do
+      count = 0
 
     # Reset unresolved flags first so the scan becomes a full recomputation.
     Supporter.where(potential_duplicate: true).update_all(
@@ -389,7 +390,8 @@ class DuplicateDetector
                )
     end
 
-    count
+      count
+    end
   end
 
   private_class_method def self.dismiss_duplicate_pair!(supporter, dismissed_match: nil, resolved_by: nil)
