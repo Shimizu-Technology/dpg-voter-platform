@@ -333,7 +333,61 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert_equal true, approved.reload.registered_voter
   end
 
-  test "merge preserves affirmative self-reported voter signal" do
+  test "merge preserves explicit no registered voter status" do
+    approved = Supporter.create!(
+      **@base_attrs,
+      first_name: "Registration",
+      last_name: "No",
+      contact_number: "671-777-1005",
+      village: @village1,
+      review_status: "approved",
+      public_review_status: "not_applicable",
+      registered_voter_status: "no"
+    )
+    public_signup = Supporter.create!(
+      **@base_attrs,
+      first_name: "Registration",
+      last_name: "No",
+      contact_number: "671-777-1005",
+      village: @village1,
+      review_status: "pending",
+      public_review_status: "approved",
+      registered_voter_status: "yes"
+    )
+
+    DuplicateDetector.resolve!(public_signup, action: "merge", merge_into: approved)
+
+    assert_equal "no", approved.reload.registered_voter_status
+  end
+
+  test "merge copies registered voter status when kept record is not sure" do
+    approved = Supporter.create!(
+      **@base_attrs,
+      first_name: "Registration",
+      last_name: "Unknown",
+      contact_number: "671-777-1006",
+      village: @village1,
+      review_status: "approved",
+      public_review_status: "not_applicable",
+      registered_voter_status: "not_sure"
+    )
+    public_signup = Supporter.create!(
+      **@base_attrs,
+      first_name: "Registration",
+      last_name: "Unknown",
+      contact_number: "671-777-1006",
+      village: @village1,
+      review_status: "pending",
+      public_review_status: "approved",
+      registered_voter_status: "yes"
+    )
+
+    DuplicateDetector.resolve!(public_signup, action: "merge", merge_into: approved)
+
+    assert_equal "yes", approved.reload.registered_voter_status
+  end
+
+  test "merge preserves explicit false self-reported voter signal" do
     approved = Supporter.create!(
       **@base_attrs,
       first_name: "Self",
@@ -349,6 +403,33 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
       first_name: "Self",
       last_name: "Reported",
       contact_number: "671-777-1002",
+      village: @village1,
+      review_status: "pending",
+      public_review_status: "approved",
+      self_reported_registered_voter: true
+    )
+
+    DuplicateDetector.resolve!(public_signup, action: "merge", merge_into: approved)
+
+    assert_equal false, approved.reload.self_reported_registered_voter
+  end
+
+  test "merge preserves affirmative self-reported voter signal when kept record is unknown" do
+    approved = Supporter.create!(
+      **@base_attrs,
+      first_name: "Self",
+      last_name: "Reported Unknown",
+      contact_number: "671-777-1007",
+      village: @village1,
+      review_status: "approved",
+      public_review_status: "not_applicable",
+      self_reported_registered_voter: nil
+    )
+    public_signup = Supporter.create!(
+      **@base_attrs,
+      first_name: "Self",
+      last_name: "Reported Unknown",
+      contact_number: "671-777-1007",
       village: @village1,
       review_status: "pending",
       public_review_status: "approved",

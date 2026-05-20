@@ -515,8 +515,11 @@ class DuplicateDetector
   end
 
   private_class_method def self.preserve_affirmative_signals!(source, into:)
+    if source.self_reported_registered_voter == true && into.self_reported_registered_voter != true && into.registered_voter != false && into.registered_voter_status != "no"
+      into.self_reported_registered_voter = true
+    end
+
     %w[
-      self_reported_registered_voter
       opt_in_email
       opt_in_text
       wants_to_volunteer
@@ -539,8 +542,7 @@ class DuplicateDetector
       into.volunteer_status = source.volunteer_status
     end
 
-    registration_rank = { "not_sure" => 0, "no" => 1, "yes" => 2 }
-    if registration_rank.fetch(source.registered_voter_status, 0) > registration_rank.fetch(into.registered_voter_status, 0)
+    if [ nil, "", "not_sure" ].include?(into.registered_voter_status) && source.registered_voter_status.present? && source.registered_voter_status != "not_sure"
       into.registered_voter_status = source.registered_voter_status
     end
   end
