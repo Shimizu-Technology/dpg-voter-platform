@@ -503,6 +503,19 @@ class DuplicateDetectorTest < ActiveSupport::TestCase
     assert_not_includes duplicate_ids, rejected.id
   end
 
+  test "scan_all ignores rejected swapped-name records" do
+    remaining = Supporter.create!(**@base_attrs, first_name: "Swapped", last_name: "Reject", contact_number: "671-999-0901", village: @village1)
+    rejected = Supporter.create!(**@base_attrs, first_name: "Reject", last_name: "Swapped", contact_number: "671-999-0902", village: @village1)
+
+    rejected.update!(review_status: "rejected")
+    Supporter.where(id: [ remaining.id, rejected.id ]).update_all(potential_duplicate: false, duplicate_of_id: nil, duplicate_notes: nil)
+
+    DuplicateDetector.scan_all!
+
+    assert_equal false, remaining.reload.potential_duplicate
+    assert_equal false, rejected.reload.potential_duplicate
+  end
+
   test "scan_all clears stale duplicate flags left behind by rejected records" do
     remaining = Supporter.create!(**@base_attrs, first_name: "Stale", last_name: "Flag", contact_number: "671-999-1001", village: @village1)
     rejected = Supporter.create!(**@base_attrs, first_name: "Stale", last_name: "Flag", contact_number: "671-999-1002", village: @village1)

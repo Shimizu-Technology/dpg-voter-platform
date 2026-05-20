@@ -322,6 +322,10 @@ class DuplicateDetector
         )
       WHERE s1.status = 'active'
         AND s2.status = 'active'
+        AND s1.review_status != 'rejected'
+        AND s2.review_status != 'rejected'
+        AND s1.public_review_status != 'rejected'
+        AND s2.public_review_status != 'rejected'
         AND s1.first_name IS NOT NULL
         AND s1.last_name IS NOT NULL
       GROUP BY s1.id
