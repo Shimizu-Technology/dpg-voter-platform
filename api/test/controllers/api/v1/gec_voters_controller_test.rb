@@ -874,6 +874,40 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_includes payload.dig("preview", "warnings").first, "reconstructed"
   end
 
+  test "import data search matches normalized first middle last and last first names" do
+    import = GecImport.create!(
+      gec_list_date: Date.new(2026, 2, 25),
+      filename: "gec-voters.csv",
+      status: "completed",
+      import_type: "full_list"
+    )
+    GecImportChange.create!(
+      gec_import: import,
+      change_type: "new",
+      row_number: 1,
+      first_name: "Leon",
+      middle_name: "A.",
+      last_name: "Shimizu",
+      village_name: @village.name,
+      voter_registration_number: "LEON-123",
+      birth_year: 1999
+    )
+
+    get "/api/v1/gec_voters/imports/#{import.id}/view_data",
+      params: { q: "Leon A Shimizu" },
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    assert_equal 1, response.parsed_body.dig("preview", "pagination", "total_rows")
+
+    get "/api/v1/gec_voters/imports/#{import.id}/view_data",
+      params: { q: "Shimizu Leon" },
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    assert_equal 1, response.parsed_body.dig("preview", "pagination", "total_rows")
+  end
+
   test "activate import audit log records actual previous active state" do
     import = GecImport.create!(
       gec_list_date: Date.new(2026, 1, 25),

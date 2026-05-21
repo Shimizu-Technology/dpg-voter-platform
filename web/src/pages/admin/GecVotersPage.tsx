@@ -25,6 +25,7 @@ import {
   downloadGecImportFile,
   getGecImportChanges,
   getGecImportData,
+  getGecImportOriginal,
   getGecImportSkippedRows,
   getGecHouseholds,
   getGecImports,
@@ -108,7 +109,7 @@ type GecImport = {
   };
 };
 
-type ImportViewerTab = 'data' | 'changes' | 'skipped';
+type ImportViewerTab = 'data' | 'changes' | 'skipped' | 'original';
 type GecImportType = 'full_list' | 'changes_only';
 
 type ImportPreviewRow = Record<string, unknown>;
@@ -183,6 +184,14 @@ type ImportChangesResponse = {
 type ImportSkippedRowsResponse = {
   skipped_rows?: ImportSkippedRow[];
   pagination?: Pagination;
+};
+
+type ImportOriginalResponse = {
+  view_url?: string;
+  view_data_base64?: string;
+  filename: string;
+  content_type: string;
+  inline_supported: boolean;
 };
 
 type Pagination = {
@@ -690,6 +699,11 @@ export default function GecVotersPage() {
     }),
     enabled: canUploadGec && viewerTab === 'skipped' && Boolean(selectedImportId),
   });
+  const importOriginalQuery = useQuery<ImportOriginalResponse>({
+    queryKey: ['gec-import-original', selectedImportId],
+    queryFn: () => getGecImportOriginal(selectedImportId!),
+    enabled: canUploadGec && viewerTab === 'original' && Boolean(selectedImportId),
+  });
   const isPreviewBusy = previewMutation.isPending || pdfPreviewStatus === 'pending' || pdfPreviewStatus === 'processing';
   const canAnalyze = Boolean(file && listDate && !isPreviewBusy);
   const canImport = Boolean(
@@ -843,7 +857,7 @@ export default function GecVotersPage() {
                                 Open Import
                               </button>
                               {row.has_original_file ? (
-                                <button type="button" disabled={openOriginalMutation.isPending} onClick={() => openOriginalMutation.mutate(row.id)} className="app-btn-secondary min-h-10">
+                                <button type="button" disabled={row.status !== 'completed'} onClick={() => openImportViewer(row, 'original')} className="app-btn-secondary min-h-10">
                                   <FileText className="h-4 w-4" />
                                   Original
                                 </button>
@@ -1820,6 +1834,10 @@ export default function GecVotersPage() {
                 dataQuery={importDataQuery}
                 changesQuery={importChangesQuery}
                 skippedRowsQuery={importSkippedRowsQuery}
+                originalQuery={importOriginalQuery}
+                openOriginal={() => selectedImport && openOriginalMutation.mutate(selectedImport.id)}
+                downloadOriginal={() => selectedImport && downloadImportMutation.mutate(selectedImport.id)}
+                originalBusy={openOriginalMutation.isPending || downloadImportMutation.isPending}
               />
             </div>
           </div>
@@ -1847,6 +1865,10 @@ type ImportReviewPanelProps = {
   dataQuery: { data?: ImportDataResponse; isFetching: boolean; isError: boolean; error: unknown };
   changesQuery: { data?: ImportChangesResponse; isFetching: boolean; isError: boolean; error: unknown };
   skippedRowsQuery: { data?: ImportSkippedRowsResponse; isFetching: boolean; isError: boolean; error: unknown };
+  originalQuery: { data?: ImportOriginalResponse; isFetching: boolean; isError: boolean; error: unknown };
+  openOriginal: () => void;
+  downloadOriginal: () => void;
+  originalBusy: boolean;
 };
 
 function ImportReviewPanel({
@@ -1867,6 +1889,10 @@ function ImportReviewPanel({
   dataQuery,
   changesQuery,
   skippedRowsQuery,
+  originalQuery,
+  openOriginal,
+  downloadOriginal,
+  originalBusy,
 }: ImportReviewPanelProps) {
   const dataPreview = dataQuery.data?.preview;
   const dataRows = (dataPreview?.preview_rows ?? []) as ImportPreviewRow[];
@@ -1876,8 +1902,8 @@ function ImportReviewPanel({
   const changePagination = changesQuery.data?.pagination;
   const skippedRows = (skippedRowsQuery.data?.skipped_rows ?? []) as ImportSkippedRow[];
   const skippedPagination = skippedRowsQuery.data?.pagination;
-  const activeQuery = viewerTab === 'data' ? dataQuery : viewerTab === 'changes' ? changesQuery : skippedRowsQuery;
-  const activePagination = viewerTab === 'data' ? dataPagination : viewerTab === 'changes' ? changePagination : skippedPagination;
+  const activeQuery = viewerTab === 'data' ? dataQuery : viewerTab === 'changes' ? changesQuery : viewerTab === 'skipped' ? skippedRowsQuery : originalQuery;
+  const activePagination = viewerTab === 'data' ? dataPagination : viewerTab === 'changes' ? changePagination : viewerTab === 'skipped' ? skippedPagination : undefined;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3">
@@ -1888,32 +1914,33 @@ function ImportReviewPanel({
             {selectedImport.filename} · {formatDate(selectedImport.gec_list_date)} · {selectedImport.status}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 text-xs font-semibold">
-          {(['data', 'changes', 'skipped'] as ImportViewerTab[]).map((tab) => (
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-xs font-semibold sm:grid-cols-4">
+          {(['data', 'changes', 'skipped', 'original'] as ImportViewerTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setViewerTab(tab)}
               className={`rounded-lg px-2 py-2 capitalize ${viewerTab === tab ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}
             >
-              {tab === 'data' ? 'Imported data' : tab === 'changes' ? 'All changes' : 'Skipped'}
+              {tab === 'data' ? 'Imported data' : tab === 'changes' ? 'All changes' : tab === 'skipped' ? 'Skipped' : 'Original file'}
             </button>
           ))}
         </div>
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submitSearch();
-          }}
-        >
-          <input
-            value={viewerSearch}
-            onChange={(event) => setViewerSearch(event.target.value)}
-            placeholder="Search this import"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          />
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+        {viewerTab !== 'original' && (
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitSearch();
+            }}
+          >
+            <input
+              value={viewerSearch}
+              onChange={(event) => setViewerSearch(event.target.value)}
+              placeholder="Search this import"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            />
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
             {viewerTab === 'data' && (
               <select
                 value={viewerVillage}
@@ -1957,8 +1984,9 @@ function ImportReviewPanel({
               <Search className="h-4 w-4" />
               Search
             </button>
-          </div>
-        </form>
+            </div>
+          </form>
+        )}
       </div>
 
       <div className="mt-3">
@@ -1973,8 +2001,16 @@ function ImportReviewPanel({
           <ImportDataRows rows={dataRows} />
         ) : viewerTab === 'changes' ? (
           <ImportChangeRows rows={changeRows} />
-        ) : (
+        ) : viewerTab === 'skipped' ? (
           <ImportSkippedRows importId={selectedImport.id} rows={skippedRows} />
+        ) : (
+          <OriginalImportView
+            data={originalQuery.data}
+            hasOriginalFile={Boolean(selectedImport.has_original_file)}
+            onOpenExternal={openOriginal}
+            onDownload={downloadOriginal}
+            busy={originalBusy}
+          />
         )}
       </div>
 
@@ -2001,6 +2037,75 @@ function ImportReviewPanel({
               Next
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OriginalImportView({
+  data,
+  hasOriginalFile,
+  onOpenExternal,
+  onDownload,
+  busy,
+}: {
+  data?: ImportOriginalResponse;
+  hasOriginalFile: boolean;
+  onOpenExternal: () => void;
+  onDownload: () => void;
+  busy: boolean;
+}) {
+  const localViewUrl = useMemo(() => {
+    if (!data?.view_data_base64) return null;
+
+    const binary = window.atob(data.view_data_base64);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const blob = new Blob([bytes], { type: data.content_type || 'application/octet-stream' });
+    return URL.createObjectURL(blob);
+  }, [data]);
+
+  useEffect(() => {
+    return () => {
+      if (localViewUrl) URL.revokeObjectURL(localViewUrl);
+    };
+  }, [localViewUrl]);
+
+  if (!hasOriginalFile) {
+    return <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">This import does not have a preserved original upload file.</div>;
+  }
+
+  if (!data) return null;
+
+  const viewUrl = data.view_url || localViewUrl;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-slate-900">{data.filename}</div>
+          <div className="text-xs text-slate-500">{data.content_type}</div>
+          <div className="mt-1 text-sm text-slate-600">This is the original file that was uploaded.</div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button type="button" className="app-btn-secondary justify-center" disabled={busy || !viewUrl} onClick={onOpenExternal}>
+            <FileText className="h-4 w-4" />
+            Open Original File
+          </button>
+          <button type="button" className="app-btn-secondary justify-center" disabled={busy} onClick={onDownload}>
+            <Download className="h-4 w-4" />
+            Download File
+          </button>
+        </div>
+      </div>
+
+      {data.inline_supported && viewUrl ? (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <iframe title={`Original file preview for ${data.filename}`} src={viewUrl} className="h-[62vh] w-full bg-white" />
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
+          This file type is preserved for download/opening, but it is better viewed in your browser or local spreadsheet app than embedded inside the modal.
         </div>
       )}
     </div>

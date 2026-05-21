@@ -485,6 +485,19 @@ module Api
 
         filename = gec_import.raw_source_filename || gec_import.filename || "gec_import_#{gec_import.id}"
         content_type = gec_import.raw_content_type.presence || "application/octet-stream"
+
+        if local_artifact_key?(gec_import.raw_file_s3_key)
+          artifact_data = read_local_artifact(gec_import.raw_file_s3_key)
+          return render_api_error(message: "Original uploaded file is not available for this import", status: :not_found, code: "file_not_available") unless artifact_data
+
+          return render json: {
+            view_data_base64: Base64.strict_encode64(artifact_data),
+            filename: filename,
+            content_type: content_type,
+            inline_supported: content_type.include?("pdf")
+          }
+        end
+
         view_url = S3Service.presigned_url(
           gec_import.raw_file_s3_key,
           expires_in: 1800,
@@ -1236,18 +1249,42 @@ module Api
         end
 
         if q.present?
-          query = q.downcase.strip
-          searchable_fields = if source_type == "pdf"
-            %w[name address village precinct_number birth_year voter_registration_number]
-          else
-            %w[name first_name middle_name last_name address village_name village precinct_number birth_year dob voter_registration_number]
-          end
-          filtered = filtered.select do |row|
-            searchable_fields.any? { |field| row[field].to_s.downcase.include?(query) }
-          end
+          filtered = filtered.select { |row| import_view_row_matches_query?(row, source_type, q) }
         end
 
         filtered
+      end
+
+      def import_view_row_matches_query?(row, source_type, query)
+        query_terms = normalized_search_terms(query)
+        compact_query = query_terms.join
+        return true if compact_query.blank?
+
+        searchable_values = import_view_searchable_values(row, source_type)
+        normalized_values = searchable_values.map { |value| normalized_search_compact(value) }.reject(&:blank?)
+        return false if normalized_values.empty?
+
+        normalized_values.any? { |value| value.include?(compact_query) } ||
+          query_terms.all? { |term| normalized_values.any? { |value| value.include?(term) } }
+      end
+
+      def import_view_searchable_values(row, source_type)
+        fields = if source_type == "pdf"
+          %w[name first_name middle_name last_name address village source_village precinct_number birth_year voter_registration_number]
+        else
+          %w[name first_name middle_name last_name address village_name village source_village_name precinct_number birth_year dob voter_registration_number]
+        end
+        values = fields.filter_map { |field| row[field].presence }
+
+        first_name = row["first_name"]
+        middle_name = row["middle_name"]
+        last_name = row["last_name"]
+        values << [ first_name, middle_name, last_name ].compact.join(" ")
+        values << [ first_name, last_name ].compact.join(" ")
+        values << [ last_name, first_name ].compact.join(" ")
+        values << [ last_name, first_name, middle_name ].compact.join(" ")
+
+        values
       end
 
       def import_artifact_data(gec_import)

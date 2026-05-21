@@ -13,6 +13,34 @@ class Api::V1::ReferralCodesControllerTest < ActionDispatch::IntegrationTest
     )
   end
 
+  test "index defaults to active links and supports inactive filter search and pagination" do
+    active_code = ReferralCode.create!(
+      code: "ACTIVE-BAR-1234",
+      display_name: "Active Tamuning canvass",
+      village: @village,
+      created_by_user: @admin,
+      active: true,
+      metadata: { "source_type" => "village", "notes" => "Door team" }
+    )
+    inactive_code = ReferralCode.create!(
+      code: "ARCHIVE-BAR-1234",
+      display_name: "Archived QA link",
+      village: @village,
+      created_by_user: @admin,
+      active: false,
+      metadata: { "source_type" => "outreach", "notes" => "Local QA Test" }
+    )
+
+    get "/api/v1/referral_codes", headers: auth_headers(@admin), as: :json
+    assert_response :success
+    assert_equal [ active_code.id ], response.parsed_body["referral_codes"].map { |row| row["id"] }
+
+    get "/api/v1/referral_codes?status=inactive&q=local+qa&per_page=1", headers: auth_headers(@admin)
+    assert_response :success
+    assert_equal [ inactive_code.id ], response.parsed_body["referral_codes"].map { |row| row["id"] }
+    assert_equal 1, response.parsed_body.dig("pagination", "total")
+  end
+
   test "unused signup link can be deleted" do
     code = ReferralCode.create!(
       code: "UNUSED-BAR-1234",

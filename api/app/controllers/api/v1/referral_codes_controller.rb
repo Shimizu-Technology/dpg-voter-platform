@@ -13,16 +13,34 @@ module Api
 
       # GET /api/v1/referral_codes
       def index
-        codes = referral_code_scope
+        scope = referral_code_scope
           .includes(:village, :assigned_user, :created_by_user)
           .left_joins(:supporters)
           .select("referral_codes.*, COUNT(supporters.id) AS supporters_count")
           .group("referral_codes.id")
-          .order(active: :desc, created_at: :desc)
+        scope = apply_status_filter(scope)
+        scope = apply_search_filter(scope)
+
+        per_page = [ [ params.fetch(:per_page, 10).to_i, 1 ].max, 50 ].min
+        page = [ params.fetch(:page, 1).to_i, 1 ].max
+        total = scope.except(:select, :group, :order).distinct.count(:id)
+        total_pages = total.zero? ? 1 : (total.to_f / per_page).ceil
+        page = [ page, total_pages ].min
+        codes = scope.order(active: :desc, created_at: :desc).offset((page - 1) * per_page).limit(per_page)
 
         render json: {
           referral_codes: codes.map { |code| referral_code_json(code) },
-          signup_base_url: signup_base_url
+          signup_base_url: signup_base_url,
+          pagination: {
+            page: page,
+            per_page: per_page,
+            total: total,
+            pages: total_pages
+          },
+          filters: {
+            status: status_filter,
+            q: search_query
+          }
         }
       end
 
@@ -143,6 +161,37 @@ module Api
       def referral_code_scope
         ids = scoped_village_ids
         ids ? ReferralCode.where(village_id: ids) : ReferralCode.all
+      end
+
+      def apply_status_filter(scope)
+        case status_filter
+        when "inactive"
+          scope.where(active: false)
+        when "all"
+          scope
+        else
+          scope.where(active: true)
+        end
+      end
+
+      def apply_search_filter(scope)
+        query = search_query
+        return scope if query.blank?
+
+        pattern = "%#{ActiveRecord::Base.sanitize_sql_like(query.downcase)}%"
+        scope.where(
+          "LOWER(referral_codes.display_name) LIKE :pattern OR LOWER(referral_codes.code) LIKE :pattern OR LOWER(COALESCE(referral_codes.metadata->>'notes', '')) LIKE :pattern OR LOWER(COALESCE(referral_codes.metadata->>'source_type', '')) LIKE :pattern",
+          pattern: pattern
+        )
+      end
+
+      def status_filter
+        requested = params[:status].to_s
+        %w[active inactive all].include?(requested) ? requested : "active"
+      end
+
+      def search_query
+        params[:q].to_s.strip
       end
 
       def find_referral_code
