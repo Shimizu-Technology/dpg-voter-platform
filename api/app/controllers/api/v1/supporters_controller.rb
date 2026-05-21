@@ -491,6 +491,7 @@ module Api
         end
         supporters = supporters.where(status: params[:status]) if params[:status].present?
         supporters = supporters.where(source: params[:source]) if params[:source].present?
+        supporters = supporters.where(quota_period_id: params[:quota_period_id]) if params[:quota_period_id].present?
         supporters = supporters.where(review_status: params[:review_status]) if params[:review_status].present?
         supporters = supporters.where(public_review_status: params[:public_review_status]) if params[:public_review_status].present?
         supporters = supporters.where(registered_voter_status: params[:registered_voter_status]) if params[:registered_voter_status].present?
@@ -1172,6 +1173,7 @@ module Api
         end
         supporters = supporters.where(status: params[:status]) if params[:status].present?
         supporters = supporters.where(source: params[:source]) if params[:source].present?
+        supporters = supporters.where(quota_period_id: params[:quota_period_id]) if params[:quota_period_id].present?
         supporters = supporters.where(review_status: params[:review_status]) if params[:review_status].present?
         supporters = supporters.where(public_review_status: params[:public_review_status]) if params[:public_review_status].present?
         supporters = supporters.where(registered_voter_status: params[:registered_voter_status]) if params[:registered_voter_status].present?

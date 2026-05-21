@@ -16,7 +16,7 @@ class CampaignCycle < ApplicationRecord
 
   def self.current_or_create_default!
     active.ordered.first || create!(
-      name: "2026 DPG Organizing Cycle",
+      name: "#{Date.current.year} DPG Organizing Cycle",
       cycle_type: "organizing",
       start_date: Date.current.beginning_of_year,
       end_date: Date.current.end_of_year,

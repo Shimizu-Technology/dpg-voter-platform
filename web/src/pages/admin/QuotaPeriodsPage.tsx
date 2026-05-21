@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, CalendarDays, CheckCircle2, Loader2, Plus, RefreshCw, Target } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
@@ -68,7 +69,7 @@ function statusClass(period: QuotaPeriod) {
 
 function goalProgress(period: QuotaPeriod) {
   const goal = Number(period.quota_target || 0);
-  const current = Number(period.counts.total_contacts || 0);
+  const current = Number(period.counts.supporters || 0);
   const percent = goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
   return { current, goal, percent };
 }
@@ -174,8 +175,8 @@ export default function QuotaPeriodsPage() {
       )}
 
       <section className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 text-sm leading-relaxed text-blue-950">
-        <p className="font-semibold">This first version uses one overall credited-record goal per period.</p>
-        <p className="mt-1 text-blue-900/75">Total credited includes new intake plus reviewed contacts for the active period. Active contacts and supporters stay separate so public signups do not look vetted before DPG reviews them. Village or precinct-level goals are intentionally not exposed yet.</p>
+        <p className="font-semibold">This first version tracks intake, active contacts, and supporters separately.</p>
+        <p className="mt-1 text-blue-900/75">Public signups stay in Intake until DPG reviews them. Once reviewed, they become Active contacts; only active contacts marked as supporting DPG count as Supporters. The period goal below is a supporter goal for now.</p>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[420px_minmax(0,1fr)]">
@@ -211,18 +212,20 @@ export default function QuotaPeriodsPage() {
                 <input type="date" value={draft.due_date} onChange={(event) => setDraft((value) => ({ ...value, due_date: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Overall credited-record goal</span>
+                <span className="font-medium text-slate-700">Overall supporter goal</span>
                 <input type="number" min="0" value={draft.quota_target} onChange={(event) => setDraft((value) => ({ ...value, quota_target: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" />
-                <span className="mt-1 block text-xs text-slate-500">For now this tracks all records credited to the period, including pending intake.</span>
+                <span className="mt-1 block text-xs text-slate-500">For now this tracks reviewed contacts marked as supporters.</span>
               </label>
             </div>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Initial status</span>
-              <select value={draft.status} onChange={(event) => setDraft((value) => ({ ...value, status: event.target.value as 'open' | 'closed' }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
-                <option value="closed">Closed until activated</option>
-                <option value="open">Active now</option>
-              </select>
-            </label>
+            {!draft.id && (
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Initial status</span>
+                <select value={draft.status} onChange={(event) => setDraft((value) => ({ ...value, status: event.target.value as 'open' | 'closed' }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+                  <option value="closed">Closed until activated</option>
+                  <option value="open">Active now</option>
+                </select>
+              </label>
+            )}
             <div className="flex flex-col gap-2 sm:flex-row">
               <button type="submit" className="app-btn-primary justify-center" disabled={!canSave}>
                 {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
@@ -262,6 +265,17 @@ export default function QuotaPeriodsPage() {
                       </p>
                       <PeriodCountGrid period={period} className="mt-3" compact />
                       <GoalProgress period={period} className="mt-3 max-w-xl" compact />
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                        <Link className="rounded-full bg-blue-50 px-3 py-1 text-blue-700 hover:bg-blue-100" to={`/admin/intake?quota_period_id=${period.id}&return_to=${encodeURIComponent('/admin/periods')}`}>
+                          View intake
+                        </Link>
+                        <Link className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 hover:bg-slate-200" to={`/admin/supporters?quota_period_id=${period.id}&contact_classification=active_contact&return_to=${encodeURIComponent('/admin/periods')}`}>
+                          View active contacts
+                        </Link>
+                        <Link className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 hover:bg-emerald-100" to={`/admin/supporters?quota_period_id=${period.id}&contact_classification=active_contact&support_status=supporter&return_to=${encodeURIComponent('/admin/periods')}`}>
+                          View supporters
+                        </Link>
+                      </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
                       <button type="button" className="app-btn-secondary justify-center" onClick={() => setDraft({ id: period.id, name: period.name, start_date: period.start_date, end_date: period.end_date, due_date: period.due_date, quota_target: String(period.quota_target), status: period.status === 'open' ? 'open' : 'closed' })}>
@@ -295,8 +309,7 @@ export default function QuotaPeriodsPage() {
 
 function PeriodCountGrid({ period, className = '', compact = false }: { period: QuotaPeriod; className?: string; compact?: boolean }) {
   return (
-    <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${className}`}>
-      <Stat label="Total credited" value={period.counts.total_contacts} compact={compact} />
+    <div className={`grid grid-cols-1 gap-2 sm:grid-cols-3 ${className}`}>
       <Stat label="Intake" value={period.counts.pending_intake} compact={compact} />
       <Stat label="Active contacts" value={period.counts.active_contacts} compact={compact} />
       <Stat label="Supporters" value={period.counts.supporters} compact={compact} />
@@ -311,7 +324,7 @@ function GoalProgress({ period, className = '', compact = false }: { period: Quo
   return (
     <div className={className}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="font-semibold text-slate-800">Overall credited-record goal</span>
+        <span className="font-semibold text-slate-800">Overall supporter goal</span>
         <span className="text-slate-600">
           {progress.current.toLocaleString()} / {hasGoal ? progress.goal.toLocaleString() : 'No goal set'}{hasGoal ? ` · ${progress.percent}%` : ''}
         </span>
@@ -319,7 +332,7 @@ function GoalProgress({ period, className = '', compact = false }: { period: Quo
       <div className={`${compact ? 'h-2' : 'h-3'} overflow-hidden rounded-full bg-slate-100`}>
         <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${hasGoal ? progress.percent : 0}%` }} />
       </div>
-      {!hasGoal && <p className="mt-1 text-xs text-slate-500">Set an overall credited-record goal to show quota progress.</p>}
+      {!hasGoal && <p className="mt-1 text-xs text-slate-500">Set an overall supporter goal to show quota progress.</p>}
     </div>
   );
 }

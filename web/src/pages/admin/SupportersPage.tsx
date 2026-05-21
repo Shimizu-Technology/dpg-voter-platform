@@ -289,6 +289,7 @@ export default function SupportersPage() {
   const [villageFilter, setVillageFilter] = useState(searchParams.get('village_id') || '');
   const [precinctFilter, setPrecinctFilter] = useState(searchParams.get('precinct_id') || '');
   const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '');
+  const [quotaPeriodFilter] = useState(searchParams.get('quota_period_id') || '');
   const [optInFilter, setOptInFilter] = useState(searchParams.get('opt_in') || '');
   const [verificationFilter, setVerificationFilter] = useState(searchParams.get('verification_status') || '');
   const [classificationFilter, setClassificationFilter] = useState(searchParams.get('contact_classification') || defaultClassificationFilter(isIntakeView));
@@ -357,6 +358,7 @@ export default function SupportersPage() {
     if (effectiveVillageFilter) params.set('village_id', effectiveVillageFilter);
     if (precinctFilter) params.set('precinct_id', precinctFilter);
     if (sourceFilter) params.set('source', sourceFilter);
+    if (quotaPeriodFilter) params.set('quota_period_id', quotaPeriodFilter);
     if (optInFilter) params.set('opt_in', optInFilter);
     if (verificationFilter) params.set('verification_status', verificationFilter);
     if (classificationFilter && classificationFilter !== defaultClassificationFilter(isIntakeView)) params.set('contact_classification', classificationFilter);
@@ -370,15 +372,16 @@ export default function SupportersPage() {
     params.set('per_page', String(perPage));
     if (returnTo) params.set('return_to', returnTo);
     setSearchParams(params, { replace: true });
-  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, isIntakeView, setSearchParams]);
+  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, isIntakeView, setSearchParams]);
 
   const { data, isFetching } = useQuery<SupportersResponse>({
-    queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
+    queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
     queryFn: () => getSupporters({
       search: debouncedSearch,
       village_id: effectiveVillageFilter || undefined,
       precinct_id: precinctFilter || undefined,
       source: sourceFilter || undefined,
+      quota_period_id: quotaPeriodFilter || undefined,
       opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
       opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
       verification_status: verificationFilter || undefined,
@@ -407,7 +410,7 @@ export default function SupportersPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => setVisibleRows(80), 0);
     return () => window.clearTimeout(timer);
-  }, [progressiveRenderingEnabled, page, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage]);
+  }, [progressiveRenderingEnabled, page, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage]);
 
   useEffect(() => {
     if (!progressiveRenderingEnabled) return;
@@ -424,12 +427,13 @@ export default function SupportersPage() {
     const totalPages = data.pagination.pages;
     if (page < totalPages) {
       void queryClient.prefetchQuery({
-        queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
+        queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
         queryFn: () => getSupporters({
           search: debouncedSearch,
           village_id: effectiveVillageFilter || undefined,
           precinct_id: precinctFilter || undefined,
           source: sourceFilter || undefined,
+          quota_period_id: quotaPeriodFilter || undefined,
           opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
           opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
           verification_status: verificationFilter || undefined,
@@ -447,7 +451,7 @@ export default function SupportersPage() {
         }),
       });
     }
-  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
+  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
 
   const assignPrecinctMutation = useMutation({
     mutationFn: ({ supporterId, precinctId }: { supporterId: number; precinctId: number }) =>

@@ -163,8 +163,7 @@ export default function DashboardPage() {
                 {new Date(`${activeQuotaPeriod.start_date}T00:00:00`).toLocaleDateString()} to {new Date(`${activeQuotaPeriod.end_date}T00:00:00`).toLocaleDateString()}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <MiniPeriodStat label="Total credited" value={activeQuotaPeriod.counts.total_contacts} />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <MiniPeriodStat label="Intake" value={activeQuotaPeriod.counts.pending_intake} />
               <MiniPeriodStat label="Active contacts" value={activeQuotaPeriod.counts.active_contacts} />
               <MiniPeriodStat label="Supporters" value={activeQuotaPeriod.counts.supporters} />
@@ -272,13 +271,13 @@ export default function DashboardPage() {
 
 function DashboardGoalProgress({ period }: { period: ActiveQuotaPeriod }) {
   const goal = Number(period.quota_target || 0);
-  const current = Number(period.counts.total_contacts || 0);
+  const current = Number(period.counts.supporters || 0);
   const percent = goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
 
   return (
     <div className="mt-4">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="font-semibold text-emerald-900">Overall credited-record goal</span>
+        <span className="font-semibold text-emerald-900">Overall supporter goal</span>
         <span className="text-emerald-800/80">
           {current.toLocaleString()} / {goal > 0 ? goal.toLocaleString() : 'No goal set'}{goal > 0 ? ` · ${percent}%` : ''}
         </span>
