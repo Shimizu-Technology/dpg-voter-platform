@@ -26,6 +26,8 @@ export function useCampaignUpdates(onEvent?: (event: CampaignEvent) => void, ena
         'vetting-queue',
         'public-review',
         'reports-list',
+        'quota-periods',
+        'referral-codes',
       ],
       supporter_updated: [
         'supporters',
@@ -37,6 +39,8 @@ export function useCampaignUpdates(onEvent?: (event: CampaignEvent) => void, ena
         'public-review',
         'reports-list',
         'duplicates',
+        'quota-periods',
+        'referral-codes',
       ],
       stats_update: [
         'dashboard',
@@ -46,6 +50,14 @@ export function useCampaignUpdates(onEvent?: (event: CampaignEvent) => void, ena
         'vetting-supporters',
         'vetting-queue',
         'public-review',
+        'reports-list',
+        'quota-periods',
+        'referral-codes',
+      ],
+      quota_period_updated: [
+        'dashboard',
+        'quota-periods',
+        'referral-codes',
         'reports-list',
       ],
     };

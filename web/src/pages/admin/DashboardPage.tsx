@@ -164,9 +164,9 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <MiniPeriodStat label="Contacts" value={activeQuotaPeriod.counts.total_contacts} />
+              <MiniPeriodStat label="Total credited" value={activeQuotaPeriod.counts.total_contacts} />
               <MiniPeriodStat label="Intake" value={activeQuotaPeriod.counts.pending_intake} />
-              <MiniPeriodStat label="QR signups" value={activeQuotaPeriod.counts.qr_signups} />
+              <MiniPeriodStat label="Active contacts" value={activeQuotaPeriod.counts.active_contacts} />
               <MiniPeriodStat label="Supporters" value={activeQuotaPeriod.counts.supporters} />
             </div>
           </div>
@@ -278,7 +278,7 @@ function DashboardGoalProgress({ period }: { period: ActiveQuotaPeriod }) {
   return (
     <div className="mt-4">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="font-semibold text-emerald-900">Overall contact goal</span>
+        <span className="font-semibold text-emerald-900">Overall credited-record goal</span>
         <span className="text-emerald-800/80">
           {current.toLocaleString()} / {goal > 0 ? goal.toLocaleString() : 'No goal set'}{goal > 0 ? ` · ${percent}%` : ''}
         </span>

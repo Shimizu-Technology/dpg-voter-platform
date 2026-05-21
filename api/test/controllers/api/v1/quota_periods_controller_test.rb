@@ -63,6 +63,26 @@ class Api::V1::QuotaPeriodsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "quota_period_archive_failed", response.parsed_body["code"]
   end
 
+  test "update cannot archive the active quota period by status bypass" do
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Active Period For Update",
+      start_date: Date.new(2026, 5, 1),
+      end_date: Date.new(2026, 5, 31),
+      due_date: Date.new(2026, 6, 3),
+      status: "open"
+    )
+
+    patch "/api/v1/quota_periods/#{period.id}",
+      params: { quota_period: { name: "Renamed Active Period", status: "archived" } },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    assert_equal "Renamed Active Period", period.reload.name
+    assert_equal "open", period.status
+  end
+
   test "closed quota period can be archived" do
     period = QuotaPeriod.create!(
       campaign_cycle: @cycle,
