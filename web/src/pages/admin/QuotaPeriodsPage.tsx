@@ -66,6 +66,13 @@ function statusClass(period: QuotaPeriod) {
   return 'bg-amber-50 text-amber-700';
 }
 
+function goalProgress(period: QuotaPeriod) {
+  const goal = Number(period.quota_target || 0);
+  const current = Number(period.counts.total_contacts || 0);
+  const percent = goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
+  return { current, goal, percent };
+}
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error && 'response' in error) {
@@ -167,8 +174,14 @@ export default function QuotaPeriodsPage() {
               <Stat label="Supporters" value={activePeriod.counts.supporters} />
             </div>
           </div>
+          <GoalProgress period={activePeriod} className="mt-5" />
         </section>
       )}
+
+      <section className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 text-sm leading-relaxed text-blue-950">
+        <p className="font-semibold">This first version uses one overall contact goal per period.</p>
+        <p className="mt-1 text-blue-900/75">Village or precinct-level goals are intentionally not exposed yet. The data model can support village quotas later, but DPG should decide whether goals are island-wide, per village, per organizer, or by signup link before we add more knobs.</p>
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-[420px_minmax(0,1fr)]">
         <form
@@ -203,8 +216,9 @@ export default function QuotaPeriodsPage() {
                 <input type="date" value={draft.due_date} onChange={(event) => setDraft((value) => ({ ...value, due_date: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" />
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-slate-700">Goal target</span>
+                <span className="font-medium text-slate-700">Overall contact goal</span>
                 <input type="number" min="0" value={draft.quota_target} onChange={(event) => setDraft((value) => ({ ...value, quota_target: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" />
+                <span className="mt-1 block text-xs text-slate-500">For now this tracks total contacts credited to the period.</span>
               </label>
             </div>
             <label className="block text-sm">
@@ -257,6 +271,7 @@ export default function QuotaPeriodsPage() {
                         <Stat label="QR" value={period.counts.qr_signups} compact />
                         <Stat label="Supporters" value={period.counts.supporters} compact />
                       </div>
+                      <GoalProgress period={period} className="mt-3 max-w-xl" compact />
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
                       <button type="button" className="app-btn-secondary justify-center" onClick={() => setDraft({ id: period.id, name: period.name, start_date: period.start_date, end_date: period.end_date, due_date: period.due_date, quota_target: String(period.quota_target), status: period.status === 'open' ? 'open' : 'closed' })}>
@@ -285,6 +300,26 @@ export default function QuotaPeriodsPage() {
         </section>
       </section>
     </WorkspacePage>
+  );
+}
+
+function GoalProgress({ period, className = '', compact = false }: { period: QuotaPeriod; className?: string; compact?: boolean }) {
+  const progress = goalProgress(period);
+  const hasGoal = progress.goal > 0;
+
+  return (
+    <div className={className}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span className="font-semibold text-slate-800">Overall contact goal</span>
+        <span className="text-slate-600">
+          {progress.current.toLocaleString()} / {hasGoal ? progress.goal.toLocaleString() : 'No goal set'}{hasGoal ? ` · ${progress.percent}%` : ''}
+        </span>
+      </div>
+      <div className={`${compact ? 'h-2' : 'h-3'} overflow-hidden rounded-full bg-slate-100`}>
+        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${hasGoal ? progress.percent : 0}%` }} />
+      </div>
+      {!hasGoal && <p className="mt-1 text-xs text-slate-500">Set an overall contact goal to show quota progress.</p>}
+    </div>
   );
 }
 

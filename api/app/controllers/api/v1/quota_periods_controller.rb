@@ -14,11 +14,12 @@ module Api
       def index
         periods = QuotaPeriod.includes(:campaign_cycle).visible.ordered.to_a
         active_period = QuotaPeriod.active_for
-        counts_by_period = period_counts_by_period(periods.map(&:id))
+        period_ids = (periods.map(&:id) + [ active_period&.id ]).compact.uniq
+        counts_by_period = period_counts_by_period(period_ids)
 
         render json: {
           quota_periods: periods.map { |period| quota_period_json(period, counts: counts_by_period.fetch(period.id, empty_period_counts), active_period: active_period) },
-          active_quota_period: active_period && quota_period_json(active_period, active_period: active_period)
+          active_quota_period: active_period && quota_period_json(active_period, counts: counts_by_period.fetch(active_period.id, empty_period_counts), active_period: active_period)
         }
       end
 

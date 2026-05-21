@@ -27,7 +27,6 @@ interface VillageData {
   total_contacts?: number;
   new_intake_count?: number;
   supporter_count?: number;
-  member_count?: number;
   volunteer_count?: number;
   needs_follow_up_count?: number;
   matched_to_gec_count?: number;
@@ -41,7 +40,6 @@ interface DashboardSummary {
   total_contacts: number;
   new_intake: number;
   supporters: number;
-  members: number;
   volunteers: number;
   needs_follow_up: number;
   matched_to_gec: number;
@@ -132,7 +130,6 @@ export default function DashboardPage() {
     matched: Number(row.matched_to_gec_count ?? 0),
     followUp: Number(row.needs_follow_up_count ?? 0),
     supporters: Number(row.supporter_count ?? 0),
-    members: Number(row.member_count ?? 0),
     route: `/admin/villages/${row.id}`,
   }));
 
@@ -173,6 +170,7 @@ export default function DashboardPage() {
               <MiniPeriodStat label="Supporters" value={activeQuotaPeriod.counts.supporters} />
             </div>
           </div>
+          <DashboardGoalProgress period={activeQuotaPeriod} />
         </Link>
       )}
 
@@ -247,7 +245,6 @@ export default function DashboardPage() {
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">GEC Matches</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Follow-Up</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Supporters</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Members</th>
               </tr>
             </thead>
             <tbody>
@@ -263,7 +260,6 @@ export default function DashboardPage() {
                     <td className="py-2 px-3 text-right text-green-700">{v.matched}</td>
                     <td className="py-2 px-3 text-right text-red-700">{v.followUp}</td>
                     <td className="py-2 px-3 text-right text-gray-600">{v.supporters}</td>
-                    <td className="py-2 px-3 text-right text-gray-600">{v.members}</td>
                   </tr>
               ))}
             </tbody>
@@ -271,6 +267,26 @@ export default function DashboardPage() {
         </div>
       </div>
     </WorkspacePage>
+  );
+}
+
+function DashboardGoalProgress({ period }: { period: ActiveQuotaPeriod }) {
+  const goal = Number(period.quota_target || 0);
+  const current = Number(period.counts.total_contacts || 0);
+  const percent = goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
+
+  return (
+    <div className="mt-4">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span className="font-semibold text-emerald-900">Overall contact goal</span>
+        <span className="text-emerald-800/80">
+          {current.toLocaleString()} / {goal > 0 ? goal.toLocaleString() : 'No goal set'}{goal > 0 ? ` · ${percent}%` : ''}
+        </span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-white/80">
+        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${goal > 0 ? percent : 0}%` }} />
+      </div>
+    </div>
   );
 }
 
