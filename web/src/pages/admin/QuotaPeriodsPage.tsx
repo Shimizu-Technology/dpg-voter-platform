@@ -268,10 +268,14 @@ export default function QuotaPeriodsPage() {
                           Activate
                         </button>
                       )}
-                      <button type="button" className="app-btn-secondary justify-center text-amber-700 hover:bg-amber-50" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(period.id)}>
-                        <Archive className="h-4 w-4" />
-                        Archive
-                      </button>
+                      {period.active ? (
+                        <p className="max-w-40 text-xs leading-relaxed text-slate-500">Activate another period before archiving this one.</p>
+                      ) : (
+                        <button type="button" className="app-btn-secondary justify-center text-amber-700 hover:bg-amber-50" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(period.id)}>
+                          <Archive className="h-4 w-4" />
+                          Archive
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

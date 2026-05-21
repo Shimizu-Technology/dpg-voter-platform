@@ -39,6 +39,11 @@ class QuotaPeriod < ApplicationRecord
   end
 
   def archive!
+    if open?
+      errors.add(:status, "cannot archive an active period; close or activate another period first")
+      raise ActiveRecord::RecordInvalid, self
+    end
+
     update!(status: "archived")
   end
 

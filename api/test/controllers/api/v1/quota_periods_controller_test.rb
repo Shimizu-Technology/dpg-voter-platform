@@ -46,6 +46,39 @@ class Api::V1::QuotaPeriodsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Quota Period 1", response.parsed_body.dig("active_quota_period", "name")
   end
 
+  test "active quota period cannot be archived" do
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Active Period",
+      start_date: Date.new(2026, 5, 1),
+      end_date: Date.new(2026, 5, 31),
+      due_date: Date.new(2026, 6, 3),
+      status: "open"
+    )
+
+    post "/api/v1/quota_periods/#{period.id}/archive", headers: auth_headers(@admin), as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "open", period.reload.status
+    assert_equal "quota_period_archive_failed", response.parsed_body["code"]
+  end
+
+  test "closed quota period can be archived" do
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Closed Period",
+      start_date: Date.new(2026, 5, 1),
+      end_date: Date.new(2026, 5, 31),
+      due_date: Date.new(2026, 6, 3),
+      status: "closed"
+    )
+
+    post "/api/v1/quota_periods/#{period.id}/archive", headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    assert_equal "archived", period.reload.status
+  end
+
   test "only one period can be open at a time unless activated" do
     first = QuotaPeriod.create!(
       campaign_cycle: @cycle,

@@ -12,18 +12,19 @@ module Api
 
       # GET /api/v1/quota_periods
       def index
-        periods = QuotaPeriod.includes(:campaign_cycle).visible.ordered
+        periods = QuotaPeriod.includes(:campaign_cycle).visible.ordered.to_a
         active_period = QuotaPeriod.active_for
+        counts_by_period = period_counts_by_period(periods.map(&:id))
 
         render json: {
-          quota_periods: periods.map { |period| quota_period_json(period) },
-          active_quota_period: active_period && quota_period_json(active_period)
+          quota_periods: periods.map { |period| quota_period_json(period, counts: counts_by_period.fetch(period.id, empty_period_counts), active_period: active_period) },
+          active_quota_period: active_period && quota_period_json(active_period, active_period: active_period)
         }
       end
 
       # GET /api/v1/quota_periods/:id
       def show
-        render json: { quota_period: quota_period_json(@quota_period, include_breakdown: true) }
+        render json: { quota_period: quota_period_json(@quota_period, include_breakdown: true, active_period: QuotaPeriod.active_for) }
       end
 
       # POST /api/v1/quota_periods
@@ -64,7 +65,9 @@ module Api
       def archive
         @quota_period.archive!
         log_audit!(@quota_period, action: "quota_period_archived", changed_data: { status: "archived" })
-        render json: { quota_period: quota_period_json(@quota_period.reload) }
+        render json: { quota_period: quota_period_json(@quota_period.reload, active_period: QuotaPeriod.active_for) }
+      rescue ActiveRecord::RecordInvalid => e
+        render_api_error(message: e.record.errors.full_messages.to_sentence, status: :unprocessable_entity, code: "quota_period_archive_failed")
       end
 
       private
@@ -86,8 +89,8 @@ module Api
         params.require(:quota_period).permit(:name, :start_date, :end_date, :due_date, :quota_target, :status)
       end
 
-      def quota_period_json(period, include_breakdown: false)
-        counts = period_counts(period)
+      def quota_period_json(period, include_breakdown: false, counts: nil, active_period: QuotaPeriod.active_for)
+        counts ||= period_counts(period)
         payload = {
           id: period.id,
           name: period.name,
@@ -96,7 +99,7 @@ module Api
           due_date: period.due_date,
           quota_target: period.quota_target,
           status: period.status,
-          active: period == QuotaPeriod.active_for,
+          active: period == active_period,
           campaign_cycle_id: period.campaign_cycle_id,
           campaign_cycle_name: period.campaign_cycle&.name,
           counts: counts,
@@ -108,15 +111,36 @@ module Api
       end
 
       def period_counts(period)
-        scope = Supporter.where(quota_period_id: period.id)
+        period_counts_by_period([ period.id ]).fetch(period.id, empty_period_counts)
+      end
+
+      def period_counts_by_period(period_ids)
+        ids = period_ids.compact
+        return {} if ids.empty?
+
+        counts = ids.index_with { empty_period_counts }
+        base_scope = Supporter.where(quota_period_id: ids)
+
+        base_scope.contacts.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:total_contacts] = total }
+        base_scope.intake.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:pending_intake] = total }
+        base_scope.relationship_contacts.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:active_contacts] = total }
+        base_scope.classified_supporters.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:supporters] = total }
+        base_scope.where(source: "qr_signup").group(:quota_period_id).count.each { |period_id, total| counts[period_id][:qr_signups] = total }
+        base_scope.public_origin.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:public_signups] = total }
+        base_scope.where(source: "staff_entry").group(:quota_period_id).count.each { |period_id, total| counts[period_id][:staff_entries] = total }
+
+        counts
+      end
+
+      def empty_period_counts
         {
-          total_contacts: scope.contacts.count,
-          pending_intake: scope.intake.count,
-          active_contacts: scope.relationship_contacts.count,
-          supporters: scope.classified_supporters.count,
-          qr_signups: scope.where(source: "qr_signup").count,
-          public_signups: scope.public_origin.count,
-          staff_entries: scope.where(source: "staff_entry").count
+          total_contacts: 0,
+          pending_intake: 0,
+          active_contacts: 0,
+          supporters: 0,
+          qr_signups: 0,
+          public_signups: 0,
+          staff_entries: 0
         }
       end
 

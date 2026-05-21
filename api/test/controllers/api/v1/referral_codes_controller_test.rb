@@ -96,6 +96,7 @@ class Api::V1::ReferralCodesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     row = response.parsed_body["referral_codes"].find { |item| item["id"] == code.id }
+    assert_equal 2, row["signup_count"]
     assert_equal 1, row["period_signup_count"]
     assert_equal 2, row["lifetime_signup_count"]
     assert_equal period.id, response.parsed_body.dig("selected_quota_period", "id")

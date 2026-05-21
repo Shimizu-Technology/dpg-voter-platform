@@ -24,13 +24,14 @@ module Api
         page = [ page, total_pages ].min
         codes = scope.order(active: :desc, created_at: :desc).offset((page - 1) * per_page).limit(per_page).to_a
         period = resolved_quota_period
+        active_period = QuotaPeriod.active_for
         period_counts = referral_counts(codes, period: period)
         lifetime_counts = referral_counts(codes)
 
         render json: {
           referral_codes: codes.map { |code| referral_code_json(code, period_counts: period_counts, lifetime_counts: lifetime_counts) },
           signup_base_url: signup_base_url,
-          active_quota_period: QuotaPeriod.active_for && quota_period_summary(QuotaPeriod.active_for),
+          active_quota_period: active_period && quota_period_summary(active_period),
           selected_quota_period: period && quota_period_summary(period),
           pagination: {
             page: page,
@@ -317,7 +318,7 @@ module Api
           source_type: code.source_type,
           precinct_id: code.precinct_id,
           notes: code.notes,
-          signup_count: count,
+          signup_count: lifetime_count,
           period_signup_count: count,
           lifetime_signup_count: lifetime_count,
           signup_url: url,
