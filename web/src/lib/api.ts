@@ -48,6 +48,16 @@ export const updateReferralCode = (id: number, data: JsonRecord) =>
   api.patch(`/referral_codes/${id}`, { referral_code: data }).then(r => r.data);
 export const deleteReferralCode = (id: number) => api.delete(`/referral_codes/${id}`).then(r => r.data);
 
+// Quota / outreach periods
+export const getQuotaPeriods = () => api.get('/quota_periods').then(r => r.data);
+export const getQuotaPeriod = (id: number) => api.get(`/quota_periods/${id}`).then(r => r.data);
+export const createQuotaPeriod = (data: JsonRecord) =>
+  api.post('/quota_periods', { quota_period: data }).then(r => r.data);
+export const updateQuotaPeriod = (id: number, data: JsonRecord) =>
+  api.patch(`/quota_periods/${id}`, { quota_period: data }).then(r => r.data);
+export const activateQuotaPeriod = (id: number) => api.post(`/quota_periods/${id}/activate`).then(r => r.data);
+export const archiveQuotaPeriod = (id: number) => api.post(`/quota_periods/${id}/archive`).then(r => r.data);
+
 // Supporters
 export const createSupporter = (
   data: JsonRecord,

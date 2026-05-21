@@ -83,16 +83,19 @@ Build immediately from demo feedback:
 
 ### 2. DPG quota/period foundation
 
+Status: in implementation on `feature/dpg-quota-period-foundation`.
+
 DPG independently raised quota/period needs during the demo, so this is now safe to design as a DPG-owned goals/period system rather than a copied campaign workflow.
 
 Initial scope:
 
 - admin-defined quota/goal periods with start/end dates
 - active period selection
-- new signups/contacts attributed to the active period
-- period-aware signup-link/user/village counts
+- new public signups, QR signups, and staff entries attributed to the active period
+- active-period summary on the dashboard
+- period-aware signup-link counts with lifetime totals preserved
 - reports that can filter by period
-- duplicate handling that avoids double-counting where possible
+- duplicate handling remains in Duplicate Contact Review; more advanced unique-credit rules should wait for DPG feedback
 
 Clarify before detailed dashboards:
 

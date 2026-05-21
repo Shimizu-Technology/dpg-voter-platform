@@ -11,6 +11,7 @@ import {
   Upload,
   FileSpreadsheet,
   TrendingUp,
+  Target,
 } from 'lucide-react';
 import DashboardSkeleton from '../../components/DashboardSkeleton';
 import { getDashboard } from '../../lib/api';
@@ -49,11 +50,30 @@ interface DashboardSummary {
   total_villages: number;
 }
 
+interface ActiveQuotaPeriod {
+  id: number;
+  name: string;
+  start_date: string;
+  end_date: string;
+  due_date: string;
+  quota_target: number;
+  status: string;
+  counts: {
+    total_contacts: number;
+    pending_intake: number;
+    active_contacts: number;
+    supporters: number;
+    qr_signups: number;
+    public_signups: number;
+  };
+}
+
 interface DashboardPayload {
   campaign?: {
     id?: number;
     name?: string;
   };
+  active_quota_period?: ActiveQuotaPeriod | null;
   summary?: Partial<DashboardSummary>;
   villages?: VillageData[];
 }
@@ -103,6 +123,7 @@ export default function DashboardPage() {
   const officialVillageCount = Number(
     summary.total_villages || villages.filter((v) => v.name !== 'Unassigned').length
   );
+  const activeQuotaPeriod = dashboard.active_quota_period;
   const villageProgressRows = villages.map((row) => ({
     villageId: row.id,
     villageName: row.name,
@@ -131,6 +152,29 @@ export default function DashboardPage() {
           Track public signups, supporter records, voter-help follow-up, and outreach activity for the Democratic Party of Guam.
         </p>
       </div>
+
+      {activeQuotaPeriod && (
+        <Link to="/admin/periods" className="block rounded-xl border border-emerald-100 bg-emerald-50/70 p-5 transition hover:border-emerald-200 hover:bg-emerald-50">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-emerald-700">
+                <Target className="h-4 w-4" />
+                Active period
+              </div>
+              <h2 className="mt-2 text-lg font-semibold text-slate-950">{activeQuotaPeriod.name}</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {new Date(`${activeQuotaPeriod.start_date}T00:00:00`).toLocaleDateString()} to {new Date(`${activeQuotaPeriod.end_date}T00:00:00`).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <MiniPeriodStat label="Contacts" value={activeQuotaPeriod.counts.total_contacts} />
+              <MiniPeriodStat label="Intake" value={activeQuotaPeriod.counts.pending_intake} />
+              <MiniPeriodStat label="QR signups" value={activeQuotaPeriod.counts.qr_signups} />
+              <MiniPeriodStat label="Supporters" value={activeQuotaPeriod.counts.supporters} />
+            </div>
+          </div>
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -227,6 +271,15 @@ export default function DashboardPage() {
         </div>
       </div>
     </WorkspacePage>
+  );
+}
+
+function MiniPeriodStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg bg-white/75 px-3 py-2">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">{label}</div>
+      <div className="mt-1 text-lg font-semibold text-slate-950">{Number(value || 0).toLocaleString()}</div>
+    </div>
   );
 }
 

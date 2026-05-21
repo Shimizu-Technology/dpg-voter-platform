@@ -44,6 +44,12 @@ Rails.application.routes.draw do
           get :supporters
         end
       end
+      resources :quota_periods, only: [ :index, :show, :create, :update ] do
+        member do
+          post :activate
+          post :archive
+        end
+      end
       resources :precincts, only: [ :index, :update ]
       resources :audit_logs, only: [ :index ]
       resources :gec_voters, only: [ :index ] do

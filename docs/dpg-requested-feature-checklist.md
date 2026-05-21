@@ -227,6 +227,11 @@ Core build:
 - period filters for signup-link, user, village, and report counts
 - duplicate cleanup rules so the same person is not double-counted where DPG expects unique-person counts
 
+Current implementation branch:
+
+- `feature/dpg-quota-period-foundation` adds period management, active-period assignment for public/QR/staff signups, signup-link period counts, dashboard active-period summary, and report period filtering.
+- Detailed goal rules, leaderboards, and unique-person quota credit should wait for DPG feedback.
+
 Open questions:
 
 - should quotas count raw signups, approved contacts, supporters, registered Democrats, volunteers, or multiple metrics?
@@ -294,12 +299,12 @@ Status: implemented. Membership is hidden from the active manual workflow and re
 ## Phase 4: Communications and list operations
 
 - QR attribution: implemented.
-- QR-code download: requested in the May 20 demo, pending.
-- signup-link delete/archive lifecycle: requested in the May 20 demo, pending.
+- QR-code download: implemented.
+- signup-link delete/archive lifecycle: implemented.
 - SMS/email templates: implemented starter templates.
 - recipient review: implemented through dry-run preview and count confirmation before live sends.
 - SMS delivery status and resend-to-failed/undelivered: requested in the May 20 demo, pending provider-status integration.
-- DPG quota/period tracking: requested in the May 20 demo, pending DPG-specific period/goal design.
+- DPG quota/period tracking: requested in the May 20 demo; foundation is in implementation with detailed goal/leaderboard rules pending DPG feedback.
 - exports/import reports: DPG/GEC contact cross-reference reports are implemented; explicit non-GEC list types and official member-roster/registered-Democrat list-lineage reporting remain pending actual DPG list samples.
 
 ## Phase 5: Election operations

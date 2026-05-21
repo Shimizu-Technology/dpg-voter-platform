@@ -24,6 +24,7 @@ import {
   Copy,
   Database,
   QrCode,
+  Target,
 } from 'lucide-react';
 import WorkspaceBrandPanel from './WorkspaceBrandPanel';
 import { publicSiteConfig } from '../lib/publicSite';
@@ -87,6 +88,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     {
       label: 'Review',
       items: [
+        ...(permissions?.can_access_reports ? [ { to: '/admin/periods', label: 'Periods & Goals', icon: Target } ] : []),
         ...(permissions?.can_access_reports ? [ { to: '/admin/reports', label: 'Reports', icon: FileSpreadsheet } ] : []),
         ...(permissions?.can_access_audit_logs ? [ { to: '/admin/audit-logs', label: 'Activity Log', icon: ScrollText } ] : []),
       ],

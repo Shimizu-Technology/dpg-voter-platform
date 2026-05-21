@@ -109,10 +109,13 @@ module Api
         all_villages = Village.all
         global_total_precincts = all_villages.sum { |v| v.precinct_count.to_i }
 
+        active_quota_period = QuotaPeriod.active_for
+
         Rails.logger.info("[Dashboard] total_precincts=#{global_total_precincts} villages=#{villages.size}")
 
         render json: {
           campaign: campaign&.slice(:id, :name, :candidate_names, :election_year, :primary_color, :secondary_color),
+          active_quota_period: active_quota_period && quota_period_dashboard_json(active_quota_period),
           summary: {
             total_contacts: global_total,
             new_intake: global_intake,
@@ -139,6 +142,27 @@ module Api
       end
 
       private
+
+      def quota_period_dashboard_json(period)
+        scope = Supporter.where(quota_period_id: period.id)
+        {
+          id: period.id,
+          name: period.name,
+          start_date: period.start_date,
+          end_date: period.end_date,
+          due_date: period.due_date,
+          quota_target: period.quota_target,
+          status: period.status,
+          counts: {
+            total_contacts: scope.contacts.count,
+            pending_intake: scope.intake.count,
+            active_contacts: scope.relationship_contacts.count,
+            supporters: scope.classified_supporters.count,
+            qr_signups: scope.where(source: "qr_signup").count,
+            public_signups: scope.public_origin.count
+          }
+        }
+      end
 
       def official_village_scope
         Village.where.not(name: OFFICIAL_UNASSIGNED_VILLAGE_NAME)

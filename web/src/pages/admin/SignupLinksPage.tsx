@@ -5,7 +5,7 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, External
 import { Link } from 'react-router-dom';
 import WorkspacePage from '../../components/WorkspacePage';
 import { useSession } from '../../hooks/useSession';
-import { createReferralCode, deleteReferralCode, getReferralCodeSupporters, getReferralCodes, getUsers, getVillages, updateReferralCode } from '../../lib/api';
+import { createReferralCode, deleteReferralCode, getQuotaPeriods, getReferralCodeSupporters, getReferralCodes, getUsers, getVillages, updateReferralCode } from '../../lib/api';
 
 interface VillageOption {
   id: number;
@@ -34,13 +34,25 @@ interface SignupLink {
   precinct_id: string | null;
   notes: string | null;
   signup_count: number;
+  period_signup_count: number;
+  lifetime_signup_count: number;
   signup_url: string;
   created_at: string;
+}
+
+interface QuotaPeriodOption {
+  id: number;
+  name: string;
+  start_date: string;
+  end_date: string;
+  status: string;
 }
 
 interface ReferralCodesResponse {
   referral_codes: SignupLink[];
   signup_base_url: string;
+  active_quota_period?: QuotaPeriodOption | null;
+  selected_quota_period?: QuotaPeriodOption | null;
   pagination?: {
     page: number;
     per_page: number;
@@ -55,6 +67,11 @@ interface ReferralCodesResponse {
 
 interface UsersResponse {
   users: UserOption[];
+}
+
+interface QuotaPeriodsResponse {
+  quota_periods: QuotaPeriodOption[];
+  active_quota_period?: QuotaPeriodOption | null;
 }
 
 interface ReferralSignup {
@@ -100,12 +117,12 @@ function sourceLabel(value: string) {
 
 function linkStatusLabel(link: SignupLink) {
   if (link.active) return 'Active';
-  return link.signup_count > 0 ? 'Archived' : 'Inactive';
+  return link.lifetime_signup_count > 0 ? 'Archived' : 'Inactive';
 }
 
 function linkStatusClass(link: SignupLink) {
   if (link.active) return 'bg-emerald-50 text-emerald-700';
-  return link.signup_count > 0 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
+  return link.lifetime_signup_count > 0 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
 }
 
 function QrPreview({ url, label, className = 'h-28 w-28' }: { url: string; label: string; className?: string }) {
@@ -220,10 +237,11 @@ export default function SignupLinksPage() {
   const [linkSearch, setLinkSearch] = useState('');
   const [submittedLinkSearch, setSubmittedLinkSearch] = useState('');
   const [linksPage, setLinksPage] = useState(1);
+  const [periodFilter, setPeriodFilter] = useState('active');
 
   const { data, isLoading } = useQuery<ReferralCodesResponse>({
-    queryKey: ['referral-codes', statusFilter, submittedLinkSearch, linksPage],
-    queryFn: () => getReferralCodes({ status: statusFilter, q: submittedLinkSearch, page: linksPage, per_page: 10 }),
+    queryKey: ['referral-codes', statusFilter, submittedLinkSearch, linksPage, periodFilter],
+    queryFn: () => getReferralCodes({ status: statusFilter, q: submittedLinkSearch, page: linksPage, per_page: 10, quota_period_id: periodFilter }),
   });
   const { data: villagesData } = useQuery<{ villages: VillageOption[] }>({
     queryKey: ['villages'],
@@ -233,6 +251,10 @@ export default function SignupLinksPage() {
     queryKey: ['users'],
     queryFn: getUsers,
     enabled: Boolean(sessionData?.permissions?.can_manage_users),
+  });
+  const { data: quotaPeriodsData } = useQuery<QuotaPeriodsResponse>({
+    queryKey: ['quota-periods'],
+    queryFn: getQuotaPeriods,
   });
 
   useEffect(() => {
@@ -249,6 +271,10 @@ export default function SignupLinksPage() {
   );
   const signupLinks = data?.referral_codes ?? [];
   const linksPagination = data?.pagination;
+  const quotaPeriods = quotaPeriodsData?.quota_periods ?? [];
+  const selectedPeriodLabel = periodFilter === 'all'
+    ? 'all time'
+    : data?.selected_quota_period?.name || quotaPeriodsData?.active_quota_period?.name || 'the active period';
   const generalSignupUrl = `${(data?.signup_base_url || window.location.origin).replace(/\/$/, '')}/signup`;
 
   const createMutation = useMutation({
@@ -319,8 +345,8 @@ export default function SignupLinksPage() {
   const downloadQrCode = (link: SignupLink) => downloadQrImage(link.signup_url, `dpg-signup-${link.code.toLowerCase()}.png`);
 
   const removeSignupLink = (link: SignupLink) => {
-    const message = link.signup_count > 0
-      ? `Archive "${link.display_name}"? It already has ${link.signup_count} signup${link.signup_count === 1 ? '' : 's'}, so the link will be deactivated and attribution history will stay intact.`
+    const message = link.lifetime_signup_count > 0
+      ? `Archive "${link.display_name}"? It already has ${link.lifetime_signup_count} signup${link.lifetime_signup_count === 1 ? '' : 's'}, so the link will be deactivated and attribution history will stay intact.`
       : `Delete "${link.display_name}"? This link has no signups yet.`;
     if (!window.confirm(message)) return;
     deleteMutation.mutate({ id: link.id });
@@ -507,7 +533,7 @@ export default function SignupLinksPage() {
             </div>
           )}
           <form
-            className="mt-4 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto]"
+            className="mt-4 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_220px_auto]"
             onSubmit={(event) => {
               event.preventDefault();
               setSubmittedLinkSearch(linkSearch.trim());
@@ -531,6 +557,20 @@ export default function SignupLinksPage() {
               <option value="active">Active links</option>
               <option value="inactive">Archived / inactive</option>
               <option value="all">All links</option>
+            </select>
+            <select
+              value={periodFilter}
+              onChange={(event) => {
+                setPeriodFilter(event.target.value);
+                setLinksPage(1);
+              }}
+              className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="active">Active period</option>
+              <option value="all">All time</option>
+              {quotaPeriods.map((period) => (
+                <option key={period.id} value={String(period.id)}>{period.name}</option>
+              ))}
             </select>
             <button type="submit" className="app-btn-secondary min-h-11 justify-center">
               Search
@@ -561,7 +601,14 @@ export default function SignupLinksPage() {
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <code className="max-w-full truncate rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-700">{link.signup_url}</code>
-                      <span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{link.signup_count} signup{link.signup_count === 1 ? '' : 's'}</span>
+                      <span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                        {link.period_signup_count} signup{link.period_signup_count === 1 ? '' : 's'} in {selectedPeriodLabel}
+                      </span>
+                      {periodFilter !== 'all' && (
+                        <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
+                          {link.lifetime_signup_count} lifetime
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
@@ -597,11 +644,11 @@ export default function SignupLinksPage() {
                     <button
                       type="button"
                       className="app-btn-secondary inline-flex items-center justify-center gap-2 text-red-700 hover:bg-red-50"
-                      disabled={(deleteMutation.isPending && deleteMutation.variables?.id === link.id) || (!link.active && link.signup_count > 0)}
+                      disabled={(deleteMutation.isPending && deleteMutation.variables?.id === link.id) || (!link.active && link.lifetime_signup_count > 0)}
                       onClick={() => removeSignupLink(link)}
                     >
                       <Trash2 className="h-4 w-4" />
-                      {deleteMutation.isPending && deleteMutation.variables?.id === link.id ? 'Removing...' : !link.active && link.signup_count > 0 ? 'Archived' : link.signup_count > 0 ? 'Archive' : 'Delete'}
+                      {deleteMutation.isPending && deleteMutation.variables?.id === link.id ? 'Removing...' : !link.active && link.lifetime_signup_count > 0 ? 'Archived' : link.lifetime_signup_count > 0 ? 'Archive' : 'Delete'}
                     </button>
                   </div>
                 </div>

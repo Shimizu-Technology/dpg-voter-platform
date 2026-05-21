@@ -38,6 +38,7 @@ class Supporter < ApplicationRecord
   belongs_to :block, optional: true
   belongs_to :household_group, optional: true
   belongs_to :referral_code, optional: true
+  belongs_to :quota_period, optional: true
   belongs_to :entered_by, class_name: "User", foreign_key: :entered_by_user_id, optional: true
   belongs_to :turnout_updated_by_user, class_name: "User", optional: true
   belongs_to :verified_by, class_name: "User", foreign_key: :verified_by_user_id, optional: true
@@ -115,6 +116,7 @@ class Supporter < ApplicationRecord
   scope :public_review_approved, -> { where(public_review_status: "approved", source: PUBLIC_SOURCES) }
   scope :public_review_rejected, -> { where(public_review_status: "rejected", source: PUBLIC_SOURCES) }
   scope :public_origin, -> { where(source: PUBLIC_SOURCES) }
+  scope :for_quota_period, ->(period_id) { where(quota_period_id: period_id) if period_id.present? }
   scope :accepted_public_signups, -> { public_origin.review_approved }
   scope :engaged_contacts, -> { contacts.where(contact_classification: "active_contact").where.not(support_status: "not_supporting") }
   scope :official_supporters, -> {

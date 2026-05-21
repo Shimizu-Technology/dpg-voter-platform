@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getReportsList, getVillages, getDistricts, getPrecincts, getReportPreview, downloadReport } from '../../lib/api';
+import { getReportsList, getVillages, getDistricts, getPrecincts, getQuotaPeriods, getReportPreview, downloadReport } from '../../lib/api';
 import { captureAnalyticsEvent } from '../../lib/analytics';
 import {
   FileSpreadsheet,
@@ -40,6 +40,12 @@ type ReportCategory = {
 };
 
 type OptionRecord = Record<string, unknown>;
+
+type QuotaPeriodOption = {
+  id: number;
+  name: string;
+  status: string;
+};
 
 const reportIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   support_list: Users,
@@ -126,6 +132,7 @@ export default function TeamReportsPage() {
   const [supportNeedFilter, setSupportNeedFilter] = useState('');
   const [registrationFollowUpFilter, setRegistrationFollowUpFilter] = useState('');
   const [supportFollowUpFilter, setSupportFollowUpFilter] = useState('');
+  const [quotaPeriodFilter, setQuotaPeriodFilter] = useState('');
   const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
   const supportsSupporterFilters = SUPPORTER_REPORT_TYPES.has(selectedReport);
 
@@ -142,6 +149,7 @@ export default function TeamReportsPage() {
       if (supportNeedFilter) params.support_need = supportNeedFilter;
       if (registrationFollowUpFilter) params.registration_outreach_status = registrationFollowUpFilter;
       if (supportFollowUpFilter) params.support_follow_up_status = supportFollowUpFilter;
+      if (quotaPeriodFilter) params.quota_period_id = quotaPeriodFilter;
     }
 
     if (includePreviewLimit) params.limit = 100;
@@ -151,12 +159,13 @@ export default function TeamReportsPage() {
   const { data: reportsList } = useQuery({ queryKey: ['reports-list'], queryFn: getReportsList });
   const { data: villages } = useQuery({ queryKey: ['villages'], queryFn: getVillages });
   const { data: districts } = useQuery({ queryKey: ['districts'], queryFn: getDistricts });
+  const { data: quotaPeriodsData } = useQuery<{ quota_periods: QuotaPeriodOption[] }>({ queryKey: ['quota-periods'], queryFn: getQuotaPeriods });
   const { data: precincts } = useQuery({
     queryKey: ['precincts', selectedVillage],
     queryFn: () => getPrecincts(selectedVillage ? { village_id: selectedVillage } : undefined),
   });
   const { data: preview, isLoading: previewLoading } = useQuery({
-    queryKey: ['report-preview', selectedReport, selectedDistrict, selectedVillage, selectedPrecinct, registeredStatusFilter, supportStatusFilter, volunteerStatusFilter, supportNeedFilter, registrationFollowUpFilter, supportFollowUpFilter],
+    queryKey: ['report-preview', selectedReport, selectedDistrict, selectedVillage, selectedPrecinct, registeredStatusFilter, supportStatusFilter, volunteerStatusFilter, supportNeedFilter, registrationFollowUpFilter, supportFollowUpFilter, quotaPeriodFilter],
     queryFn: () => getReportPreview(selectedReport, buildReportParams(selectedReport, true)),
     enabled: Boolean(selectedReport),
   });
@@ -178,6 +187,7 @@ export default function TeamReportsPage() {
         support_need: SUPPORTER_REPORT_TYPES.has(reportType) ? supportNeedFilter || undefined : undefined,
         registration_outreach_status: SUPPORTER_REPORT_TYPES.has(reportType) ? registrationFollowUpFilter || undefined : undefined,
         support_follow_up_status: SUPPORTER_REPORT_TYPES.has(reportType) ? supportFollowUpFilter || undefined : undefined,
+        quota_period_id: SUPPORTER_REPORT_TYPES.has(reportType) ? quotaPeriodFilter || undefined : undefined,
       });
     } catch (err) {
       console.error('Download failed:', err);
@@ -196,6 +206,7 @@ export default function TeamReportsPage() {
     setSupportNeedFilter('');
     setRegistrationFollowUpFilter('');
     setSupportFollowUpFilter('');
+    setQuotaPeriodFilter('');
   };
 
   const quickStats = reportsList?.quick_stats;
@@ -206,7 +217,7 @@ export default function TeamReportsPage() {
   const selectedReportUseCase = reportUseCases[selectedReport];
   const selectedIcon = reportIcons[selectedReport] || FileSpreadsheet;
   const isDownloadingSelected = downloadingReport === selectedReport;
-  const activeFilterCount = [selectedDistrict, selectedVillage, selectedPrecinct, registeredStatusFilter, supportStatusFilter, volunteerStatusFilter, supportNeedFilter, registrationFollowUpFilter, supportFollowUpFilter].filter(Boolean).length;
+  const activeFilterCount = [selectedDistrict, selectedVillage, selectedPrecinct, registeredStatusFilter, supportStatusFilter, volunteerStatusFilter, supportNeedFilter, registrationFollowUpFilter, supportFollowUpFilter, quotaPeriodFilter].filter(Boolean).length;
 
   return (
     <WorkspacePage width="full" className="space-y-6">
@@ -412,6 +423,12 @@ export default function TeamReportsPage() {
                       <option value="in_progress">In progress</option>
                       <option value="completed">Completed</option>
                       <option value="declined">Declined</option>
+                    </FilterSelect>
+                    <FilterSelect label="Period" value={quotaPeriodFilter} onChange={setQuotaPeriodFilter}>
+                      <option value="">All periods</option>
+                      {(quotaPeriodsData?.quota_periods || []).map((period) => (
+                        <option key={period.id} value={period.id}>{period.name}</option>
+                      ))}
                     </FilterSelect>
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-blue-900/70">

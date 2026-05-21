@@ -44,7 +44,8 @@ class ReportGenerator
     support_need: nil,
     registration_outreach_status: nil,
     support_follow_up_status: nil,
-    outreach_status: nil
+    outreach_status: nil,
+    quota_period_id: nil
   )
     @report_type = report_type
     @village_id = village_id
@@ -59,6 +60,7 @@ class ReportGenerator
     @support_need = support_need
     @registration_outreach_status = registration_outreach_status.presence || outreach_status
     @support_follow_up_status = support_follow_up_status
+    @quota_period_id = quota_period_id
   end
 
   def generate
@@ -123,6 +125,7 @@ class ReportGenerator
     scope = scope.where(volunteer_status: @volunteer_status) if @volunteer_status.present?
     scope = scope.where(registration_outreach_status: @registration_outreach_status) if @registration_outreach_status.present?
     scope = scope.where(support_follow_up_status: @support_follow_up_status) if @support_follow_up_status.present?
+    scope = scope.where(quota_period_id: @quota_period_id) if @quota_period_id.present?
     apply_support_need_filter(scope)
   end
 
