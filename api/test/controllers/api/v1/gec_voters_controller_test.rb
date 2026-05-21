@@ -874,23 +874,26 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_includes payload.dig("preview", "warnings").first, "reconstructed"
   end
 
-  test "import data search matches normalized first middle last and last first names" do
+  test "import data search matches normalized current GEC names when artifact is missing" do
     import = GecImport.create!(
       gec_list_date: Date.new(2026, 2, 25),
       filename: "gec-voters.csv",
       status: "completed",
       import_type: "full_list"
     )
-    GecImportChange.create!(
-      gec_import: import,
-      change_type: "new",
-      row_number: 1,
+    GecVoter.create!(
       first_name: "Leon",
       middle_name: "A.",
       last_name: "Shimizu",
+      birth_year: 1999,
+      address: "PO Box 761",
+      village: @village,
       village_name: @village.name,
+      precinct: @precinct,
+      precinct_number: @precinct.number,
       voter_registration_number: "LEON-123",
-      birth_year: 1999
+      gec_list_date: import.gec_list_date,
+      imported_at: Time.current
     )
 
     get "/api/v1/gec_voters/imports/#{import.id}/view_data",

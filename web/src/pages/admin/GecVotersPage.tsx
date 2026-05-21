@@ -1902,8 +1902,12 @@ function ImportReviewPanel({
   const changePagination = changesQuery.data?.pagination;
   const skippedRows = (skippedRowsQuery.data?.skipped_rows ?? []) as ImportSkippedRow[];
   const skippedPagination = skippedRowsQuery.data?.pagination;
-  const activeQuery = viewerTab === 'data' ? dataQuery : viewerTab === 'changes' ? changesQuery : viewerTab === 'skipped' ? skippedRowsQuery : originalQuery;
-  const activePagination = viewerTab === 'data' ? dataPagination : viewerTab === 'changes' ? changePagination : viewerTab === 'skipped' ? skippedPagination : undefined;
+  const visibleTabs: ImportViewerTab[] = selectedImport.has_original_file
+    ? ['data', 'changes', 'skipped', 'original']
+    : ['data', 'changes', 'skipped'];
+  const effectiveViewerTab = visibleTabs.includes(viewerTab) ? viewerTab : 'data';
+  const activeQuery = effectiveViewerTab === 'data' ? dataQuery : effectiveViewerTab === 'changes' ? changesQuery : effectiveViewerTab === 'skipped' ? skippedRowsQuery : originalQuery;
+  const activePagination = effectiveViewerTab === 'data' ? dataPagination : effectiveViewerTab === 'changes' ? changePagination : effectiveViewerTab === 'skipped' ? skippedPagination : undefined;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3">
@@ -1915,7 +1919,7 @@ function ImportReviewPanel({
           </div>
         </div>
         <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-xs font-semibold sm:grid-cols-4">
-          {(['data', 'changes', 'skipped', 'original'] as ImportViewerTab[]).map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab}
               type="button"
@@ -1926,7 +1930,7 @@ function ImportReviewPanel({
             </button>
           ))}
         </div>
-        {viewerTab !== 'original' && (
+        {effectiveViewerTab !== 'original' && (
           <form
             className="flex flex-col gap-2"
             onSubmit={(event) => {
@@ -1941,7 +1945,7 @@ function ImportReviewPanel({
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
             />
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-            {viewerTab === 'data' && (
+            {effectiveViewerTab === 'data' && (
               <select
                 value={viewerVillage}
                 onChange={(event) => setViewerVillage(event.target.value)}
@@ -1953,7 +1957,7 @@ function ImportReviewPanel({
                 ))}
               </select>
             )}
-            {viewerTab === 'changes' && (
+            {effectiveViewerTab === 'changes' && (
               <select
                 value={changeType}
                 onChange={(event) => setChangeType(event.target.value)}
@@ -1968,7 +1972,7 @@ function ImportReviewPanel({
                 <option value="routed_to_unassigned">Routed to Unassigned</option>
               </select>
             )}
-            {viewerTab === 'skipped' && (
+            {effectiveViewerTab === 'skipped' && (
               <select
                 value={skippedStatus}
                 onChange={(event) => setSkippedStatus(event.target.value)}
@@ -1997,11 +2001,11 @@ function ImportReviewPanel({
           </div>
         ) : activeQuery.isError ? (
           <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">{getErrorMessage(activeQuery.error)}</div>
-        ) : viewerTab === 'data' ? (
+        ) : effectiveViewerTab === 'data' ? (
           <ImportDataRows rows={dataRows} />
-        ) : viewerTab === 'changes' ? (
+        ) : effectiveViewerTab === 'changes' ? (
           <ImportChangeRows rows={changeRows} />
-        ) : viewerTab === 'skipped' ? (
+        ) : effectiveViewerTab === 'skipped' ? (
           <ImportSkippedRows importId={selectedImport.id} rows={skippedRows} />
         ) : (
           <OriginalImportView

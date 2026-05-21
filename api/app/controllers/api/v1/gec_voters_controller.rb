@@ -311,7 +311,7 @@ module Api
         gec_import = GecImport.includes(:uploaded_by_user).find_by(id: params[:id])
         return render_api_error(message: "Import not found", status: :not_found, code: "not_found") unless gec_import
 
-        unless gec_import.import_artifact_available? || gec_import.change_records.exists?
+        unless gec_import.import_artifact_available? || gec_import.change_records.exists? || fallback_gec_voter_rows_available?(gec_import)
           return render_api_error(message: "Parsed import data is not available for this import", status: :not_found, code: "parsed_data_not_available")
         end
 
@@ -1131,7 +1131,59 @@ module Api
       end
 
       def build_import_change_fallback_dataset(gec_import)
-        rows = gec_import.change_records.order(Arel.sql("COALESCE(row_number, 2147483647) ASC"), :id).map do |change|
+        rows = fallback_gec_voter_rows_for_import(gec_import)
+        warnings = []
+
+        if rows.any?
+          warnings << "Original import artifact is unavailable, so this view is reconstructed from the active GEC records for this import's list date."
+        else
+          rows = fallback_change_rows_for_import(gec_import)
+          warnings << "Original import artifact is unavailable, so this view is reconstructed from recorded import changes."
+        end
+
+        {
+          "source_type" => "change_fallback",
+          "row_count" => rows.length,
+          "rows" => rows,
+          "available_villages" => rows.map { |row| row["village_name"] }.compact.uniq.sort,
+          "warnings" => warnings
+        }
+      end
+
+      def fallback_gec_voter_rows_available?(gec_import)
+        gec_import.import_type == "full_list" && GecVoter.where(gec_list_date: gec_import.gec_list_date).exists?
+      end
+
+      def fallback_gec_voter_rows_for_import(gec_import)
+        return [] unless gec_import.import_type == "full_list"
+
+        GecVoter.where(gec_list_date: gec_import.gec_list_date)
+          .order(:last_name, :first_name, :id)
+          .map do |voter|
+            {
+              "name" => NameParser.combine(
+                first_name: voter.first_name,
+                middle_name: voter.middle_name,
+                last_name: voter.last_name,
+                format: :last_comma_first
+              ),
+              "first_name" => voter.first_name,
+              "middle_name" => voter.middle_name,
+              "last_name" => voter.last_name,
+              "address" => voter.address,
+              "village_name" => voter.village_name,
+              "precinct_number" => voter.precinct_number,
+              "birth_year" => voter.birth_year,
+              "dob" => voter.dob,
+              "voter_registration_number" => voter.voter_registration_number,
+              "status" => voter.status,
+              "change_type" => "current_record"
+            }
+          end
+      end
+
+      def fallback_change_rows_for_import(gec_import)
+        gec_import.change_records.order(Arel.sql("COALESCE(row_number, 2147483647) ASC"), :id).map do |change|
           details = change.details || {}
           {
             "name" => NameParser.combine(
@@ -1154,14 +1206,6 @@ module Api
             "row_number" => change.row_number
           }
         end
-
-        {
-          "source_type" => "change_fallback",
-          "row_count" => rows.length,
-          "rows" => rows,
-          "available_villages" => rows.map { |row| row["village_name"] }.compact.uniq.sort,
-          "warnings" => [ "Original import artifact is unavailable, so this view is reconstructed from recorded import changes." ]
-        }
       end
 
       def build_import_viewer_dataset(gec_import)
