@@ -39,13 +39,14 @@ export const updatePrecinct = (id: number, data: JsonRecord) =>
 export const getAuditLogs = (params?: QueryParams) => api.get('/audit_logs', { params }).then(r => r.data);
 
 // Signup links / QR attribution
-export const getReferralCodes = () => api.get('/referral_codes').then(r => r.data);
+export const getReferralCodes = (params?: QueryParams) => api.get('/referral_codes', { params }).then(r => r.data);
 export const getReferralCodeSupporters = (id: number, params?: QueryParams) =>
   api.get(`/referral_codes/${id}/supporters`, { params }).then(r => r.data);
 export const createReferralCode = (data: JsonRecord) =>
   api.post('/referral_codes', { referral_code: data }).then(r => r.data);
 export const updateReferralCode = (id: number, data: JsonRecord) =>
   api.patch(`/referral_codes/${id}`, { referral_code: data }).then(r => r.data);
+export const deleteReferralCode = (id: number) => api.delete(`/referral_codes/${id}`).then(r => r.data);
 
 // Supporters
 export const createSupporter = (
@@ -165,10 +166,20 @@ export const resolveGecImportSkippedRow = (
   }).then(r => r.data);
 export const dismissGecImportSkippedRow = (importId: number, skippedRowId: number) =>
   api.post(`/gec_voters/imports/${importId}/skipped_rows/${skippedRowId}/dismiss`).then(r => r.data);
+export const getGecImportOriginal = (importId: number) =>
+  api.get(`/gec_voters/imports/${importId}/view_original`).then(r => r.data);
 export const openGecImportOriginal = (importId: number) =>
-  api.get(`/gec_voters/imports/${importId}/view_original`).then(r => {
-    if (r.data?.view_url) window.open(r.data.view_url, '_blank', 'noopener,noreferrer');
-    return r.data;
+  getGecImportOriginal(importId).then(data => {
+    if (data?.view_url) window.open(data.view_url, '_blank', 'noopener,noreferrer');
+    if (data?.view_data_base64) {
+      const binary = atob(data.view_data_base64);
+      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+      const blob = new Blob([bytes], { type: data?.content_type || 'application/octet-stream' });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    }
+    return data;
   });
 export const downloadGecImportFile = (importId: number) =>
   api.get(`/gec_voters/imports/${importId}/download`).then(r => {

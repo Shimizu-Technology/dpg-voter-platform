@@ -1,15 +1,15 @@
 # DPG Voter Platform - Next Implementation Plan
 
 **Created:** May 14, 2026
-**Last updated:** May 18, 2026
-**Status:** Updated after PR #37 reporting polish merged to `main`
-**Base commit:** `fc96d72`
+**Last updated:** May 20, 2026
+**Status:** Updated after DPG demo walkthrough and PR #39 duplicate-contact polish merged to `main`
+**Base commit:** `c154765`
 
 ## Current posture
 
-The DPG platform is deployed and ready for guided review with Auntie Stephanie and a small tester group. Leon has completed initial production QA on the Render/Netlify/Neon deployment and Auntie Stephanie has already received and confirmed access.
+The DPG platform has completed its first live demo walkthrough with Auntie Stephanie and DPG team members. The demo went well: DPG understood the Intake/GEC/QR/household/duplicate workflows and began discussing real operational use with village organizers, signup contests, quotas/periods, Mike Weekly's poll-watcher team, and future list imports.
 
-The app should still be framed as a guided review build, not a broad staff rollout. The foundation works, but DPG still needs to validate the language, role model, list workflows, and field process in person.
+The app should now be treated as a controlled beta build for a small DPG tester group, not yet a broad staff rollout. The foundation works, but the demo surfaced concrete beta polish needs around GEC search strictness, address search, QR-code downloads, signup-link lifecycle, safe demo-data cleanup, SMS delivery visibility, and DPG-owned quota periods.
 
 Already in place:
 
@@ -26,6 +26,7 @@ Already in place:
 - SMS/email dry-run governance, starter templates, and contact-history logging.
 - Redesigned Reports workspace, including DPG/GEC cross-reference reports and mismatch reporting.
 - DPG-facing role labels and tightened import/export/contact-attempt permissions.
+- Duplicate Contact Review for DPG contact cleanup, with persistent dismissed-pair history, grouped sidebar count, merge safeguards, and Intake approval blocking for unresolved duplicate warnings.
 
 ## Before broader DPG rollout
 
@@ -50,19 +51,67 @@ Already in place:
 
 ## Next product recommendation
 
-### Guided DPG Walkthrough + List-Sample Intake
+### GEC Search + Beta Usability Polish
 
-The next product step is not another speculative importer. DPG did ask for official member rosters, registered Democrat lists, supporter/contact lists, and cross-reference reporting in the April meetings, but we should wait for real list files or sample columns before building schema-specific mapping.
+The next product step should address the concrete issues found in the May 20 DPG demo before a wider tester rollout.
 
-The recommended next branch after the walkthrough should be based on what DPG gives us:
+Recommended next branch:
 
-- If they bring real list files, build explicit list types and list-lineage reporting.
-- If they find workflow confusion first, polish language, role scoping, follow-up labels, or household/GEC review flow.
-- If they are ready to prepare field use, polish QR print/download assets, field instructions, and small-team permissions.
+- make GEC voter search punctuation-insensitive and middle-initial tolerant (`Christopher C Flores` and `Christopher C. Flores` should both find the same likely people)
+- investigate why the GEC list view did not pull up some people cleanly during the demo
+- improve address search/normalization for PO Box, P.O. Box, HCR/HC, punctuation, and stale-address variants
+- allow QR-code download from signup links
+- add signup-link delete/archive lifecycle behavior
+- ensure archiving/removing demo contacts does not prevent future legitimate signup or attribution
+- prepare simple beta tester instructions for Auntie Stephanie's group
+
+DPG also confirmed that official active/inactive party lists exist, but schema-specific importers should still wait for actual DPG sample files.
 
 ## Next product phases
 
-### 1. DPG list imports and list lineage
+### 1. GEC search, address search, and beta usability polish
+
+Build immediately from demo feedback:
+
+- punctuation-insensitive GEC voter search
+- middle-initial tolerant search
+- less strict GEC list view matching
+- address normalization/search for PO Box/P.O. Box/HCR/HC variants
+- QR-code download for signup links
+- delete unused signup links; archive/deactivate used links
+- safe archive/remove flow so demo contacts can sign up again later without poisoning future attribution or duplicate detection
+
+### 2. DPG quota/period foundation
+
+DPG independently raised quota/period needs during the demo, so this is now safe to design as a DPG-owned goals/period system rather than a copied campaign workflow.
+
+Initial scope:
+
+- admin-defined quota/goal periods with start/end dates
+- active period selection
+- new signups/contacts attributed to the active period
+- period-aware signup-link/user/village counts
+- reports that can filter by period
+- duplicate handling that avoids double-counting where possible
+
+Clarify before detailed dashboards:
+
+- whether quotas count raw signups, approved contacts, supporters, registered Democrats, volunteers, or multiple metrics
+- whether goals are per village, per user, per signup link, or party-wide
+- how DPG wants to handle carryover between periods
+
+### 3. SMS delivery status and resend
+
+DPG asked to see who received/did not receive messages and to resend only to people who did not receive the first message.
+
+Initial scope:
+
+- per-recipient SMS delivery status storage
+- blast detail recipient/status table
+- failed/undelivered resend action
+- provider status polling or webhook support, depending on ClickSend capabilities
+
+### 4. DPG list imports and list lineage
 
 Build first-class import types only after DPG provides files or sample schemas:
 

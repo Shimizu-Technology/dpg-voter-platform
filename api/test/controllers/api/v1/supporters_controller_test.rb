@@ -436,6 +436,50 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "merge_target_self_reference", response.parsed_body["code"]
   end
 
+  test "removed demo contact does not block future attributed signup" do
+    village = Village.find_or_create_by!(name: "Barrigada")
+    referral_code = ReferralCode.create!(
+      code: "DEMO-BAR-1234",
+      display_name: "Demo link",
+      village: village,
+      active: true,
+      metadata: { "source_type" => "village" }
+    )
+    removed = Supporter.create!(
+      first_name: "Demo",
+      last_name: "Cleanup",
+      contact_number: "+16715551999",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      review_status: "approved",
+      status: "removed"
+    )
+
+    assert_difference -> { Supporter.count }, 1 do
+      post "/api/v1/supporters",
+        params: {
+          leader_code: referral_code.code,
+          supporter: {
+            first_name: "Demo",
+            last_name: "Cleanup",
+            contact_number: "+16715551999",
+            village_id: village.id
+          }
+        },
+        as: :json
+    end
+
+    assert_response :created
+    created = Supporter.order(:created_at).last
+    assert_not_equal removed.id, created.id
+    assert_equal "active", created.status
+    assert_equal "new_intake", created.contact_classification
+    assert_equal referral_code.id, created.referral_code_id
+    assert_equal referral_code.code, created.leader_code
+  end
+
   test "review intake can classify unresolved duplicate as duplicate" do
     village = Village.find_or_create_by!(name: "Dededo")
     Supporter.create!(

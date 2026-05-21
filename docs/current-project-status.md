@@ -1,14 +1,14 @@
 # DPG Voter Platform - Current Project Status
 
-**Last updated:** May 18, 2026
+**Last updated:** May 20, 2026
 **Current branch:** `main`
-**Base commit:** `fc96d72` after PR #37 merged DPG/GEC cross-reference reporting and Reports workspace polish
+**Base commit:** `c154765` after PR #39 merged DPG Duplicate Contact Review polish
 
 ## One-line status
 
-The Democratic Party of Guam app is deployed on the Render/Netlify/Neon stack and now has the core voter-engagement foundation in place: public signup, QR/share-link attribution, a unified admin workspace, Contacts/Intake, GEC voter-list search/import, household/address lookup, create/link contact actions from GEC and household results, contact history with editable audited corrections, follow-up queue logging, a redesigned Reports workspace with DPG/GEC cross-reference reports, users/roles, and governed SMS/email outreach.
+The Democratic Party of Guam app is deployed on the Render/Netlify/Neon stack and now has the core voter-engagement foundation in place: public signup, QR/share-link attribution, a unified admin workspace, Contacts/Intake, GEC voter-list search/import, household/address lookup, create/link contact actions from GEC and household results, contact history with editable audited corrections, follow-up queue logging, Duplicate Contact Review, a redesigned Reports workspace with DPG/GEC cross-reference reports, users/roles, and governed SMS/email outreach.
 
-Leon completed an initial production QA pass and confirmed the deployed app works. Auntie Stephanie has already been sent access and confirmed receipt. The next milestone is a guided in-person walkthrough with Auntie Stephanie when she returns from her trip, followed by DPG-provided list samples and workflow feedback before broad staff rollout.
+Leon completed the first live app walkthrough with Auntie Stephanie and DPG team members on May 20. The demo went well and validated the product direction: DPG understood the workflows and immediately connected them to real party operations, including village organizers, QR signup attribution, duplicate cleanup, GEC/household search, quotas/periods, active/inactive party lists, SMS resend needs, and future Election Day poll-watcher workflows. The next milestone is controlled beta polish, not broad rollout yet.
 
 ## Product frame
 
@@ -52,6 +52,18 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - possible ID/photo/OCR import later
 - possible autodialer integration later
 
+The May 20 demo added/confirmed these near-term requests:
+
+- less strict GEC voter search, especially middle initials and punctuation
+- more forgiving address/household search for PO Box, P.O. Box, HCR/HC, and similar variants
+- SMS recipient delivery status and resend only to failed/undelivered recipients
+- QR-code download for signup links
+- delete/archive unused signup links
+- safe demo/contact cleanup so archived/removed contacts can sign up again later
+- DPG-owned quota/period tracking for signup/contact credit
+- active/inactive DPG list import planning once sample files are provided
+- Mike Weekly/poll-watcher involvement for Phase 2 Election Day workflows
+
 ## Implemented now
 
 ### DPG app foundation
@@ -64,6 +76,7 @@ The April 2 and April 27 DPG notes/transcripts point to these needs:
 - Live public URL currently used for review: `https://dpg-voter-platform.netlify.app/`.
 - Live backend health and public API checks have been reported as passing, including Netlify-to-Render CORS and protected endpoint auth blocking.
 - Leon completed a production QA pass and reported the core deployed flows working.
+- Leon completed the first DPG team demo walkthrough on May 20. Auntie Stephanie and the team responded positively and are ready for controlled beta testing after immediate search/usability polish.
 
 ### Public signup and Intake
 

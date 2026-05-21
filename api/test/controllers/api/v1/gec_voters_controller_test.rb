@@ -49,6 +49,79 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal @voter.id, payload["gec_voters"].first["id"]
   end
 
+  test "index search is tolerant of middle initial punctuation" do
+    voter = GecVoter.create!(
+      first_name: "Christopher",
+      middle_name: "C.",
+      last_name: "Flores",
+      birth_year: 1978,
+      address: "PO Box 9321",
+      village: @village,
+      village_name: @village.name,
+      precinct: @precinct,
+      precinct_number: @precinct.number,
+      voter_registration_number: "GEC-CHRIS",
+      gec_list_date: Date.new(2026, 1, 25),
+      imported_at: Time.current
+    )
+
+    get "/api/v1/gec_voters", params: { q: "Christopher C Flores" }, headers: auth_headers(@admin)
+    assert_response :success
+    assert_includes JSON.parse(response.body)["gec_voters"].map { |row| row["id"] }, voter.id
+
+    get "/api/v1/gec_voters", params: { q: "Christopher C. Flores" }, headers: auth_headers(@admin)
+    assert_response :success
+    assert_includes JSON.parse(response.body)["gec_voters"].map { |row| row["id"] }, voter.id
+  end
+
+  test "household search is tolerant of PO box punctuation" do
+    voter = GecVoter.create!(
+      first_name: "Box",
+      last_name: "Tester",
+      birth_year: 1981,
+      address: "P.O. Box 7249",
+      village: @village,
+      village_name: @village.name,
+      precinct: @precinct,
+      precinct_number: @precinct.number,
+      voter_registration_number: "GEC-BOX",
+      gec_list_date: Date.new(2026, 1, 25),
+      imported_at: Time.current
+    )
+
+    get "/api/v1/gec_voters/households", params: { q: "PO Box 7249" }, headers: auth_headers(@admin)
+    assert_response :success
+    assert JSON.parse(response.body)["households"].any? { |row| row["gec_voters"].any? { |entry| entry["id"] == voter.id } }
+
+    get "/api/v1/gec_voters/households", params: { q: "P O Box 7249" }, headers: auth_headers(@admin)
+    assert_response :success
+    assert JSON.parse(response.body)["households"].any? { |row| row["gec_voters"].any? { |entry| entry["id"] == voter.id } }
+
+    get "/api/v1/gec_voters/households", params: { q: "Box 7249" }, headers: auth_headers(@admin)
+    assert_response :success
+    assert JSON.parse(response.body)["households"].any? { |row| row["gec_voters"].any? { |entry| entry["id"] == voter.id } }
+  end
+
+  test "household search matches partial HCR box queries" do
+    voter = GecVoter.create!(
+      first_name: "Hcr",
+      last_name: "Tester",
+      birth_year: 1982,
+      address: "HCR Box 17289",
+      village: @village,
+      village_name: @village.name,
+      precinct: @precinct,
+      precinct_number: @precinct.number,
+      voter_registration_number: "GEC-HCR",
+      gec_list_date: Date.new(2026, 1, 25),
+      imported_at: Time.current
+    )
+
+    get "/api/v1/gec_voters/households", params: { q: "HCR 17289" }, headers: auth_headers(@admin)
+    assert_response :success
+    assert JSON.parse(response.body)["households"].any? { |row| row["gec_voters"].any? { |entry| entry["id"] == voter.id } }
+  end
+
   test "index filters by village precinct and link status" do
     other_village = Village.find_or_create_by!(name: "Dededo")
     GecVoter.create!(
@@ -799,6 +872,43 @@ class Api::V1::GecVotersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Fallback", row["first_name"]
     assert_equal "12 Test Street", row["address"]
     assert_includes payload.dig("preview", "warnings").first, "reconstructed"
+  end
+
+  test "import data search matches normalized current GEC names when artifact is missing" do
+    import = GecImport.create!(
+      gec_list_date: Date.new(2026, 2, 25),
+      filename: "gec-voters.csv",
+      status: "completed",
+      import_type: "full_list"
+    )
+    GecVoter.create!(
+      first_name: "Leon",
+      middle_name: "A.",
+      last_name: "Shimizu",
+      birth_year: 1999,
+      address: "PO Box 761",
+      village: @village,
+      village_name: @village.name,
+      precinct: @precinct,
+      precinct_number: @precinct.number,
+      voter_registration_number: "LEON-123",
+      gec_list_date: import.gec_list_date,
+      imported_at: Time.current
+    )
+
+    get "/api/v1/gec_voters/imports/#{import.id}/view_data",
+      params: { q: "Leon A Shimizu" },
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    assert_equal 1, response.parsed_body.dig("preview", "pagination", "total_rows")
+
+    get "/api/v1/gec_voters/imports/#{import.id}/view_data",
+      params: { q: "Shimizu Leon" },
+      headers: auth_headers(@admin)
+
+    assert_response :success
+    assert_equal 1, response.parsed_body.dig("preview", "pagination", "total_rows")
   end
 
   test "activate import audit log records actual previous active state" do

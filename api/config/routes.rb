@@ -39,7 +39,7 @@ Rails.application.routes.draw do
           post :resend_invite
         end
       end
-      resources :referral_codes, only: [ :index, :create, :update ] do
+      resources :referral_codes, only: [ :index, :create, :update, :destroy ] do
         member do
           get :supporters
         end

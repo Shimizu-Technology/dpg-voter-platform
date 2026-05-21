@@ -13,6 +13,8 @@ class AddressNormalizer
     "court" => "ct",
     "dr" => "dr",
     "drive" => "dr",
+    "hc" => "hcr",
+    "hcr" => "hcr",
     "hwy" => "hwy",
     "highway" => "hwy",
     "ln" => "ln",
@@ -75,7 +77,10 @@ class AddressNormalizer
       index = 0
 
       while index < tokens.length
-        if tokens[index] == "p" && tokens[index + 1] == "o" && tokens[index + 2] == "box"
+        if tokens[index] == "pobox"
+          collapsed << "po" << "box"
+          index += 1
+        elsif tokens[index] == "p" && tokens[index + 1] == "o" && tokens[index + 2] == "box"
           collapsed << "po" << "box"
           index += 3
         elsif tokens[index] == "post" && tokens[index + 1] == "office" && tokens[index + 2] == "box"

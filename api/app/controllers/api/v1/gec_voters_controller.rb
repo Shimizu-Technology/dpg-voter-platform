@@ -9,6 +9,28 @@ module Api
       include AuditLoggable
 
       MAX_GEC_UPLOAD_BYTES = 50.megabytes
+      GEC_SEARCH_SQL = <<~SQL.squish.freeze
+        REGEXP_REPLACE(LOWER(COALESCE((gec_voters.first_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.middle_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.last_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.first_name || ' ' || COALESCE(gec_voters.middle_name, '') || ' ' || gec_voters.last_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.first_name || ' ' || gec_voters.last_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.last_name || ' ' || gec_voters.first_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.address)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.village_name)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.precinct_number)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+        OR REGEXP_REPLACE(LOWER(COALESCE((gec_voters.voter_registration_number)::text, '')), '[^a-z0-9]+', '', 'g') LIKE :pattern
+      SQL
+      ADDRESS_SEARCH_COLUMNS = {
+        gec_address: {
+          raw: "gec_voters.address",
+          normalized: "REGEXP_REPLACE(LOWER(COALESCE((gec_voters.address)::text, '')), '[^a-z0-9]+', '', 'g')"
+        },
+        supporter_street_address: {
+          raw: "supporters.street_address",
+          normalized: "REGEXP_REPLACE(LOWER(COALESCE((supporters.street_address)::text, '')), '[^a-z0-9]+', '', 'g')"
+        }
+      }.freeze
 
       before_action :authenticate_request
       before_action :require_supporter_access!, only: [ :index, :stats, :households, :create_contact, :link_contact ]
@@ -94,16 +116,14 @@ module Api
           )
         end
 
-        voters = scoped_gec_voters(GecVoter.active.includes(:village, :precinct))
-          .where("LOWER(gec_voters.address) LIKE ?", "%#{ActiveRecord::Base.sanitize_sql_like(query.downcase)}%")
+        voters = apply_address_search(scoped_gec_voters(GecVoter.active.includes(:village, :precinct)), :gec_address, query)
           .order(:village_name, :address, :last_name, :first_name)
           .limit(250)
           .to_a
         linked_contacts_by_voter = linked_contacts_by_voter(voters.map(&:id))
         possible_contacts_by_voter = possible_contacts_by_voter(voters)
 
-        contacts = scope_supporters(Supporter.contacts.includes(:village, :precinct, :gec_voter))
-          .where("LOWER(supporters.street_address) LIKE ?", "%#{ActiveRecord::Base.sanitize_sql_like(query.downcase)}%")
+        contacts = apply_address_search(scope_supporters(Supporter.contacts.includes(:village, :precinct, :gec_voter)), :supporter_street_address, query)
           .order(:street_address, :last_name, :first_name)
           .limit(250)
           .to_a
@@ -291,7 +311,7 @@ module Api
         gec_import = GecImport.includes(:uploaded_by_user).find_by(id: params[:id])
         return render_api_error(message: "Import not found", status: :not_found, code: "not_found") unless gec_import
 
-        unless gec_import.import_artifact_available? || gec_import.change_records.exists?
+        unless gec_import.import_artifact_available? || gec_import.change_records.exists? || fallback_gec_voter_rows_available?(gec_import)
           return render_api_error(message: "Parsed import data is not available for this import", status: :not_found, code: "parsed_data_not_available")
         end
 
@@ -465,6 +485,19 @@ module Api
 
         filename = gec_import.raw_source_filename || gec_import.filename || "gec_import_#{gec_import.id}"
         content_type = gec_import.raw_content_type.presence || "application/octet-stream"
+
+        if local_artifact_key?(gec_import.raw_file_s3_key)
+          artifact_data = read_local_artifact(gec_import.raw_file_s3_key)
+          return render_api_error(message: "Original uploaded file is not available for this import", status: :not_found, code: "file_not_available") unless artifact_data
+
+          return render json: {
+            view_data_base64: Base64.strict_encode64(artifact_data),
+            filename: filename,
+            content_type: content_type,
+            inline_supported: content_type.include?("pdf")
+          }
+        end
+
         view_url = S3Service.presigned_url(
           gec_import.raw_file_s3_key,
           expires_in: 1800,
@@ -675,24 +708,40 @@ module Api
       end
 
       def apply_search(scope, query)
-        terms = query.to_s.downcase.strip.split(/\s+/).first(6)
+        terms = normalized_search_terms(query).first(6)
         return scope if terms.empty?
 
         terms.reduce(scope) do |memo, term|
           pattern = "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
-          memo.where(
-            <<~SQL.squish,
-              LOWER(gec_voters.first_name) LIKE :pattern
-              OR LOWER(gec_voters.middle_name) LIKE :pattern
-              OR LOWER(gec_voters.last_name) LIKE :pattern
-              OR LOWER(gec_voters.address) LIKE :pattern
-              OR LOWER(gec_voters.village_name) LIKE :pattern
-              OR LOWER(gec_voters.precinct_number) LIKE :pattern
-              OR LOWER(gec_voters.voter_registration_number) LIKE :pattern
-            SQL
-            pattern: pattern
-          )
+          memo.where(GEC_SEARCH_SQL, pattern: pattern)
         end
+      end
+
+      def normalized_search_terms(query)
+        query.to_s.downcase.gsub(/[^\p{Alnum}]+/, " ").squish.split
+      end
+
+      def normalized_search_compact(query)
+        normalized_search_terms(query).join
+      end
+
+      def apply_address_search(scope, column_key, query)
+        column = ADDRESS_SEARCH_COLUMNS.fetch(column_key)
+        binds = {
+          raw_pattern: "%#{ActiveRecord::Base.sanitize_sql_like(query.to_s.downcase.strip)}%",
+          normalized_pattern: "%#{ActiveRecord::Base.sanitize_sql_like(normalized_search_compact(query))}%"
+        }
+        normalized_address = column.fetch(:normalized)
+        conditions = [ "LOWER(#{column.fetch(:raw)}) LIKE :raw_pattern", "#{normalized_address} LIKE :normalized_pattern" ]
+
+        token_conditions = normalized_search_terms(query).first(6).map.with_index do |term, index|
+          key = "address_term_#{index}".to_sym
+          binds[key] = "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
+          "#{normalized_address} LIKE :#{key}"
+        end
+        conditions << token_conditions.join(" AND ") if token_conditions.any?
+
+        scope.where(conditions.map { |condition| "(#{condition})" }.join(" OR "), binds)
       end
 
       def apply_linked_filter(scope, linked_status)
@@ -1082,7 +1131,59 @@ module Api
       end
 
       def build_import_change_fallback_dataset(gec_import)
-        rows = gec_import.change_records.order(Arel.sql("COALESCE(row_number, 2147483647) ASC"), :id).map do |change|
+        rows = fallback_gec_voter_rows_for_import(gec_import)
+        warnings = []
+
+        if rows.any?
+          warnings << "Original import artifact is unavailable, so this view is reconstructed from the active GEC records for this import's list date."
+        else
+          rows = fallback_change_rows_for_import(gec_import)
+          warnings << "Original import artifact is unavailable, so this view is reconstructed from recorded import changes."
+        end
+
+        {
+          "source_type" => "change_fallback",
+          "row_count" => rows.length,
+          "rows" => rows,
+          "available_villages" => rows.map { |row| row["village_name"] }.compact.uniq.sort,
+          "warnings" => warnings
+        }
+      end
+
+      def fallback_gec_voter_rows_available?(gec_import)
+        gec_import.import_type == "full_list" && GecVoter.where(gec_list_date: gec_import.gec_list_date).exists?
+      end
+
+      def fallback_gec_voter_rows_for_import(gec_import)
+        return [] unless gec_import.import_type == "full_list"
+
+        GecVoter.where(gec_list_date: gec_import.gec_list_date)
+          .order(:last_name, :first_name, :id)
+          .map do |voter|
+            {
+              "name" => NameParser.combine(
+                first_name: voter.first_name,
+                middle_name: voter.middle_name,
+                last_name: voter.last_name,
+                format: :last_comma_first
+              ),
+              "first_name" => voter.first_name,
+              "middle_name" => voter.middle_name,
+              "last_name" => voter.last_name,
+              "address" => voter.address,
+              "village_name" => voter.village_name,
+              "precinct_number" => voter.precinct_number,
+              "birth_year" => voter.birth_year,
+              "dob" => voter.dob,
+              "voter_registration_number" => voter.voter_registration_number,
+              "status" => voter.status,
+              "change_type" => "current_record"
+            }
+          end
+      end
+
+      def fallback_change_rows_for_import(gec_import)
+        gec_import.change_records.order(Arel.sql("COALESCE(row_number, 2147483647) ASC"), :id).map do |change|
           details = change.details || {}
           {
             "name" => NameParser.combine(
@@ -1105,14 +1206,6 @@ module Api
             "row_number" => change.row_number
           }
         end
-
-        {
-          "source_type" => "change_fallback",
-          "row_count" => rows.length,
-          "rows" => rows,
-          "available_villages" => rows.map { |row| row["village_name"] }.compact.uniq.sort,
-          "warnings" => [ "Original import artifact is unavailable, so this view is reconstructed from recorded import changes." ]
-        }
       end
 
       def build_import_viewer_dataset(gec_import)
@@ -1200,18 +1293,42 @@ module Api
         end
 
         if q.present?
-          query = q.downcase.strip
-          searchable_fields = if source_type == "pdf"
-            %w[name address village precinct_number birth_year voter_registration_number]
-          else
-            %w[name first_name middle_name last_name address village_name village precinct_number birth_year dob voter_registration_number]
-          end
-          filtered = filtered.select do |row|
-            searchable_fields.any? { |field| row[field].to_s.downcase.include?(query) }
-          end
+          filtered = filtered.select { |row| import_view_row_matches_query?(row, source_type, q) }
         end
 
         filtered
+      end
+
+      def import_view_row_matches_query?(row, source_type, query)
+        query_terms = normalized_search_terms(query)
+        compact_query = query_terms.join
+        return true if compact_query.blank?
+
+        searchable_values = import_view_searchable_values(row, source_type)
+        normalized_values = searchable_values.map { |value| normalized_search_compact(value) }.reject(&:blank?)
+        return false if normalized_values.empty?
+
+        normalized_values.any? { |value| value.include?(compact_query) } ||
+          query_terms.all? { |term| normalized_values.any? { |value| value.include?(term) } }
+      end
+
+      def import_view_searchable_values(row, source_type)
+        fields = if source_type == "pdf"
+          %w[name first_name middle_name last_name address village source_village precinct_number birth_year voter_registration_number]
+        else
+          %w[name first_name middle_name last_name address village_name village source_village_name precinct_number birth_year dob voter_registration_number]
+        end
+        values = fields.filter_map { |field| row[field].presence }
+
+        first_name = row["first_name"]
+        middle_name = row["middle_name"]
+        last_name = row["last_name"]
+        values << [ first_name, middle_name, last_name ].compact.join(" ")
+        values << [ first_name, last_name ].compact.join(" ")
+        values << [ last_name, first_name ].compact.join(" ")
+        values << [ last_name, first_name, middle_name ].compact.join(" ")
+
+        values
       end
 
       def import_artifact_data(gec_import)
