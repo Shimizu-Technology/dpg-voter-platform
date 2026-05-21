@@ -1918,7 +1918,7 @@ function ImportReviewPanel({
             {selectedImport.filename} · {formatDate(selectedImport.gec_list_date)} · {selectedImport.status}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-xs font-semibold sm:grid-cols-4">
+        <div className={`grid grid-cols-1 gap-1 rounded-xl bg-slate-100 p-1 text-xs font-semibold ${visibleTabs.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
           {visibleTabs.map((tab) => (
             <button
               key={tab}
