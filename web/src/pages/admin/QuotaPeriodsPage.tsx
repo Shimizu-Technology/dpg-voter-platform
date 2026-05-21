@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, CalendarDays, CheckCircle2, Loader2, Plus, RefreshCw, Target } from 'lucide-react';
+import { Archive, CalendarDays, CheckCircle2, ChevronDown, Loader2, Plus, RefreshCw, Target } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
-import { activateQuotaPeriod, archiveQuotaPeriod, createQuotaPeriod, getQuotaPeriods, updateQuotaPeriod } from '../../lib/api';
+import { activateQuotaPeriod, archiveQuotaPeriod, createQuotaPeriod, getQuotaPeriods, getSupporters, updateQuotaPeriod } from '../../lib/api';
 
 type QuotaPeriodCounts = {
   total_contacts: number;
@@ -32,6 +32,24 @@ type QuotaPeriodsResponse = {
   quota_periods: QuotaPeriod[];
   active_quota_period?: QuotaPeriod | null;
 };
+
+type PeriodSupporter = {
+  id: number;
+  print_name: string;
+  contact_number?: string | null;
+  village_name?: string | null;
+  source?: string | null;
+  contact_classification?: string | null;
+  support_status?: string | null;
+  created_at: string;
+};
+
+type PeriodSupportersResponse = {
+  supporters: PeriodSupporter[];
+  pagination: { total: number; page: number; pages: number };
+};
+
+type PeriodDetailFilter = 'all' | 'intake' | 'active_contacts' | 'supporters';
 
 type PeriodDraft = {
   id?: number;
@@ -74,6 +92,42 @@ function goalProgress(period: QuotaPeriod) {
   return { current, goal, percent };
 }
 
+function periodDetailParams(periodId: number | null, filter: PeriodDetailFilter) {
+  const params: Record<string, string | number> = {
+    quota_period_id: periodId || '',
+    status: 'active',
+    sort_by: 'created_at',
+    sort_dir: 'desc',
+    per_page: 8,
+  };
+
+  if (filter === 'intake') params.contact_classification = 'new_intake';
+  if (filter === 'active_contacts') params.contact_classification = 'active_contact';
+  if (filter === 'supporters') {
+    params.contact_classification = 'active_contact';
+    params.support_status = 'supporter';
+  }
+
+  return params;
+}
+
+function sourceLabel(source?: string | null) {
+  if (source === 'public_signup') return 'Public signup';
+  if (source === 'qr_signup') return 'QR signup';
+  if (source === 'staff_entry') return 'Staff entry';
+  if (source === 'bulk_import') return 'Import';
+  return 'Unknown origin';
+}
+
+function classificationLabel(value?: string | null) {
+  if (value === 'new_intake') return 'Intake';
+  if (value === 'active_contact') return 'Active contact';
+  if (value === 'duplicate') return 'Duplicate';
+  if (value === 'invalid') return 'Invalid';
+  if (value === 'archived') return 'Archived';
+  return 'Unclassified';
+}
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error && 'response' in error) {
@@ -87,9 +141,18 @@ export default function QuotaPeriodsPage() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<PeriodDraft>(emptyDraft);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [expandedPeriodId, setExpandedPeriodId] = useState<number | null>(null);
+  const [detailFilter, setDetailFilter] = useState<PeriodDetailFilter>('all');
   const { data, isLoading } = useQuery<QuotaPeriodsResponse>({ queryKey: ['quota-periods'], queryFn: getQuotaPeriods });
   const periods = useMemo(() => data?.quota_periods ?? [], [data]);
   const activePeriod = data?.active_quota_period;
+  const expandedPeriod = periods.find((period) => period.id === expandedPeriodId) || null;
+  const detailParams = periodDetailParams(expandedPeriodId, detailFilter);
+  const { data: detailData, isFetching: detailLoading } = useQuery<PeriodSupportersResponse>({
+    queryKey: ['quota-period-supporters', expandedPeriodId, detailFilter],
+    queryFn: () => getSupporters(detailParams),
+    enabled: Boolean(expandedPeriodId),
+  });
 
   const refreshPeriods = () => {
     void queryClient.invalidateQueries({ queryKey: ['quota-periods'] });
@@ -278,6 +341,17 @@ export default function QuotaPeriodsPage() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                      <button
+                        type="button"
+                        className="app-btn-secondary justify-center"
+                        onClick={() => {
+                          setExpandedPeriodId((current) => current === period.id ? null : period.id);
+                          setDetailFilter('all');
+                        }}
+                      >
+                        <ChevronDown className={`h-4 w-4 transition ${expandedPeriodId === period.id ? 'rotate-180' : ''}`} />
+                        {expandedPeriodId === period.id ? 'Hide details' : 'Details'}
+                      </button>
                       <button type="button" className="app-btn-secondary justify-center" onClick={() => setDraft({ id: period.id, name: period.name, start_date: period.start_date, end_date: period.end_date, due_date: period.due_date, quota_target: String(period.quota_target), status: period.status === 'open' ? 'open' : 'closed' })}>
                         Edit
                       </button>
@@ -297,6 +371,16 @@ export default function QuotaPeriodsPage() {
                       )}
                     </div>
                   </div>
+                  {expandedPeriodId === period.id && (
+                    <PeriodDetailPanel
+                      period={expandedPeriod}
+                      filter={detailFilter}
+                      onFilterChange={setDetailFilter}
+                      supporters={detailData?.supporters || []}
+                      total={detailData?.pagination.total || 0}
+                      loading={detailLoading}
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -304,6 +388,89 @@ export default function QuotaPeriodsPage() {
         </section>
       </section>
     </WorkspacePage>
+  );
+}
+
+function PeriodDetailPanel({
+  period,
+  filter,
+  onFilterChange,
+  supporters,
+  total,
+  loading,
+}: {
+  period: QuotaPeriod | null;
+  filter: PeriodDetailFilter;
+  onFilterChange: (filter: PeriodDetailFilter) => void;
+  supporters: PeriodSupporter[];
+  total: number;
+  loading: boolean;
+}) {
+  const filterOptions: Array<{ value: PeriodDetailFilter; label: string }> = [
+    { value: 'all', label: 'All period records' },
+    { value: 'intake', label: 'Intake' },
+    { value: 'active_contacts', label: 'Active contacts' },
+    { value: 'supporters', label: 'Supporters' },
+  ];
+
+  return (
+    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-950">Period records{period ? ` · ${period.name}` : ''}</h4>
+          <p className="mt-1 text-xs text-slate-500">Showing the latest records credited to this period. Use the full links above for complete lists and exports.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {filterOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onFilterChange(option.value)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${filter === option.value ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="min-w-[760px] w-full text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase tracking-[0.08em] text-slate-500">
+            <tr>
+              <th className="px-3 py-2">Name</th>
+              <th className="px-3 py-2">Phone</th>
+              <th className="px-3 py-2">Village</th>
+              <th className="px-3 py-2">Origin</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Support</th>
+              <th className="px-3 py-2">Created</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading ? (
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">Loading period records...</td></tr>
+            ) : supporters.length === 0 ? (
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">No records match this period view.</td></tr>
+            ) : supporters.map((supporter) => (
+              <tr key={supporter.id} className="hover:bg-slate-50">
+                <td className="px-3 py-2 font-semibold text-slate-950">
+                  <Link to={`/admin/supporters/${supporter.id}?return_to=${encodeURIComponent('/admin/periods')}`} className="hover:text-blue-700">
+                    {supporter.print_name}
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-slate-600">{supporter.contact_number || '—'}</td>
+                <td className="px-3 py-2 text-slate-600">{supporter.village_name || 'Unknown'}</td>
+                <td className="px-3 py-2 text-slate-600">{sourceLabel(supporter.source)}</td>
+                <td className="px-3 py-2 text-slate-600">{classificationLabel(supporter.contact_classification)}</td>
+                <td className="px-3 py-2 text-slate-600">{supporter.support_status?.replace(/_/g, ' ') || 'unknown'}</td>
+                <td className="px-3 py-2 text-slate-600">{new Date(supporter.created_at).toLocaleDateString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-2 text-xs text-slate-500">Showing {supporters.length.toLocaleString()} of {total.toLocaleString()} matching records.</div>
+    </div>
   );
 }
 
