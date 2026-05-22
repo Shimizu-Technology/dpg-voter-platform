@@ -157,7 +157,7 @@ module Api
         return render_api_error(message: "Blast not found", status: :not_found, code: "blast_not_found") unless blast
         return live_outreach_disabled_response unless live_outreach_enabled?
 
-        deliveries = blast.outreach_deliveries.resendable.includes(:supporter).to_a
+        deliveries = blast.outreach_deliveries.resendable.not_already_resent.includes(:supporter).to_a
         return render json: { resent: 0, message: "No failed or undelivered SMS recipients to resend." } if deliveries.empty?
 
         phones_and_bodies = deliveries.map { |delivery| { to: delivery.recipient, body: blast.message, supporter_id: delivery.supporter_id } }

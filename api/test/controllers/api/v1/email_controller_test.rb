@@ -100,6 +100,47 @@ class Api::V1::EmailControllerTest < ActionDispatch::IntegrationTest
     assert EmailBlast.exists?(payload["blast_id"])
   end
 
+  test "email resend failed does not resend the same original twice" do
+    village = Village.create!(name: "Email Resend Village")
+    supporter = Supporter.create!(
+      first_name: "Email", last_name: "Retry", print_name: "Email Retry",
+      contact_number: "6715557100",
+      email: "retry@example.com",
+      village: village,
+      source: "staff_entry",
+      opt_in_email: true,
+      status: "active"
+    )
+    blast = EmailBlast.create!(status: "completed", subject: "DPG retry", body: "Hello {first_name}", initiated_by: @coordinator)
+    original_delivery = OutreachDelivery.create!(
+      channel: "email",
+      email_blast: blast,
+      supporter: supporter,
+      recipient: supporter.email,
+      provider: "resend",
+      status: "failed"
+    )
+
+    original = Resend::Emails.method(:send)
+    calls = 0
+    Resend::Emails.define_singleton_method(:send) do |_payload|
+      calls += 1
+      { id: "email-resent-#{calls}" }
+    end
+
+    with_live_outreach_enabled do
+      post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      assert_response :success
+      post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      assert_response :success
+    end
+
+    assert_equal 1, calls
+    assert_equal 1, original_delivery.resends.count
+  ensure
+    Resend::Emails.define_singleton_method(:send, original) if original
+  end
+
   test "resend webhook updates email delivery status" do
     village = Village.create!(name: "Webhook Village")
     supporter = Supporter.create!(
@@ -132,6 +173,34 @@ class Api::V1::EmailControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal "delivered", delivery.reload.status
+  end
+
+  test "resend webhook rejects stale signed payloads" do
+    previous_secret = ENV["RESEND_WEBHOOK_SIGNING_SECRET"]
+    secret_bytes = "test-secret-for-svix"
+    ENV["RESEND_WEBHOOK_SIGNING_SECRET"] = "whsec_#{Base64.strict_encode64(secret_bytes)}"
+    body = {
+      type: "email.delivered",
+      created_at: Time.current.iso8601,
+      data: { email_id: "email-stale" }
+    }.to_json
+    timestamp = 10.minutes.ago.to_i.to_s
+    svix_id = "msg_test"
+    signed_payload = "#{svix_id}.#{timestamp}.#{body}"
+    signature = Base64.strict_encode64(OpenSSL::HMAC.digest("SHA256", secret_bytes, signed_payload))
+
+    post "/api/v1/email/webhooks/resend",
+      params: body,
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "svix-id" => svix_id,
+        "svix-timestamp" => timestamp,
+        "svix-signature" => "v1,#{signature}"
+      }
+
+    assert_response :unauthorized
+  ensure
+    ENV["RESEND_WEBHOOK_SIGNING_SECRET"] = previous_secret
   end
 
   private

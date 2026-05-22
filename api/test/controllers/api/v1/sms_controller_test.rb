@@ -151,6 +151,46 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
     ClicksendClient.define_singleton_method(:sms_receipt, original) if original
   end
 
+  test "resend failed sms does not resend the same original twice" do
+    village = Village.create!(name: "SMS Resend Village")
+    supporter = Supporter.create!(
+      first_name: "Retry", last_name: "Target", print_name: "Retry Target",
+      contact_number: "6715556100",
+      village: village,
+      source: "staff_entry",
+      opt_in_text: true,
+      status: "active"
+    )
+    blast = SmsBlast.create!(status: "completed", message: "DPG retry", total_recipients: 1, failed_count: 1, initiated_by: @coordinator)
+    original_delivery = OutreachDelivery.create!(
+      channel: "sms",
+      sms_blast: blast,
+      supporter: supporter,
+      recipient: "+16715556100",
+      provider: "clicksend",
+      status: "failed"
+    )
+
+    original = ClicksendClient.method(:send_batch)
+    calls = 0
+    ClicksendClient.define_singleton_method(:send_batch) do |messages|
+      calls += 1
+      { sent: messages.size, failed: 0, results: messages.map { |message| { to: message[:to], supporter_id: message[:supporter_id], success: true, message_id: "RESENT-#{calls}", error: nil } } }
+    end
+
+    with_live_outreach_enabled do
+      post "/api/v1/sms/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      assert_response :success
+      post "/api/v1/sms/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      assert_response :success
+    end
+
+    assert_equal 1, calls
+    assert_equal 1, original_delivery.resends.count
+  ensure
+    ClicksendClient.define_singleton_method(:send_batch, original) if original
+  end
+
   test "coordinator live blast is blocked by default" do
     with_live_outreach_disabled do
       post "/api/v1/sms/blast",

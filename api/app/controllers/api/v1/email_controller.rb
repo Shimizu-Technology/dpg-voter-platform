@@ -120,7 +120,7 @@ module Api
         return render_api_error(message: "Email blast not found", status: :not_found, code: "email_blast_not_found") unless blast
         return live_outreach_disabled_response unless live_outreach_enabled?
 
-        deliveries = blast.outreach_deliveries.resendable.includes(:supporter).to_a
+        deliveries = blast.outreach_deliveries.resendable.not_already_resent.includes(:supporter).to_a
         return render json: { resent: 0, message: "No failed or undelivered email recipients to resend." } if deliveries.empty?
 
         resent = 0
@@ -233,13 +233,16 @@ module Api
 
       def valid_resend_signature?(raw_body)
         secret = ENV["RESEND_WEBHOOK_SIGNING_SECRET"].to_s
-        return true if secret.blank? && !Rails.env.production?
+        return true if secret.blank? && Rails.env.test?
         return false if secret.blank?
 
         svix_id = request.headers["svix-id"].to_s
         svix_timestamp = request.headers["svix-timestamp"].to_s
         svix_signature = request.headers["svix-signature"].to_s
         return false if svix_id.blank? || svix_timestamp.blank? || svix_signature.blank?
+
+        timestamp = Integer(svix_timestamp)
+        return false if (Time.current.to_i - timestamp).abs > 300
 
         signed_payload = "#{svix_id}.#{svix_timestamp}.#{raw_body}"
         key = Base64.decode64(secret.delete_prefix("whsec_"))
@@ -250,6 +253,8 @@ module Api
         rescue ArgumentError
           false
         end
+      rescue ArgumentError
+        false
       end
 
       def live_outreach_enabled?

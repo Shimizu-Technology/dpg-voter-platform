@@ -10,6 +10,7 @@ class OutreachDelivery < ApplicationRecord
   belongs_to :email_blast, optional: true
   belongs_to :supporter
   belongs_to :resend_of, class_name: "OutreachDelivery", optional: true
+  has_many :resends, class_name: "OutreachDelivery", foreign_key: :resend_of_id, dependent: :nullify, inverse_of: :resend_of
 
   validates :channel, inclusion: { in: CHANNELS }
   validates :provider, inclusion: { in: PROVIDERS }
@@ -18,6 +19,7 @@ class OutreachDelivery < ApplicationRecord
   validate :belongs_to_exactly_one_blast
 
   scope :resendable, -> { where(status: RESENDABLE_STATUSES) }
+  scope :not_already_resent, -> { where.missing(:resends) }
   scope :recent_first, -> { order(created_at: :desc) }
 
   def resendable?
