@@ -99,6 +99,27 @@ class Api::V1::QuotaPeriodsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "archived", period.reload.status
   end
 
+  test "activate returns unprocessable when database active-period constraint is hit" do
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Period With Race",
+      start_date: Date.new(2026, 7, 1),
+      end_date: Date.new(2026, 7, 31),
+      due_date: Date.new(2026, 8, 3),
+      status: "closed"
+    )
+
+    original_activate = QuotaPeriod.instance_method(:activate!)
+    QuotaPeriod.define_method(:activate!) { raise ActiveRecord::RecordNotUnique, "duplicate open period" }
+
+    post "/api/v1/quota_periods/#{period.id}/activate", headers: auth_headers(@admin), as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "quota_period_activate_failed", response.parsed_body["code"]
+  ensure
+    QuotaPeriod.define_method(:activate!, original_activate) if original_activate
+  end
+
   test "only one period can be open at a time unless activated" do
     first = QuotaPeriod.create!(
       campaign_cycle: @cycle,

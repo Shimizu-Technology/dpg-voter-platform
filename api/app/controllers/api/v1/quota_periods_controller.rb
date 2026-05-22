@@ -69,6 +69,8 @@ module Api
         render json: { quota_period: quota_period_json(@quota_period.reload, active_period: @quota_period) }
       rescue ActiveRecord::RecordInvalid => e
         render_api_error(message: e.record.errors.full_messages.to_sentence, status: :unprocessable_entity, code: "quota_period_activate_failed")
+      rescue ActiveRecord::RecordNotUnique
+        render_api_error(message: "Only one period can be active at a time. Refresh and try again.", status: :unprocessable_entity, code: "quota_period_activate_failed")
       end
 
       # POST /api/v1/quota_periods/:id/archive
