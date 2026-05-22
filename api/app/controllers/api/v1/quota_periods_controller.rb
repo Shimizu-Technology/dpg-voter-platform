@@ -154,7 +154,7 @@ module Api
         base_scope.classified_supporters.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:supporters] = total }
         active_scope = base_scope.active
         active_scope.where(source: "qr_signup").group(:quota_period_id).count.each { |period_id, total| counts[period_id][:qr_signups] = total }
-        active_scope.public_origin.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:public_signups] = total }
+        active_scope.where(source: "public_signup").group(:quota_period_id).count.each { |period_id, total| counts[period_id][:public_signups] = total }
         active_scope.where(source: "staff_entry").group(:quota_period_id).count.each { |period_id, total| counts[period_id][:staff_entries] = total }
 
         counts

@@ -46,6 +46,47 @@ class Api::V1::QuotaPeriodsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Quota Period 1", response.parsed_body.dig("active_quota_period", "name")
   end
 
+  test "period counts separate direct public signups from qr signups" do
+    village = Village.find_or_create_by!(name: "Dededo")
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Signup Source Period",
+      start_date: Date.new(2026, 5, 1),
+      end_date: Date.new(2026, 5, 31),
+      due_date: Date.new(2026, 6, 3),
+      status: "open"
+    )
+    Supporter.create!(
+      first_name: "Direct",
+      last_name: "Signup",
+      contact_number: "671-555-2001",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      status: "active",
+      quota_period: period
+    )
+    Supporter.create!(
+      first_name: "Qr",
+      last_name: "Signup",
+      contact_number: "671-555-2002",
+      village: village,
+      source: "qr_signup",
+      attribution_method: "qr_self_signup",
+      contact_classification: "new_intake",
+      status: "active",
+      quota_period: period
+    )
+
+    get "/api/v1/quota_periods", headers: auth_headers(@admin)
+
+    assert_response :success
+    counts = response.parsed_body.dig("quota_periods", 0, "counts")
+    assert_equal 1, counts["public_signups"]
+    assert_equal 1, counts["qr_signups"]
+  end
+
   test "active quota period cannot be archived" do
     period = QuotaPeriod.create!(
       campaign_cycle: @cycle,

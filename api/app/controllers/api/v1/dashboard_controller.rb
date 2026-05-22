@@ -164,7 +164,7 @@ module Api
             active_contacts: classification_counts["active_contact"] || 0,
             supporters: supporter_count,
             qr_signups: source_counts["qr_signup"] || 0,
-            public_signups: Supporter::PUBLIC_SOURCES.sum { |source| source_counts[source] || 0 }
+            public_signups: source_counts["public_signup"] || 0
           }
         }
       end
