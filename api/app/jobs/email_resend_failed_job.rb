@@ -8,9 +8,25 @@ class EmailResendFailedJob < ApplicationJob
     OutreachDelivery.where(id: delivery_ids).includes(:email_blast, :supporter).find_each do |delivery|
       send_resend_delivery(delivery, recorded_by_user_id)
     end
+  rescue StandardError => e
+    mark_queued_deliveries_failed(delivery_ids, e)
+    raise
   end
 
   private
+
+  def mark_queued_deliveries_failed(delivery_ids, error)
+    now = Time.current
+    OutreachDelivery.where(id: delivery_ids, status: "queued").update_all(
+      status: "failed",
+      provider_status_text: "Resend job interrupted before completion: #{error.message}",
+      failed_at: now,
+      last_event_at: now,
+      updated_at: now
+    )
+  rescue StandardError => cleanup_error
+    Rails.logger.error("[EmailResendFailedJob] failed to reset queued deliveries after #{error.class}: #{cleanup_error.class} #{cleanup_error.message}")
+  end
 
   def send_resend_delivery(delivery, recorded_by_user_id)
     blast = delivery.email_blast

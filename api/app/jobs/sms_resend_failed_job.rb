@@ -12,9 +12,25 @@ class SmsResendFailedJob < ApplicationJob
       sleep(BATCH_DELAY) if batch_idx > 0
       process_batch(batch_ids, recorded_by_user_id)
     end
+  rescue StandardError => e
+    mark_queued_deliveries_failed(delivery_ids, e)
+    raise
   end
 
   private
+
+  def mark_queued_deliveries_failed(delivery_ids, error)
+    now = Time.current
+    OutreachDelivery.where(id: delivery_ids, status: "queued").update_all(
+      status: "failed",
+      provider_status_text: "SMS resend job interrupted before completion: #{error.message}",
+      failed_at: now,
+      last_event_at: now,
+      updated_at: now
+    )
+  rescue StandardError => cleanup_error
+    Rails.logger.error("[SmsResendFailedJob] failed to reset queued deliveries after #{error.class}: #{cleanup_error.class} #{cleanup_error.message}")
+  end
 
   def process_batch(delivery_ids, recorded_by_user_id)
     deliveries = OutreachDelivery.where(id: delivery_ids).includes(:sms_blast, :supporter).to_a
