@@ -47,6 +47,8 @@ interface EmailBlastRow {
   initiated_by?: string | null;
 }
 
+const RESENDABLE_STATUSES = new Set(['failed', 'bounced', 'undelivered', 'suppressed', 'delivery_delayed', 'unknown']);
+
 const EMAIL_TEMPLATES = [
   {
     label: 'Registration help',
@@ -502,7 +504,8 @@ function EmailDeliveryPanel({
   onResend: () => void;
   resending: boolean;
 }) {
-  const resendableCount = ['failed', 'bounced', 'undelivered', 'suppressed', 'delivery_delayed', 'unknown'].reduce((sum, status) => sum + (counts[status] || 0), 0);
+  const deliveryIdsWithResends = new Set(deliveries.map((delivery) => delivery.resend_of_id).filter((id): id is number => id != null));
+  const resendableCount = deliveries.filter((delivery) => RESENDABLE_STATUSES.has(delivery.status) && !deliveryIdsWithResends.has(delivery.id)).length;
 
   return (
     <div className="app-card p-5">
