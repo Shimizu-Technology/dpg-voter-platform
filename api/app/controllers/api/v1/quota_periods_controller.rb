@@ -142,9 +142,10 @@ module Api
         base_scope.intake.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:pending_intake] = total }
         base_scope.relationship_contacts.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:active_contacts] = total }
         base_scope.classified_supporters.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:supporters] = total }
-        base_scope.where(source: "qr_signup").group(:quota_period_id).count.each { |period_id, total| counts[period_id][:qr_signups] = total }
-        base_scope.public_origin.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:public_signups] = total }
-        base_scope.where(source: "staff_entry").group(:quota_period_id).count.each { |period_id, total| counts[period_id][:staff_entries] = total }
+        active_scope = base_scope.active
+        active_scope.where(source: "qr_signup").group(:quota_period_id).count.each { |period_id, total| counts[period_id][:qr_signups] = total }
+        active_scope.public_origin.group(:quota_period_id).count.each { |period_id, total| counts[period_id][:public_signups] = total }
+        active_scope.where(source: "staff_entry").group(:quota_period_id).count.each { |period_id, total| counts[period_id][:staff_entries] = total }
 
         counts
       end
