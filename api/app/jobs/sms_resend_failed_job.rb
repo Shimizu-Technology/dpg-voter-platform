@@ -4,7 +4,19 @@ class SmsResendFailedJob < ApplicationJob
   queue_as :default
   discard_on StandardError # SMS sends are not idempotent; retries can duplicate messages.
 
+  BATCH_SIZE = 500 # ClickSend supports up to 1000, use 500 for safety
+  BATCH_DELAY = 1.0 # seconds between batches to respect rate limits
+
   def perform(delivery_ids:, recorded_by_user_id: nil)
+    delivery_ids.each_slice(BATCH_SIZE).with_index do |batch_ids, batch_idx|
+      sleep(BATCH_DELAY) if batch_idx > 0
+      process_batch(batch_ids, recorded_by_user_id)
+    end
+  end
+
+  private
+
+  def process_batch(delivery_ids, recorded_by_user_id)
     deliveries = OutreachDelivery.where(id: delivery_ids).includes(:sms_blast, :supporter).to_a
     return if deliveries.empty?
 
@@ -16,26 +28,27 @@ class SmsResendFailedJob < ApplicationJob
     now = Time.current
 
     deliveries.each do |delivery|
-      row = result_by_supporter_id[delivery.supporter_id]
-      next unless row
-
-      success = row[:success]
-      delivery.update!(
-        recipient: row[:to].presence || delivery.recipient,
-        provider_message_id: row[:message_id],
-        status: success ? "sent" : "failed",
-        provider_status_text: row[:error],
-        sent_at: success ? now : nil,
-        failed_at: success ? nil : now,
-        last_event_at: now
-      )
-      create_contact_attempt(delivery, recorded_by_user_id, success, row, now)
-    rescue StandardError => e
-      Rails.logger.error("[SmsResendFailedJob] resend tracking failed for delivery=#{delivery.id}: #{e.class} #{e.message}")
+      update_delivery_from_result(delivery, result_by_supporter_id[delivery.supporter_id], recorded_by_user_id, now)
     end
   end
 
-  private
+  def update_delivery_from_result(delivery, row, recorded_by_user_id, now)
+    return unless row
+
+    success = row[:success]
+    delivery.update!(
+      recipient: row[:to].presence || delivery.recipient,
+      provider_message_id: row[:message_id],
+      status: success ? "sent" : "failed",
+      provider_status_text: row[:error],
+      sent_at: success ? now : nil,
+      failed_at: success ? nil : now,
+      last_event_at: now
+    )
+    create_contact_attempt(delivery, recorded_by_user_id, success, row, now)
+  rescue StandardError => e
+    Rails.logger.error("[SmsResendFailedJob] resend tracking failed for delivery=#{delivery.id}: #{e.class} #{e.message}")
+  end
 
   def create_contact_attempt(delivery, recorded_by_user_id, success, row, now)
     return if recorded_by_user_id.blank?

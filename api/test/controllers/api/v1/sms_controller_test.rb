@@ -229,6 +229,62 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
     ClicksendClient.define_singleton_method(:send_batch, original) if original
   end
 
+  test "sms resend failed job sends queued deliveries in safe clicksend batches" do
+    village = Village.create!(name: "SMS Batched Resend Village")
+    blast = SmsBlast.create!(status: "completed", message: "DPG retry", total_recipients: 2, failed_count: 2, initiated_by: @coordinator)
+    deliveries = 2.times.map do |idx|
+      supporter = Supporter.create!(
+        first_name: "Batch", last_name: "Retry #{idx}", print_name: "Batch Retry #{idx}",
+        contact_number: "67155562#{idx.to_s.rjust(2, '0')}",
+        village: village,
+        source: "staff_entry",
+        opt_in_text: true,
+        status: "active"
+      )
+      OutreachDelivery.create!(
+        channel: "sms",
+        sms_blast: blast,
+        supporter: supporter,
+        resend_of: OutreachDelivery.create!(
+          channel: "sms",
+          sms_blast: blast,
+          supporter: supporter,
+          recipient: supporter.contact_number,
+          provider: "clicksend",
+          status: "failed"
+        ),
+        recipient: supporter.contact_number,
+        provider: "clicksend",
+        status: "queued"
+      )
+    end
+
+    previous_batch_size = SmsResendFailedJob::BATCH_SIZE
+    previous_batch_delay = SmsResendFailedJob::BATCH_DELAY
+    SmsResendFailedJob.send(:remove_const, :BATCH_SIZE)
+    SmsResendFailedJob.const_set(:BATCH_SIZE, 1)
+    SmsResendFailedJob.send(:remove_const, :BATCH_DELAY)
+    SmsResendFailedJob.const_set(:BATCH_DELAY, 0)
+
+    original = ClicksendClient.method(:send_batch)
+    batch_sizes = []
+    ClicksendClient.define_singleton_method(:send_batch) do |messages|
+      batch_sizes << messages.size
+      { sent: messages.size, failed: 0, results: messages.map { |message| { to: message[:to], supporter_id: message[:supporter_id], success: true, message_id: "sms-batch-#{batch_sizes.size}", error: nil } } }
+    end
+
+    SmsResendFailedJob.perform_now(delivery_ids: deliveries.map(&:id), recorded_by_user_id: @coordinator.id)
+
+    assert_equal [ 1, 1 ], batch_sizes
+    assert deliveries.all? { |delivery| delivery.reload.status == "sent" }
+  ensure
+    ClicksendClient.define_singleton_method(:send_batch, original) if original
+    SmsResendFailedJob.send(:remove_const, :BATCH_SIZE)
+    SmsResendFailedJob.const_set(:BATCH_SIZE, previous_batch_size)
+    SmsResendFailedJob.send(:remove_const, :BATCH_DELAY)
+    SmsResendFailedJob.const_set(:BATCH_DELAY, previous_batch_delay)
+  end
+
   test "coordinator live blast is blocked by default" do
     with_live_outreach_disabled do
       post "/api/v1/sms/blast",
