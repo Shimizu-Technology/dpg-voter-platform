@@ -436,6 +436,27 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "merge_target_self_reference", response.parsed_body["code"]
   end
 
+  test "index quota period filter ignores unsafe non-integer values" do
+    village = Village.find_or_create_by!(name: "Yigo")
+    Supporter.create!(
+      first_name: "No",
+      last_name: "Period",
+      contact_number: "671-555-9191",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      status: "active"
+    )
+
+    get "/api/v1/supporters", params: { quota_period_id: "not-a-period" }, headers: auth_headers(@admin)
+
+    assert_response :success
+    assert_equal 0, response.parsed_body.dig("pagination", "total")
+    assert_empty response.parsed_body["supporters"]
+  end
+
   test "public signup is assigned to the active quota period" do
     village = Village.find_or_create_by!(name: "Barrigada")
     period = QuotaPeriod.create!(

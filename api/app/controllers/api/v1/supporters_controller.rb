@@ -1207,8 +1207,9 @@ module Api
         end
 
         return supporters.where(quota_period_id: nil) if quota_period_id == "none"
+        return supporters.where(quota_period_id: quota_period_id) if quota_period_id.to_s.match?(/\A\d+\z/)
 
-        supporters.where(quota_period_id: quota_period_id)
+        supporters.none
       end
 
       def public_supporter_params
