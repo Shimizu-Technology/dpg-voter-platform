@@ -6,6 +6,11 @@ class SendEmailBlastJob < ApplicationJob
 
   def perform(email_blast_id: nil, subject: nil, body: nil, filters: {}, initiated_by_user_id: nil)
     blast = EmailBlast.find_by(id: email_blast_id) if email_blast_id
+    if email_blast_id.present? && blast.nil?
+      Rails.logger.warn("[EmailBlast] skipped missing email_blast_id=#{email_blast_id}")
+      return
+    end
+
     subject ||= blast&.subject
     body ||= blast&.body
     filters = blast&.filters || filters || {}
