@@ -31,18 +31,22 @@ module Api
       # POST /api/v1/quota_periods
       def create
         period = QuotaPeriod.new(quota_period_create_params)
-        period.campaign_cycle ||= CampaignCycle.current_or_create_default!
-        period.due_date ||= period.end_date
-        period.quota_target ||= 0
 
-        if period.save
-          active_period = period.open? ? period : QuotaPeriod.active_for
-          log_audit!(period, action: "quota_period_created", changed_data: quota_period_json(period, active_period: active_period))
-          CampaignBroadcast.quota_period_updated(period, action: "created")
-          render json: { quota_period: quota_period_json(period, active_period: active_period) }, status: :created
-        else
-          render_api_error(message: period.errors.full_messages.to_sentence, status: :unprocessable_entity, code: "quota_period_create_failed")
+        ApplicationRecord.transaction do
+          period.campaign_cycle ||= CampaignCycle.current_or_create_default!
+          period.due_date ||= period.end_date
+          period.quota_target ||= 0
+          period.save!
         end
+
+        active_period = period.open? ? period : QuotaPeriod.active_for
+        log_audit!(period, action: "quota_period_created", changed_data: quota_period_json(period, active_period: active_period))
+        CampaignBroadcast.quota_period_updated(period, action: "created")
+        render json: { quota_period: quota_period_json(period, active_period: active_period) }, status: :created
+      rescue ActiveRecord::RecordInvalid => e
+        render_api_error(message: e.record.errors.full_messages.to_sentence, status: :unprocessable_entity, code: "quota_period_create_failed")
+      rescue ActiveRecord::RecordNotUnique
+        render_api_error(message: "Only one period can be active at a time. Refresh and try again.", status: :unprocessable_entity, code: "quota_period_create_failed")
       end
 
       # PATCH /api/v1/quota_periods/:id
