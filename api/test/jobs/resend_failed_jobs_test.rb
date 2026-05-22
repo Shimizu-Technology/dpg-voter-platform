@@ -1,6 +1,54 @@
 require "test_helper"
 
 class ResendFailedJobsTest < ActiveJob::TestCase
+  test "sms receipt sync job throttles receipt lookups in batches" do
+    user = User.create!(clerk_id: "clerk-sms-sync-job", email: "sms-sync-job@example.com", name: "SMS Sync Job", role: "district_coordinator")
+    village = Village.create!(name: "SMS Sync Village")
+    blast = SmsBlast.create!(status: "completed", message: "DPG update", total_recipients: 2, sent_count: 2, initiated_by: user)
+    deliveries = 2.times.map do |idx|
+      supporter = Supporter.create!(
+        first_name: "Sync", last_name: "Recipient #{idx}", print_name: "Sync Recipient #{idx}",
+        contact_number: "67155563#{idx.to_s.rjust(2, '0')}",
+        village: village,
+        source: "staff_entry",
+        opt_in_text: true,
+        status: "active"
+      )
+      OutreachDelivery.create!(
+        channel: "sms",
+        sms_blast: blast,
+        supporter: supporter,
+        recipient: supporter.contact_number,
+        provider: "clicksend",
+        provider_message_id: "MSG-#{idx}",
+        status: "sent"
+      )
+    end
+
+    previous_batch_size = SmsSyncReceiptsJob::BATCH_SIZE
+    previous_batch_delay = SmsSyncReceiptsJob::BATCH_DELAY
+    SmsSyncReceiptsJob.send(:remove_const, :BATCH_SIZE)
+    SmsSyncReceiptsJob.const_set(:BATCH_SIZE, 1)
+    SmsSyncReceiptsJob.send(:remove_const, :BATCH_DELAY)
+    SmsSyncReceiptsJob.const_set(:BATCH_DELAY, 0)
+
+    receipt_calls = []
+    with_stubbed_singleton_method(ClicksendClient, :sms_receipt, lambda { |message_id|
+      receipt_calls << message_id
+      { success: true, receipt: { "status_code" => 201, "status_text" => "Success: Message received on handset." } }
+    }) do
+      SmsSyncReceiptsJob.perform_now(sms_blast_id: blast.id)
+    end
+
+    assert_equal deliveries.map(&:provider_message_id), receipt_calls
+    assert deliveries.all? { |delivery| delivery.reload.status == "delivered" }
+  ensure
+    SmsSyncReceiptsJob.send(:remove_const, :BATCH_SIZE)
+    SmsSyncReceiptsJob.const_set(:BATCH_SIZE, previous_batch_size)
+    SmsSyncReceiptsJob.send(:remove_const, :BATCH_DELAY)
+    SmsSyncReceiptsJob.const_set(:BATCH_DELAY, previous_batch_delay)
+  end
+
   test "sms resend job resets queued deliveries when batch send is interrupted" do
     user = User.create!(clerk_id: "clerk-sms-resend-job", email: "sms-resend-job@example.com", name: "SMS Resend Job", role: "district_coordinator")
     village = Village.create!(name: "SMS Job Village")
