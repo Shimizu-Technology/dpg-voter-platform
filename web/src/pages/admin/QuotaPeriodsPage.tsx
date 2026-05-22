@@ -63,8 +63,12 @@ type PeriodDraft = {
 
 const emptyDraft = (): PeriodDraft => {
   const today = new Date();
-  const start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const start = `${year}-${pad(month + 1)}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const end = `${year}-${pad(month + 1)}-${pad(lastDay)}`;
   return { name: '', start_date: start, end_date: end, due_date: end, quota_target: '0', status: 'closed' };
 };
 
