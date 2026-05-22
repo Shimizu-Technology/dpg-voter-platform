@@ -1,15 +1,15 @@
 # DPG Voter Platform - Next Implementation Plan
 
 **Created:** May 14, 2026
-**Last updated:** May 20, 2026
-**Status:** Updated after DPG demo walkthrough and PR #39 duplicate-contact polish merged to `main`
-**Base commit:** `c154765`
+**Last updated:** May 22, 2026
+**Status:** Updated after PR #40 beta usability polish and PR #41 DPG quota/period foundation merged to `main`
+**Base commit:** `43daeaa`
 
 ## Current posture
 
 The DPG platform has completed its first live demo walkthrough with Auntie Stephanie and DPG team members. The demo went well: DPG understood the Intake/GEC/QR/household/duplicate workflows and began discussing real operational use with village organizers, signup contests, quotas/periods, Mike Weekly's poll-watcher team, and future list imports.
 
-The app should now be treated as a controlled beta build for a small DPG tester group, not yet a broad staff rollout. The foundation works, but the demo surfaced concrete beta polish needs around GEC search strictness, address search, QR-code downloads, signup-link lifecycle, safe demo-data cleanup, SMS delivery visibility, and DPG-owned quota periods.
+The app should now be treated as a controlled beta build for a small DPG tester group, not yet a broad staff rollout. PR #40 addressed the immediate beta usability polish around GEC/address search, QR-code downloads, signup-link lifecycle, and safe demo-data cleanup. PR #41 added the DPG-owned quota/period foundation. The remaining direct demo ask to implement next is SMS/email delivery visibility and resend-to-failed/undelivered recipients.
 
 Already in place:
 
@@ -27,6 +27,8 @@ Already in place:
 - Redesigned Reports workspace, including DPG/GEC cross-reference reports and mismatch reporting.
 - DPG-facing role labels and tightened import/export/contact-attempt permissions.
 - Duplicate Contact Review for DPG contact cleanup, with persistent dismissed-pair history, grouped sidebar count, merge safeguards, and Intake approval blocking for unresolved duplicate warnings.
+- Beta GEC/address search and QR/signup-link lifecycle polish from PR #40.
+- DPG quota/period foundation from PR #41: period management, active-period attribution, dashboard/Signup Links/Reports/Contacts/Intake period filters, period drilldowns, realtime invalidation, and one-active-period safeguards.
 
 ## Before broader DPG rollout
 
@@ -51,19 +53,19 @@ Already in place:
 
 ## Next product recommendation
 
-### GEC Search + Beta Usability Polish
+### SMS/email delivery status and resend
 
-The next product step should address the concrete issues found in the May 20 DPG demo before a wider tester rollout.
+The next product step should address the remaining concrete May 20 demo ask: DPG wants to see who received/did not receive outreach messages and resend only to failed/undelivered recipients.
 
 Recommended next branch:
 
-- make GEC voter search punctuation-insensitive and middle-initial tolerant (`Christopher C Flores` and `Christopher C. Flores` should both find the same likely people)
-- investigate why the GEC list view did not pull up some people cleanly during the demo
-- improve address search/normalization for PO Box, P.O. Box, HCR/HC, punctuation, and stale-address variants
-- allow QR-code download from signup links
-- add signup-link delete/archive lifecycle behavior
-- ensure archiving/removing demo contacts does not prevent future legitimate signup or attribution
-- prepare simple beta tester instructions for Auntie Stephanie's group
+- add recipient-level delivery records for SMS and email blasts
+- store ClickSend `message_id` and Resend email IDs per recipient
+- ingest ClickSend delivery receipts via polling and/or delivery-receipt rules
+- ingest Resend webhook events (`sent`, `delivered`, `delivery_delayed`, `failed`, `bounced`, `complained`, `suppressed`)
+- show blast detail recipient/status tables
+- add resend-only-failed/undelivered actions with safe contact-history logging
+- keep live outreach gated behind existing preview/expected-recipient-count governance
 
 DPG also confirmed that official active/inactive party lists exist, but schema-specific importers should still wait for actual DPG sample files.
 
@@ -71,7 +73,9 @@ DPG also confirmed that official active/inactive party lists exist, but schema-s
 
 ### 1. GEC search, address search, and beta usability polish
 
-Build immediately from demo feedback:
+Status: merged in PR #40.
+
+Implemented from demo feedback:
 
 - punctuation-insensitive GEC voter search
 - middle-initial tolerant search
@@ -83,11 +87,11 @@ Build immediately from demo feedback:
 
 ### 2. DPG quota/period foundation
 
-Status: in implementation on `feature/dpg-quota-period-foundation`.
+Status: merged in PR #41.
 
 DPG independently raised quota/period needs during the demo, so this is now safe to design as a DPG-owned goals/period system rather than a copied campaign workflow.
 
-Initial scope:
+Implemented scope:
 
 - admin-defined quota/goal periods with start/end dates
 - active period selection
@@ -95,6 +99,10 @@ Initial scope:
 - active-period summary on the dashboard
 - period-aware signup-link counts with lifetime totals preserved
 - reports that can filter by period
+- Contacts/Intake period filters
+- embedded period drilldown table with pagination
+- realtime cache invalidation for period-related counts
+- model/database safeguards for one active period
 - duplicate handling remains in Duplicate Contact Review; more advanced unique-credit rules should wait for DPG feedback
 
 Clarify before detailed dashboards:
@@ -103,16 +111,18 @@ Clarify before detailed dashboards:
 - whether goals are per village, per user, per signup link, or party-wide
 - how DPG wants to handle carryover between periods
 
-### 3. SMS delivery status and resend
+### 3. SMS/email delivery status and resend
 
 DPG asked to see who received/did not receive messages and to resend only to people who did not receive the first message.
 
 Initial scope:
 
-- per-recipient SMS delivery status storage
+- per-recipient SMS and email delivery status storage
 - blast detail recipient/status table
 - failed/undelivered resend action
-- provider status polling or webhook support, depending on ClickSend capabilities
+- ClickSend delivery receipt polling and/or delivery receipt rule support
+- Resend webhook event ingestion and signature verification
+- provider IDs stored per recipient so statuses can reconcile back to the original blast
 
 ### 4. DPG list imports and list lineage
 

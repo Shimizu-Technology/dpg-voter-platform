@@ -1,14 +1,14 @@
 # DPG Voter Platform - Current Project Status
 
-**Last updated:** May 20, 2026
+**Last updated:** May 22, 2026
 **Current branch:** `main`
-**Base commit:** `c154765` after PR #39 merged DPG Duplicate Contact Review polish
+**Base commit:** `43daeaa` after PR #41 merged DPG quota/period foundation
 
 ## One-line status
 
-The Democratic Party of Guam app is deployed on the Render/Netlify/Neon stack and now has the core voter-engagement foundation in place: public signup, QR/share-link attribution, a unified admin workspace, Contacts/Intake, GEC voter-list search/import, household/address lookup, create/link contact actions from GEC and household results, contact history with editable audited corrections, follow-up queue logging, Duplicate Contact Review, a redesigned Reports workspace with DPG/GEC cross-reference reports, users/roles, governed SMS/email outreach, and an in-progress DPG quota/period foundation.
+The Democratic Party of Guam app is deployed on the Render/Netlify/Neon stack and now has the core voter-engagement foundation in place: public signup, QR/share-link attribution, a unified admin workspace, Contacts/Intake, GEC voter-list search/import, household/address lookup, create/link contact actions from GEC and household results, contact history with editable audited corrections, follow-up queue logging, Duplicate Contact Review, a redesigned Reports workspace with DPG/GEC cross-reference reports, users/roles, governed SMS/email outreach, and the DPG quota/period foundation.
 
-Leon completed the first live app walkthrough with Auntie Stephanie and DPG team members on May 20. The demo went well and validated the product direction: DPG understood the workflows and immediately connected them to real party operations, including village organizers, QR signup attribution, duplicate cleanup, GEC/household search, quotas/periods, active/inactive party lists, SMS resend needs, and future Election Day poll-watcher workflows. The next milestone is controlled beta polish, not broad rollout yet.
+Leon completed the first live app walkthrough with Auntie Stephanie and DPG team members on May 20. The demo went well and validated the product direction: DPG understood the workflows and immediately connected them to real party operations, including village organizers, QR signup attribution, duplicate cleanup, GEC/household search, quotas/periods, active/inactive party lists, SMS resend needs, and future Election Day poll-watcher workflows. The next milestone is controlled beta QA plus outreach delivery-status/resend work, not broad rollout yet.
 
 ## Product frame
 
@@ -60,7 +60,7 @@ The May 20 demo added/confirmed these near-term requests:
 - QR-code download for signup links
 - delete/archive unused signup links
 - safe demo/contact cleanup so archived/removed contacts can sign up again later
-- DPG-owned quota/period tracking for signup/contact credit (foundation in implementation)
+- DPG-owned quota/period tracking for signup/contact credit (foundation merged in PR #41)
 - active/inactive DPG list import planning once sample files are provided
 - Mike Weekly/poll-watcher involvement for Phase 2 Election Day workflows
 
@@ -221,16 +221,18 @@ The May 20 demo added/confirmed these near-term requests:
 
 ### Tests/checks
 
-Latest PR #37 validation before merge:
+Latest PR #41 validation before merge:
 
 - GitHub `api_lint`: passing
 - GitHub `api_scan_ruby`: passing
 - GitHub `api_test`: passing
 - GitHub `web_lint_build`: passing
 - Greptile review: 5/5, safe to merge
-- Local `cd api && bundle exec rails test`: passing
+- Local `cd api && bundle exec rails test`: `324 runs, 1381 assertions, 0 failures, 0 errors, 0 skips`
 - Local `cd api && bundle exec rails zeitwerk:check`: passing
 - Local `cd api && bundle exec rubocop`: passing
+- Local `cd api && bin/brakeman --no-pager -i config/brakeman.ignore`: passing
+- Local `cd api && bin/bundler-audit`: passing
 - Local `npm --prefix web run lint`: passing
 - Local `npm --prefix web run build`: passing, with the existing Vite large chunk warning
 
@@ -291,7 +293,7 @@ These are important, but should be implemented deliberately:
 - DPG-specific district grouping
 - any remaining permission tuning after DPG tests the role model
 - richer canvassing route/assignment tooling beyond address search
-- print-ready/downloadable QR assets beyond the current in-browser QR/share-link workflow
+- additional print-ready QR templates beyond the current QR download/share-link workflow
 - poll watcher workflow
 - real-time voted/not-voted tracking
 - war-room/turnout dashboard
@@ -301,7 +303,7 @@ These are important, but should be implemented deliberately:
 
 ## Recommended next work
 
-Because the app is already deployed and the QR/role/contact/household/reporting polish has merged, the next move should be guided DPG walkthrough plus list-sample discovery. The best next sequence is:
+Because the app is already deployed and the QR/search/usability polish plus DPG quota/period foundation have merged, the next move should be guided DPG walkthrough, outreach delivery-status/resend implementation, and list-sample discovery. The best next sequence is:
 
 1. **Guided Auntie Stephanie walkthrough**
    Show the deployed app in person, walk through public signup, QR links, Contacts, Intake, GEC Voters, Households, Follow-Up, reports, users/roles, and SMS/email dry-runs. Capture what feels confusing in DPG language.
@@ -312,13 +314,16 @@ Because the app is already deployed and the QR/role/contact/household/reporting 
 3. **Collect real DPG list samples**
    DPG requested official member roster, registered Democrat, supporter/contact, and custom list cross-reference work. Do not build schema-specific importers until DPG provides actual files or sample columns. GEC import is the exception because we already have real GEC files.
 
-4. **Next product phase: explicit list types + list-lineage reporting**
+4. **Next product phase: SMS/email delivery status + resend**
+   Add recipient-level delivery tracking for ClickSend SMS and Resend email, provider receipt/webhook ingestion, blast detail recipient tables, and resend-only-failed/undelivered actions. This is the next implementation PR after this docs cleanup.
+
+5. **List types + list-lineage reporting after samples**
    Add DPG contacts/supporters, official member roster, registered Democrat, and custom list imports once samples exist. Then refine cross-reference reports so list origin, DPG support status, future official membership status, and GEC voter status are clear.
 
-5. **Operational hardening**
+6. **Operational hardening**
    Confirm backups, Clerk production labeling, controlled live SMS/email, production import confidence, and any remaining role/delete/export concerns.
 
-6. **Election Day discovery**
+7. **Election Day discovery**
    Scope poll watcher, voted/not-voted, war-room reporting, and maps with DPG after they have used the foundation.
 
 ## Related docs
