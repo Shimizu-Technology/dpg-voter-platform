@@ -121,62 +121,31 @@ module Api
         return live_outreach_disabled_response unless live_outreach_enabled?
 
         deliveries = blast.outreach_deliveries.resendable.not_already_resent.includes(:supporter).to_a
-        return render json: { resent: 0, message: "No failed or undelivered email recipients to resend." } if deliveries.empty?
+        return render json: { queued: 0, message: "No failed or undelivered email recipients to resend." } if deliveries.empty?
 
-        resent = 0
-        failed = 0
         now = Time.current
-        deliveries.each do |original|
-          provider_status_text = nil
-          begin
-            personalized = SupporterEmailService.preview_html(blast.body, original.supporter)
-            response = Resend::Emails.send({
-              from: ENV["RESEND_FROM_EMAIL"].presence || ENV["MAILER_FROM_EMAIL"].presence,
-              to: original.recipient,
-              subject: SupporterEmailService.preview_subject(blast.subject, original.supporter),
-              html: personalized,
-              tags: [ { name: "email_blast_id", value: blast.id.to_s } ]
-            })
-            provider_message_id = if response.respond_to?(:id)
-              response.id
-            elsif response.is_a?(Hash)
-              response[:id] || response["id"] || response.dig(:data, :id) || response.dig("data", "id")
-            end
-            status = "sent"
-            resent += 1
-          rescue StandardError => e
-            provider_message_id = nil
-            status = "failed"
-            provider_status_text = e.message
-            failed += 1
+        resend_delivery_ids = OutreachDelivery.transaction do
+          deliveries.map do |original|
+            OutreachDelivery.create!(
+              channel: "email",
+              email_blast: blast,
+              supporter: original.supporter,
+              resend_of: original,
+              recipient: original.recipient,
+              provider: "resend",
+              status: "queued",
+              last_event_at: now,
+              metadata: { resend: true }
+            ).id
           end
-
-          OutreachDelivery.create!(
-            channel: "email",
-            email_blast: blast,
-            supporter: original.supporter,
-            resend_of: original,
-            recipient: original.recipient,
-            provider: "resend",
-            provider_message_id: provider_message_id,
-            status: status,
-            provider_status_text: provider_status_text,
-            sent_at: status == "sent" ? now : nil,
-            failed_at: status == "failed" ? now : nil,
-            last_event_at: now,
-            metadata: { resend: true }
-          )
-          SupporterContactAttempt.create!(
-            supporter: original.supporter,
-            recorded_by_user_id: current_user.id,
-            channel: "email",
-            outcome: status == "sent" ? "attempted" : "unavailable",
-            note: "Email resend #{status == 'sent' ? 'sent' : 'failed'}: #{blast.subject.to_s.truncate(120)}#{provider_status_text.present? ? " Error: #{provider_status_text}." : ''}",
-            recorded_at: now
-          )
         end
+        EmailResendFailedJob.perform_later(delivery_ids: resend_delivery_ids, recorded_by_user_id: current_user.id)
 
-        render json: { resent: resent, failed: failed, delivery_counts: blast.outreach_deliveries.group(:status).count }
+        render json: {
+          queued: resend_delivery_ids.size,
+          delivery_counts: blast.outreach_deliveries.group(:status).count,
+          message: "Queued #{resend_delivery_ids.size} failed email recipient#{'s' unless resend_delivery_ids.size == 1} for resend."
+        }, status: :accepted
       end
 
       def resend_webhook

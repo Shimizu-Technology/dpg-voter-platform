@@ -121,22 +121,54 @@ class Api::V1::EmailControllerTest < ActionDispatch::IntegrationTest
       status: "failed"
     )
 
-    original = Resend::Emails.method(:send)
-    calls = 0
-    Resend::Emails.define_singleton_method(:send) do |_payload|
-      calls += 1
-      { id: "email-resent-#{calls}" }
+    with_live_outreach_enabled do
+      assert_enqueued_with(job: EmailResendFailedJob) do
+        post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      end
+      assert_response :accepted
+      post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      assert_response :success
     end
+
+    assert_equal 1, enqueued_jobs.count { |job| job[:job] == EmailResendFailedJob }
+    assert_equal 1, original_delivery.resends.count
+    assert_equal "queued", original_delivery.resends.first.status
+  end
+
+  test "email resend failed job sends queued resend deliveries" do
+    village = Village.create!(name: "Email Async Resend Village")
+    supporter = Supporter.create!(
+      first_name: "Async", last_name: "Retry", print_name: "Async Retry",
+      contact_number: "6715557150",
+      email: "async-retry@example.com",
+      village: village,
+      source: "staff_entry",
+      opt_in_email: true,
+      status: "active"
+    )
+    blast = EmailBlast.create!(status: "completed", subject: "DPG retry", body: "Hello {first_name}", initiated_by: @coordinator)
+    original_delivery = OutreachDelivery.create!(
+      channel: "email",
+      email_blast: blast,
+      supporter: supporter,
+      recipient: supporter.email,
+      provider: "resend",
+      status: "failed"
+    )
+
+    original = Resend::Emails.method(:send)
+    Resend::Emails.define_singleton_method(:send) { |_payload| { id: "email-resent-async" } }
 
     with_live_outreach_enabled do
-      post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
-      assert_response :success
-      post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
-      assert_response :success
+      perform_enqueued_jobs do
+        post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      end
     end
 
-    assert_equal 1, calls
-    assert_equal 1, original_delivery.resends.count
+    assert_response :accepted
+    resend = original_delivery.resends.first
+    assert_equal "sent", resend.status
+    assert_equal "email-resent-async", resend.provider_message_id
   ensure
     Resend::Emails.define_singleton_method(:send, original) if original
   end
