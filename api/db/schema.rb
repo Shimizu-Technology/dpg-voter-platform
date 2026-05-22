@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_22_101500) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_22_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -60,6 +60,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_101500) do
     t.date "start_date", null: false
     t.string "status", default: "active", null: false
     t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_campaign_cycles_on_unique_name", unique: true
     t.index ["start_date", "end_date"], name: "index_campaign_cycles_on_start_date_and_end_date"
     t.index ["status"], name: "index_campaign_cycles_on_status"
   end

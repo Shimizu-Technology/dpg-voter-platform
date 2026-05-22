@@ -7,6 +7,7 @@ class CampaignCycle < ApplicationRecord
   has_many :quota_periods, dependent: :restrict_with_error
 
   validates :name, :cycle_type, :start_date, :end_date, :status, presence: true
+  validates :name, uniqueness: true
   validates :status, inclusion: { in: STATUSES }
   validates :cycle_type, inclusion: { in: CYCLE_TYPES }
   validate :end_date_on_or_after_start_date
@@ -15,15 +16,20 @@ class CampaignCycle < ApplicationRecord
   scope :ordered, -> { order(start_date: :desc, id: :desc) }
 
   def self.current_or_create_default!
-    active.ordered.first || create!(
-      name: "#{Date.current.year} DPG Organizing Cycle",
-      cycle_type: "organizing",
-      start_date: Date.current.beginning_of_year,
-      end_date: Date.current.end_of_year,
-      status: "active",
-      monthly_quota_target: 0,
-      settings: {}
-    )
+    active.ordered.first || create_or_find_default_cycle!
+  end
+
+  def self.create_or_find_default_cycle!
+    default_name = "#{Date.current.year} DPG Organizing Cycle"
+
+    create_or_find_by!(name: default_name) do |cycle|
+      cycle.cycle_type = "organizing"
+      cycle.start_date = Date.current.beginning_of_year
+      cycle.end_date = Date.current.end_of_year
+      cycle.status = "active"
+      cycle.monthly_quota_target = 0
+      cycle.settings = {}
+    end
   end
 
   private

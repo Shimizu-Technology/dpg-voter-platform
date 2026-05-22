@@ -144,7 +144,12 @@ module Api
       private
 
       def quota_period_dashboard_json(period)
-        scope = Supporter.where(quota_period_id: period.id)
+        scope = Supporter.active.where(quota_period_id: period.id)
+        classification_counts = scope.group(:contact_classification).count
+        source_counts = scope.group(:source).count
+        supporter_count = scope.where(contact_classification: "active_contact", support_status: "supporter").count
+        excluded_contact_classifications = %w[archived invalid duplicate]
+
         {
           id: period.id,
           name: period.name,
@@ -154,12 +159,12 @@ module Api
           quota_target: period.quota_target,
           status: period.status,
           counts: {
-            total_contacts: scope.contacts.count,
-            pending_intake: scope.intake.count,
-            active_contacts: scope.relationship_contacts.count,
-            supporters: scope.classified_supporters.count,
-            qr_signups: scope.where(source: "qr_signup").count,
-            public_signups: scope.public_origin.count
+            total_contacts: classification_counts.excluding(*excluded_contact_classifications).values.sum,
+            pending_intake: classification_counts["new_intake"] || 0,
+            active_contacts: classification_counts["active_contact"] || 0,
+            supporters: supporter_count,
+            qr_signups: source_counts["qr_signup"] || 0,
+            public_signups: Supporter::PUBLIC_SOURCES.sum { |source| source_counts[source] || 0 }
           }
         }
       end
