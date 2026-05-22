@@ -100,8 +100,16 @@ Rails.application.routes.draw do
       post "sms/blast", to: "sms#blast"
       get "sms/blasts", to: "sms#blasts"
       get "sms/blasts/:id", to: "sms#blast_status"
+      get "sms/blasts/:id/deliveries", to: "sms#blast_deliveries"
+      post "sms/blasts/:id/sync_receipts", to: "sms#sync_blast_receipts"
+      post "sms/blasts/:id/resend_failed", to: "sms#resend_failed"
       get "email/status", to: "email#status"
       post "email/blast", to: "email#blast"
+      get "email/blasts", to: "email#blasts"
+      get "email/blasts/:id", to: "email#blast_status"
+      get "email/blasts/:id/deliveries", to: "email#blast_deliveries"
+      post "email/blasts/:id/resend_failed", to: "email#resend_failed"
+      post "email/webhooks/resend", to: "email#resend_webhook"
     end
   end
 

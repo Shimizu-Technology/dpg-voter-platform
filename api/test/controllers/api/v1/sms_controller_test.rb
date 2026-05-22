@@ -108,6 +108,49 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "sms_message_required", payload["code"]
   end
 
+  test "coordinator can view and sync sms delivery receipts" do
+    village = Village.create!(name: "SMS Delivery Village")
+    supporter = Supporter.create!(
+      first_name: "Delivery", last_name: "Target", print_name: "Delivery Target",
+      contact_number: "6715556000",
+      village: village,
+      source: "staff_entry",
+      opt_in_text: true,
+      status: "active"
+    )
+    blast = SmsBlast.create!(
+      status: "completed",
+      message: "DPG update",
+      total_recipients: 1,
+      sent_count: 1,
+      initiated_by: @coordinator
+    )
+    delivery = OutreachDelivery.create!(
+      channel: "sms",
+      sms_blast: blast,
+      supporter: supporter,
+      recipient: "+16715556000",
+      provider: "clicksend",
+      provider_message_id: "MSG-1",
+      status: "sent"
+    )
+
+    get "/api/v1/sms/blasts/#{blast.id}/deliveries", headers: auth_headers(@coordinator)
+    assert_response :success
+    assert_equal delivery.id, response.parsed_body["deliveries"].first["id"]
+
+    original = ClicksendClient.method(:sms_receipt)
+    ClicksendClient.define_singleton_method(:sms_receipt) do |_message_id|
+      { success: true, receipt: { "status_code" => 201, "status_text" => "Success: Message received on handset." } }
+    end
+
+    post "/api/v1/sms/blasts/#{blast.id}/sync_receipts", headers: auth_headers(@coordinator)
+    assert_response :success
+    assert_equal "delivered", delivery.reload.status
+  ensure
+    ClicksendClient.define_singleton_method(:sms_receipt, original) if original
+  end
+
   test "coordinator live blast is blocked by default" do
     with_live_outreach_disabled do
       post "/api/v1/sms/blast",

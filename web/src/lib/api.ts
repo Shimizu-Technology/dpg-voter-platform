@@ -109,9 +109,16 @@ export const sendSmsBlast = (data: { message: string; village_id?: number; regis
   api.post('/sms/blast', data).then(r => r.data);
 export const getSmsBlasts = () => api.get('/sms/blasts').then(r => r.data);
 export const getSmsBlastStatus = (id: number) => api.get(`/sms/blasts/${id}`).then(r => r.data);
+export const getSmsBlastDeliveries = (id: number) => api.get(`/sms/blasts/${id}/deliveries`).then(r => r.data);
+export const syncSmsBlastReceipts = (id: number) => api.post(`/sms/blasts/${id}/sync_receipts`).then(r => r.data);
+export const resendFailedSmsBlast = (id: number) => api.post(`/sms/blasts/${id}/resend_failed`).then(r => r.data);
 export const getEmailStatus = () => api.get('/email/status').then(r => r.data);
 export const sendEmailBlast = (data: { subject: string; body: string; village_id?: number; registered_voter?: string; dry_run?: string; recipient_reviewed?: boolean; expected_recipient_count?: number }) =>
   api.post('/email/blast', data).then(r => r.data);
+export const getEmailBlasts = () => api.get('/email/blasts').then(r => r.data);
+export const getEmailBlastStatus = (id: number) => api.get(`/email/blasts/${id}`).then(r => r.data);
+export const getEmailBlastDeliveries = (id: number) => api.get(`/email/blasts/${id}/deliveries`).then(r => r.data);
+export const resendFailedEmailBlast = (id: number) => api.post(`/email/blasts/${id}/resend_failed`).then(r => r.data);
 // Import
 export const uploadImportPreview = (file: File) => {
   const form = new FormData();

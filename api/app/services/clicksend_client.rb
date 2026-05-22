@@ -4,6 +4,7 @@ require "net/http"
 require "uri"
 require "json"
 require "base64"
+require "cgi"
 
 class ClicksendClient
   BASE_URL = "https://rest.clicksend.com/v3"
@@ -192,28 +193,52 @@ class ClicksendClient
       { results: results, sent: sent, failed: failed }
     end
 
+    def sms_receipt(message_id)
+      return { success: false, error: "missing_message_id" } if message_id.blank?
+
+      response = authenticated_get("/sms/receipts/#{CGI.escape(message_id)}")
+      return response unless response[:success]
+
+      receipt = response.dig(:body, "data") || response.dig(:body, "receipt") || response[:body]
+      { success: true, receipt: receipt }
+    end
+
     def account_balance
-      username = ENV["CLICKSEND_USERNAME"]
-      api_key  = ENV["CLICKSEND_API_KEY"]
-      return nil if username.blank? || api_key.blank?
+      response = authenticated_get("/account")
+      return nil unless response[:success]
 
-      auth = Base64.strict_encode64("#{username}:#{api_key}")
-      uri  = URI("#{BASE_URL}/account")
-
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-
-      request = Net::HTTP::Get.new(uri.request_uri, {
-        "Authorization" => "Basic #{auth}",
-        "Content-Type"  => "application/json"
-      })
-
-      response = http.request(request)
-      json = JSON.parse(response.body) rescue {}
-      json.dig("data", "balance")&.to_f
+      response.dig(:body, "data", "balance")&.to_f
     rescue StandardError => e
       Rails.logger.error("[ClicksendClient] Balance check failed: #{e.message}")
       nil
+    end
+
+    def authenticated_get(path)
+      username = ENV["CLICKSEND_USERNAME"]
+      api_key  = ENV["CLICKSEND_API_KEY"]
+      return { success: false, error: "missing_credentials" } if username.blank? || api_key.blank?
+
+      auth = Base64.strict_encode64("#{username}:#{api_key}")
+      uri = URI("#{BASE_URL}#{path}")
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      http.open_timeout = 10
+      http.read_timeout = 20
+      request = Net::HTTP::Get.new(uri.request_uri, {
+        "Authorization" => "Basic #{auth}",
+        "Content-Type" => "application/json"
+      })
+      response = http.request(request)
+      body = JSON.parse(response.body) rescue {}
+
+      if response.code.to_i.between?(200, 299)
+        { success: true, body: body }
+      else
+        { success: false, error: "http_#{response.code}", body: body }
+      end
+    rescue StandardError => e
+      Rails.logger.error("[ClicksendClient] GET #{path} failed: #{e.message}")
+      { success: false, error: e.message }
     end
 
     def batch_result(message, to: nil, success:, message_id:, error:)

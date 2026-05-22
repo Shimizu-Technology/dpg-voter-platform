@@ -1,7 +1,7 @@
 # DPG Deployment And QA Checklist
 
-**Last updated:** May 18, 2026
-**Current verified branch:** `main` at `fc96d72` after PR #37
+**Last updated:** May 22, 2026
+**Current verified branch:** `feature/outreach-delivery-status-resend` after PR #42 docs cleanup
 
 ## Current deployment status
 
@@ -27,6 +27,7 @@ The main remaining risk is not missing code for the current foundation. It is DP
 - [ ] `ALLOWED_ORIGINS` includes only the DPG frontend domain(s).
 - [ ] SMS sender settings are DPG-specific or explicitly approved shared infrastructure.
 - [ ] Email sender/domain settings are DPG-specific or explicitly approved shared infrastructure.
+- [ ] `RESEND_WEBHOOK_SIGNING_SECRET` is set when Resend delivery webhooks are enabled in production.
 - [ ] GEC import storage is DPG-specific. If `AWS_S3_BUCKET=dpg-voter-platform`, the configured AWS access key must have `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` for `arn:aws:s3:::dpg-voter-platform/*`.
 - [ ] Render is not using the campaign-tracker-only S3 IAM policy against the DPG bucket. The May 14 prod failure showed `campaign-tracker-s3` denied on `dpg-voter-platform`; code now falls back to database-backed upload storage, but IAM should still be corrected before routine imports.
 - [ ] `DPG_LIVE_OUTREACH_ENABLED=true` is set only on the intended DPG environment after confirming SMS/email credentials.
@@ -149,6 +150,12 @@ These are the highest priority because the admin side has not yet been thoroughl
 - [ ] Email live send is blocked unless recipient review/count confirmation is present.
 - [ ] Controlled single-recipient email live test succeeds only when DPG approves.
 - [ ] SMS/email blast attempts appear in Contact History.
+- [ ] SMS blast recipient delivery table loads after a controlled blast.
+- [ ] ClickSend receipt sync updates recipient delivery status where receipts are available.
+- [ ] SMS resend-to-failed sends only failed/undelivered/delayed/unknown recipients.
+- [ ] Email blast recipient delivery table loads after a controlled blast.
+- [ ] Resend webhook updates delivered/bounced/failed/delayed/suppressed recipient status.
+- [ ] Email resend-to-failed sends only failed/bounced/delayed/suppressed/unknown recipients.
 
 ## Handoff notes
 

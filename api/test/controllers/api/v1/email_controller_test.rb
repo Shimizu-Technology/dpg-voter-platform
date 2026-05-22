@@ -97,6 +97,41 @@ class Api::V1::EmailControllerTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body)
     assert_equal true, payload["queued"]
     assert_equal 1, payload["total_targeted"]
+    assert EmailBlast.exists?(payload["blast_id"])
+  end
+
+  test "resend webhook updates email delivery status" do
+    village = Village.create!(name: "Webhook Village")
+    supporter = Supporter.create!(
+      first_name: "Webhook", last_name: "Target", print_name: "Webhook Target",
+      contact_number: "6715557000",
+      email: "webhook@example.com",
+      village: village,
+      source: "staff_entry",
+      opt_in_email: true,
+      status: "active"
+    )
+    blast = EmailBlast.create!(status: "completed", subject: "DPG update", body: "Hello", initiated_by: @coordinator)
+    delivery = OutreachDelivery.create!(
+      channel: "email",
+      email_blast: blast,
+      supporter: supporter,
+      recipient: supporter.email,
+      provider: "resend",
+      provider_message_id: "email-1",
+      status: "sent"
+    )
+
+    post "/api/v1/email/webhooks/resend",
+      params: {
+        type: "email.delivered",
+        created_at: Time.current.iso8601,
+        data: { email_id: "email-1" }
+      }.to_json,
+      headers: { "CONTENT_TYPE" => "application/json" }
+
+    assert_response :success
+    assert_equal "delivered", delivery.reload.status
   end
 
   private

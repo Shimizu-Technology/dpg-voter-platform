@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Mail, Send, Users, Zap, CheckCircle, AlertTriangle, Eye } from 'lucide-react';
-import { getEmailStatus, sendEmailBlast, getVillages } from '../../lib/api';
+import { getEmailStatus, sendEmailBlast, getVillages, getEmailBlasts, getEmailBlastDeliveries, resendFailedEmailBlast } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
 import type { OutreachRecipient } from '../../lib/outreachTypes';
 import WorkspacePage from '../../components/WorkspacePage';
@@ -13,6 +13,7 @@ interface EmailBlastResult {
   recipients?: OutreachRecipient[];
   preview_limit?: number;
   queued?: boolean;
+  blast_id?: number;
   subject?: string;
   preview_subject?: string;
   preview_html?: string;
@@ -21,6 +22,29 @@ interface EmailBlastResult {
 interface Village {
   id: number;
   name: string;
+}
+
+interface DeliveryRow {
+  id: number;
+  supporter_id: number;
+  supporter_name: string;
+  recipient: string;
+  status: string;
+  provider_message_id?: string | null;
+  provider_status_text?: string | null;
+  last_event_at?: string | null;
+  resend_of_id?: number | null;
+}
+
+interface EmailBlastRow {
+  id: number;
+  status: string;
+  subject: string;
+  total_recipients: number;
+  sent_count: number;
+  failed_count: number;
+  started_at?: string | null;
+  initiated_by?: string | null;
 }
 
 const EMAIL_TEMPLATES = [
@@ -50,6 +74,7 @@ export default function EmailPage() {
   const [previewResult, setPreviewResult] = useState<EmailBlastResult | null>(null);
   const [sentResult, setSentResult] = useState<EmailBlastResult | null>(null);
   const [recipientReviewAccepted, setRecipientReviewAccepted] = useState(false);
+  const [selectedBlastId, setSelectedBlastId] = useState<number | null>(null);
 
   const resetReview = () => {
     setPreviewResult(null);
@@ -65,6 +90,25 @@ export default function EmailPage() {
   const { data: villagesData } = useQuery({
     queryKey: ['villages'],
     queryFn: getVillages,
+  });
+
+  const { data: blastsData, refetch: refetchBlasts } = useQuery<{ blasts: EmailBlastRow[] }>({
+    queryKey: ['emailBlasts'],
+    queryFn: getEmailBlasts,
+  });
+
+  const { data: deliveryData, refetch: refetchDeliveries } = useQuery<{ deliveries: DeliveryRow[]; counts: Record<string, number> }>({
+    queryKey: ['emailBlastDeliveries', selectedBlastId],
+    queryFn: () => getEmailBlastDeliveries(selectedBlastId!),
+    enabled: selectedBlastId !== null,
+  });
+
+  const resendFailedMutation = useMutation({
+    mutationFn: () => resendFailedEmailBlast(selectedBlastId!),
+    onSuccess: () => {
+      void refetchDeliveries();
+      void refetchBlasts();
+    },
   });
 
   const villagesAll: Village[] = villagesData?.villages || [];
@@ -103,6 +147,7 @@ export default function EmailPage() {
       setSentResult(data);
       setPreviewResult(null);
       setRecipientReviewAccepted(false);
+      if (data.blast_id) setSelectedBlastId(data.blast_id);
     },
   });
 
@@ -392,6 +437,44 @@ export default function EmailPage() {
           </div>
         )}
 
+        {selectedBlastId && deliveryData && (
+          <EmailDeliveryPanel
+            deliveries={deliveryData.deliveries}
+            counts={deliveryData.counts}
+            onResend={() => {
+              if (window.confirm('Resend this email only to failed, bounced, delayed, suppressed, or unknown recipients?')) resendFailedMutation.mutate();
+            }}
+            resending={resendFailedMutation.isPending}
+          />
+        )}
+
+        {Boolean(blastsData?.blasts?.length) && (
+          <div className="app-card p-5">
+            <h3 className="font-medium text-[var(--text-primary)] mb-3">Recent Email Blasts</h3>
+            <div className="space-y-2">
+              {blastsData!.blasts.slice(0, 5).map((blast) => (
+                <button
+                  key={blast.id}
+                  type="button"
+                  onClick={() => setSelectedBlastId(blast.id)}
+                  className={`w-full rounded-xl border p-3 text-left transition ${selectedBlastId === blast.id ? 'border-primary bg-blue-50' : 'border-slate-100 hover:border-slate-200'}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-800">{blast.subject}</p>
+                      <p className="text-xs text-slate-500">{blast.initiated_by || 'Unknown'} · {blast.started_at ? new Date(blast.started_at).toLocaleString() : 'pending'}</p>
+                    </div>
+                    <div className="text-right text-xs text-slate-500">
+                      <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">{blast.status}</span>
+                      <p className="mt-1">{blast.sent_count}/{blast.total_recipients}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Tips */}
         <div className="app-card p-5 bg-blue-50 border-blue-200">
           <h3 className="font-medium text-gray-900 mb-2">Tips for Better Email Delivery</h3>
@@ -405,5 +488,63 @@ export default function EmailPage() {
         </div>
       </div>
     </WorkspacePage>
+  );
+}
+
+function EmailDeliveryPanel({
+  deliveries,
+  counts,
+  onResend,
+  resending,
+}: {
+  deliveries: DeliveryRow[];
+  counts: Record<string, number>;
+  onResend: () => void;
+  resending: boolean;
+}) {
+  const resendableCount = ['failed', 'bounced', 'undelivered', 'suppressed', 'delivery_delayed', 'unknown'].reduce((sum, status) => sum + (counts[status] || 0), 0);
+
+  return (
+    <div className="app-card p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="font-medium text-[var(--text-primary)]">Email delivery status</h3>
+          <p className="text-xs text-[var(--text-secondary)]">Resend webhooks update delivered, bounced, delayed, failed, and spam complaint states.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={resending || resendableCount === 0}
+          className="rounded-lg bg-cta px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+        >
+          {resending ? 'Resending...' : `Resend failed (${resendableCount})`}
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+        {Object.entries(counts).map(([status, count]) => (
+          <span key={status} className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">{status.replaceAll('_', ' ')}: {count}</span>
+        ))}
+      </div>
+      <div className="mt-3 max-h-80 overflow-auto rounded-xl border border-slate-100">
+        {deliveries.length === 0 ? (
+          <div className="p-4 text-sm text-slate-500">No recipient delivery rows yet.</div>
+        ) : deliveries.map((delivery) => (
+          <div key={delivery.id} className="grid gap-2 border-b border-slate-100 p-3 text-sm last:border-b-0 sm:grid-cols-[1.4fr_1fr_0.8fr] sm:items-center">
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-slate-800">{delivery.supporter_name}</p>
+              <p className="truncate text-xs text-slate-500">{delivery.recipient}</p>
+            </div>
+            <div className="text-xs text-slate-500">
+              <p className="truncate">{delivery.provider_status_text || delivery.provider_message_id || 'Awaiting provider update'}</p>
+              {delivery.last_event_at && <p>{new Date(delivery.last_event_at).toLocaleString()}</p>}
+            </div>
+            <div className="sm:text-right">
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{delivery.status.replaceAll('_', ' ')}</span>
+              {delivery.resend_of_id && <p className="mt-1 text-xs text-slate-400">Resend</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
