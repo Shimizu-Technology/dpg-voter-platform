@@ -36,9 +36,10 @@ module Api
         period.quota_target ||= 0
 
         if period.save
-          log_audit!(period, action: "quota_period_created", changed_data: quota_period_json(period))
+          active_period = period.open? ? period : QuotaPeriod.active_for
+          log_audit!(period, action: "quota_period_created", changed_data: quota_period_json(period, active_period: active_period))
           CampaignBroadcast.quota_period_updated(period, action: "created")
-          render json: { quota_period: quota_period_json(period) }, status: :created
+          render json: { quota_period: quota_period_json(period, active_period: active_period) }, status: :created
         else
           render_api_error(message: period.errors.full_messages.to_sentence, status: :unprocessable_entity, code: "quota_period_create_failed")
         end
@@ -47,9 +48,10 @@ module Api
       # PATCH /api/v1/quota_periods/:id
       def update
         if @quota_period.update(quota_period_update_params)
+          active_period = QuotaPeriod.active_for
           log_audit!(@quota_period, action: "quota_period_updated", changed_data: @quota_period.saved_changes.except("updated_at"), normalize: true)
           CampaignBroadcast.quota_period_updated(@quota_period, action: "updated")
-          render json: { quota_period: quota_period_json(@quota_period.reload) }
+          render json: { quota_period: quota_period_json(@quota_period.reload, active_period: active_period) }
         else
           render_api_error(message: @quota_period.errors.full_messages.to_sentence, status: :unprocessable_entity, code: "quota_period_update_failed")
         end
@@ -60,7 +62,7 @@ module Api
         @quota_period.activate!
         log_audit!(@quota_period, action: "quota_period_activated", changed_data: { status: "open" })
         CampaignBroadcast.quota_period_updated(@quota_period, action: "activated")
-        render json: { quota_period: quota_period_json(@quota_period.reload) }
+        render json: { quota_period: quota_period_json(@quota_period.reload, active_period: @quota_period) }
       rescue ActiveRecord::RecordInvalid => e
         render_api_error(message: e.record.errors.full_messages.to_sentence, status: :unprocessable_entity, code: "quota_period_activate_failed")
       end
@@ -98,7 +100,7 @@ module Api
         params.require(:quota_period).permit(:name, :start_date, :end_date, :due_date, :quota_target)
       end
 
-      def quota_period_json(period, include_breakdown: false, counts: nil, active_period: QuotaPeriod.active_for)
+      def quota_period_json(period, include_breakdown: false, counts: nil, active_period: nil)
         counts ||= period_counts(period)
         payload = {
           id: period.id,
@@ -108,7 +110,7 @@ module Api
           due_date: period.due_date,
           quota_target: period.quota_target,
           status: period.status,
-          active: period == active_period,
+          active: active_period.present? && period == active_period,
           campaign_cycle_id: period.campaign_cycle_id,
           campaign_cycle_name: period.campaign_cycle&.name,
           counts: counts,
