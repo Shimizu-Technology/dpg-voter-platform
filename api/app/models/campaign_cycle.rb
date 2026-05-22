@@ -18,18 +18,31 @@ class CampaignCycle < ApplicationRecord
   def self.current_or_create_default!
     active.ordered.first || create_or_find_default_cycle!
   rescue ActiveRecord::RecordNotUnique
-    active.ordered.first || find_by!(name: default_cycle_name)
+    active.ordered.first || activate_default_cycle!(find_by!(name: default_cycle_name))
   end
 
   def self.create_or_find_default_cycle!
-    create_or_find_by!(name: default_cycle_name) do |cycle|
-      cycle.cycle_type = "organizing"
-      cycle.start_date = Date.current.beginning_of_year
-      cycle.end_date = Date.current.end_of_year
-      cycle.status = "active"
-      cycle.monthly_quota_target = 0
-      cycle.settings = {}
-    end
+    cycle = find_by(name: default_cycle_name)
+    return activate_default_cycle!(cycle) if cycle
+
+    create!(
+      name: default_cycle_name,
+      cycle_type: "organizing",
+      start_date: Date.current.beginning_of_year,
+      end_date: Date.current.end_of_year,
+      status: "active",
+      monthly_quota_target: 0,
+      settings: {}
+    )
+  rescue ActiveRecord::RecordNotUnique
+    activate_default_cycle!(find_by!(name: default_cycle_name))
+  end
+
+  def self.activate_default_cycle!(cycle)
+    return cycle if cycle.status == "active"
+
+    cycle.update!(status: "active")
+    cycle
   end
 
   def self.default_cycle_name
