@@ -150,6 +150,16 @@ class ReportGeneratorCrossReferenceTest < ActiveSupport::TestCase
     assert_match "Review", row[14]
   end
 
+  test "support list quota period filter ignores unsafe non-integer values" do
+    preview = ReportGenerator.new(report_type: "support_list", quota_period_id: "active").preview
+
+    assert_equal 0, preview[:total_count]
+
+    preview = ReportGenerator.new(report_type: "support_list", quota_period_id: "not-a-period").preview
+
+    assert_equal 0, preview[:total_count]
+  end
+
   test "support list separates DPG assignment from linked GEC geography" do
     dpg_village = Village.find_or_create_by!(name: "Barrigada")
     dpg_precinct = Precinct.find_or_create_by!(village: dpg_village, number: "15C")
