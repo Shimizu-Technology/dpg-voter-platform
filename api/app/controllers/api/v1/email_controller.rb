@@ -186,7 +186,9 @@ module Api
         end
 
         event = JSON.parse(raw_body)
-        email_id = event.dig("data", "email_id")
+        email_id = event.dig("data", "email_id").to_s
+        return render json: { ok: true } if email_id.blank?
+
         delivery = OutreachDelivery.find_by(provider: "resend", provider_message_id: email_id)
         if delivery
           delivery.mark_provider_event!(

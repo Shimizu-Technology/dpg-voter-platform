@@ -175,6 +175,40 @@ class Api::V1::EmailControllerTest < ActionDispatch::IntegrationTest
     assert_equal "delivered", delivery.reload.status
   end
 
+  test "resend webhook ignores events without email id" do
+    village = Village.create!(name: "Blank Webhook Village")
+    supporter = Supporter.create!(
+      first_name: "Blank", last_name: "Webhook", print_name: "Blank Webhook",
+      contact_number: "6715557200",
+      email: "blank-webhook@example.com",
+      village: village,
+      source: "staff_entry",
+      opt_in_email: true,
+      status: "active"
+    )
+    blast = EmailBlast.create!(status: "completed", subject: "DPG update", body: "Hello", initiated_by: @coordinator)
+    delivery = OutreachDelivery.create!(
+      channel: "email",
+      email_blast: blast,
+      supporter: supporter,
+      recipient: supporter.email,
+      provider: "resend",
+      provider_message_id: nil,
+      status: "failed"
+    )
+
+    post "/api/v1/email/webhooks/resend",
+      params: {
+        type: "email.delivered",
+        created_at: Time.current.iso8601,
+        data: {}
+      }.to_json,
+      headers: { "CONTENT_TYPE" => "application/json" }
+
+    assert_response :success
+    assert_equal "failed", delivery.reload.status
+  end
+
   test "resend webhook rejects stale signed payloads" do
     previous_secret = ENV["RESEND_WEBHOOK_SIGNING_SECRET"]
     secret_bytes = "test-secret-for-svix"
