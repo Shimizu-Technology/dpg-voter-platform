@@ -144,8 +144,13 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
       { success: true, receipt: { "status_code" => 201, "status_text" => "Success: Message received on handset." } }
     end
 
-    post "/api/v1/sms/blasts/#{blast.id}/sync_receipts", headers: auth_headers(@coordinator)
-    assert_response :success
+    assert_enqueued_with(job: SmsSyncReceiptsJob) do
+      post "/api/v1/sms/blasts/#{blast.id}/sync_receipts", headers: auth_headers(@coordinator)
+    end
+    assert_response :accepted
+    assert_equal "sent", delivery.reload.status
+
+    perform_enqueued_jobs
     assert_equal "delivered", delivery.reload.status
   ensure
     ClicksendClient.define_singleton_method(:sms_receipt, original) if original

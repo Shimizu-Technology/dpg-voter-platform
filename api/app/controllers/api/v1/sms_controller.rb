@@ -139,17 +139,14 @@ module Api
         blast = SmsBlast.find_by(id: params[:id])
         return render_api_error(message: "Blast not found", status: :not_found, code: "blast_not_found") unless blast
 
-        updated = 0
-        blast.outreach_deliveries.where(provider: "clicksend").where.not(provider_message_id: [ nil, "" ]).find_each do |delivery|
-          result = ClicksendClient.sms_receipt(delivery.provider_message_id)
-          next unless result[:success] && result[:receipt].is_a?(Hash)
+        syncable_count = blast.outreach_deliveries.where(provider: "clicksend").where.not(provider_message_id: [ nil, "" ]).count
+        SmsSyncReceiptsJob.perform_later(sms_blast_id: blast.id)
 
-          attrs = OutreachDeliveryStatus.normalize_clicksend_receipt(result[:receipt])
-          delivery.mark_provider_event!(**attrs, occurred_at: Time.current, metadata: { clicksend_receipt: result[:receipt] })
-          updated += 1
-        end
-
-        render json: { updated: updated, delivery_counts: blast.outreach_deliveries.group(:status).count }
+        render json: {
+          queued: syncable_count,
+          delivery_counts: blast.outreach_deliveries.group(:status).count,
+          message: "Queued ClickSend receipt sync for #{syncable_count} SMS recipient#{'s' unless syncable_count == 1}."
+        }, status: :accepted
       end
 
       def resend_failed
