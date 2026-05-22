@@ -96,13 +96,16 @@ function goalProgress(period: QuotaPeriod) {
   return { current, goal, percent };
 }
 
-function periodDetailParams(periodId: number | null, filter: PeriodDetailFilter) {
+const PERIOD_DETAIL_PER_PAGE = 8;
+
+function periodDetailParams(periodId: number | null, filter: PeriodDetailFilter, page: number) {
   const params: Record<string, string | number> = {
     quota_period_id: periodId || '',
     status: 'active',
     sort_by: 'created_at',
     sort_dir: 'desc',
-    per_page: 8,
+    page,
+    per_page: PERIOD_DETAIL_PER_PAGE,
   };
 
   if (filter === 'intake') params.contact_classification = 'new_intake';
@@ -147,13 +150,14 @@ export default function QuotaPeriodsPage() {
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [expandedPeriodId, setExpandedPeriodId] = useState<number | null>(null);
   const [detailFilter, setDetailFilter] = useState<PeriodDetailFilter>('all');
+  const [detailPage, setDetailPage] = useState(1);
   const { data, isLoading } = useQuery<QuotaPeriodsResponse>({ queryKey: ['quota-periods'], queryFn: getQuotaPeriods });
   const periods = useMemo(() => data?.quota_periods ?? [], [data]);
   const activePeriod = data?.active_quota_period;
   const expandedPeriod = periods.find((period) => period.id === expandedPeriodId) || null;
-  const detailParams = periodDetailParams(expandedPeriodId, detailFilter);
+  const detailParams = periodDetailParams(expandedPeriodId, detailFilter, detailPage);
   const { data: detailData, isFetching: detailLoading } = useQuery<PeriodSupportersResponse>({
-    queryKey: ['quota-period-supporters', expandedPeriodId, detailFilter],
+    queryKey: ['quota-period-supporters', expandedPeriodId, detailFilter, detailPage],
     queryFn: () => getSupporters(detailParams),
     enabled: Boolean(expandedPeriodId),
   });
@@ -351,6 +355,7 @@ export default function QuotaPeriodsPage() {
                         onClick={() => {
                           setExpandedPeriodId((current) => current === period.id ? null : period.id);
                           setDetailFilter('all');
+                          setDetailPage(1);
                         }}
                       >
                         <ChevronDown className={`h-4 w-4 transition ${expandedPeriodId === period.id ? 'rotate-180' : ''}`} />
@@ -379,7 +384,13 @@ export default function QuotaPeriodsPage() {
                     <PeriodDetailPanel
                       period={expandedPeriod}
                       filter={detailFilter}
-                      onFilterChange={setDetailFilter}
+                      onFilterChange={(nextFilter) => {
+                        setDetailFilter(nextFilter);
+                        setDetailPage(1);
+                      }}
+                      page={detailData?.pagination.page || detailPage}
+                      pages={detailData?.pagination.pages || 1}
+                      onPageChange={setDetailPage}
                       supporters={detailData?.supporters || []}
                       total={detailData?.pagination.total || 0}
                       loading={detailLoading}
@@ -402,6 +413,9 @@ function PeriodDetailPanel({
   supporters,
   total,
   loading,
+  page,
+  pages,
+  onPageChange,
 }: {
   period: QuotaPeriod | null;
   filter: PeriodDetailFilter;
@@ -409,6 +423,9 @@ function PeriodDetailPanel({
   supporters: PeriodSupporter[];
   total: number;
   loading: boolean;
+  page: number;
+  pages: number;
+  onPageChange: (page: number) => void;
 }) {
   const filterOptions: Array<{ value: PeriodDetailFilter; label: string }> = [
     { value: 'all', label: 'All period records' },
@@ -473,7 +490,31 @@ function PeriodDetailPanel({
           </tbody>
         </table>
       </div>
-      <div className="mt-2 text-xs text-slate-500">Showing {supporters.length.toLocaleString()} of {total.toLocaleString()} matching records.</div>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-xs text-slate-500">
+          Showing {supporters.length.toLocaleString()} of {total.toLocaleString()} matching records · page {page.toLocaleString()} of {pages.toLocaleString()}
+        </div>
+        {pages > 1 && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 disabled:opacity-40"
+              disabled={page <= 1 || loading}
+              onClick={() => onPageChange(Math.max(1, page - 1))}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 disabled:opacity-40"
+              disabled={page >= pages || loading}
+              onClick={() => onPageChange(Math.min(pages, page + 1))}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
