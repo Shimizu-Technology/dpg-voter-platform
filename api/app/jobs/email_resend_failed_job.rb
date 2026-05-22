@@ -4,9 +4,13 @@ class EmailResendFailedJob < ApplicationJob
   queue_as :default
   discard_on StandardError # Resend API calls are not idempotent; retries can duplicate email sends.
 
+  BATCH_SIZE = 100
+  BATCH_DELAY = 1.0
+
   def perform(delivery_ids:, recorded_by_user_id: nil)
-    OutreachDelivery.where(id: delivery_ids).includes(:email_blast, :supporter).find_each do |delivery|
-      send_resend_delivery(delivery, recorded_by_user_id)
+    delivery_ids.each_slice(BATCH_SIZE).with_index do |batch_ids, batch_idx|
+      sleep(BATCH_DELAY) if batch_idx > 0
+      process_batch(batch_ids, recorded_by_user_id)
     end
   rescue StandardError => e
     mark_queued_deliveries_failed(delivery_ids, e)
@@ -14,6 +18,12 @@ class EmailResendFailedJob < ApplicationJob
   end
 
   private
+
+  def process_batch(delivery_ids, recorded_by_user_id)
+    OutreachDelivery.where(id: delivery_ids).includes(:email_blast, :supporter).find_each do |delivery|
+      send_resend_delivery(delivery, recorded_by_user_id)
+    end
+  end
 
   def mark_queued_deliveries_failed(delivery_ids, error)
     now = Time.current

@@ -95,6 +95,51 @@ class ResendFailedJobsTest < ActiveJob::TestCase
     assert_equal "ClickSend resend returned no result for this recipient", queued.provider_status_text
   end
 
+  test "email resend job throttles resend work in batches" do
+    previous_from = ENV["RESEND_FROM_EMAIL"]
+    ENV["RESEND_FROM_EMAIL"] = "dpg@example.com"
+    user = User.create!(clerk_id: "clerk-email-batch-job", email: "email-batch-job@example.com", name: "Email Batch Job", role: "district_coordinator")
+    village = Village.create!(name: "Email Batch Village")
+    blast = EmailBlast.create!(status: "completed", subject: "DPG retry", body: "Hello {first_name}", initiated_by: user)
+    deliveries = 2.times.map do |idx|
+      supporter = Supporter.create!(
+        first_name: "Email", last_name: "Batch #{idx}", print_name: "Email Batch #{idx}",
+        contact_number: "67155575#{idx.to_s.rjust(2, '0')}",
+        email: "email-batch-#{idx}@example.com",
+        village: village,
+        source: "staff_entry",
+        opt_in_email: true,
+        status: "active"
+      )
+      original = OutreachDelivery.create!(channel: "email", email_blast: blast, supporter: supporter, recipient: supporter.email, provider: "resend", status: "failed")
+      OutreachDelivery.create!(channel: "email", email_blast: blast, supporter: supporter, resend_of: original, recipient: supporter.email, provider: "resend", status: "queued")
+    end
+
+    previous_batch_size = EmailResendFailedJob::BATCH_SIZE
+    previous_batch_delay = EmailResendFailedJob::BATCH_DELAY
+    EmailResendFailedJob.send(:remove_const, :BATCH_SIZE)
+    EmailResendFailedJob.const_set(:BATCH_SIZE, 1)
+    EmailResendFailedJob.send(:remove_const, :BATCH_DELAY)
+    EmailResendFailedJob.const_set(:BATCH_DELAY, 0)
+
+    calls = []
+    with_stubbed_singleton_method(Resend::Emails, :send, lambda { |payload|
+      calls << payload[:to]
+      { id: "email-batch-#{calls.size}" }
+    }) do
+      EmailResendFailedJob.perform_now(delivery_ids: deliveries.map(&:id), recorded_by_user_id: user.id)
+    end
+
+    assert_equal deliveries.map(&:recipient), calls
+    assert deliveries.all? { |delivery| delivery.reload.status == "sent" }
+  ensure
+    ENV["RESEND_FROM_EMAIL"] = previous_from
+    EmailResendFailedJob.send(:remove_const, :BATCH_SIZE)
+    EmailResendFailedJob.const_set(:BATCH_SIZE, previous_batch_size)
+    EmailResendFailedJob.send(:remove_const, :BATCH_DELAY)
+    EmailResendFailedJob.const_set(:BATCH_DELAY, previous_batch_delay)
+  end
+
   test "email resend job records provider failures as failed deliveries" do
     previous_from = ENV["RESEND_FROM_EMAIL"]
     ENV["RESEND_FROM_EMAIL"] = "dpg@example.com"
