@@ -46,7 +46,8 @@ module Api
           volunteer_status: params[:volunteer_status],
           support_need: params[:support_need],
           registration_outreach_status: params[:registration_outreach_status] || params[:outreach_status],
-          support_follow_up_status: params[:support_follow_up_status]
+          support_follow_up_status: params[:support_follow_up_status],
+          quota_period_id: params[:quota_period_id]
         )
 
         begin
@@ -72,6 +73,7 @@ module Api
           "support_need" => params[:support_need],
           "registration_outreach_status" => params[:registration_outreach_status] || params[:outreach_status],
           "support_follow_up_status" => params[:support_follow_up_status],
+          "quota_period_id" => params[:quota_period_id],
           "filename" => result[:filename]
         })
 
@@ -116,7 +118,8 @@ module Api
           volunteer_status: params[:volunteer_status],
           support_need: params[:support_need],
           registration_outreach_status: params[:registration_outreach_status] || params[:outreach_status],
-          support_follow_up_status: params[:support_follow_up_status]
+          support_follow_up_status: params[:support_follow_up_status],
+          quota_period_id: params[:quota_period_id]
         )
 
         begin

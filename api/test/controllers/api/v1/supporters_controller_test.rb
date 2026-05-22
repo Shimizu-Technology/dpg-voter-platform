@@ -436,6 +436,62 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "merge_target_self_reference", response.parsed_body["code"]
   end
 
+  test "index quota period filter ignores unsafe non-integer values" do
+    village = Village.find_or_create_by!(name: "Yigo")
+    Supporter.create!(
+      first_name: "No",
+      last_name: "Period",
+      contact_number: "671-555-9191",
+      village: village,
+      source: "staff_entry",
+      attribution_method: "staff_manual",
+      contact_classification: "active_contact",
+      support_status: "supporter",
+      status: "active"
+    )
+
+    get "/api/v1/supporters", params: { quota_period_id: "not-a-period" }, headers: auth_headers(@admin)
+
+    assert_response :success
+    assert_equal 0, response.parsed_body.dig("pagination", "total")
+    assert_empty response.parsed_body["supporters"]
+  end
+
+  test "public signup is assigned to the active quota period" do
+    village = Village.find_or_create_by!(name: "Barrigada")
+    period = QuotaPeriod.create!(
+      campaign_cycle: CampaignCycle.create!(
+        name: "2026 DPG Organizing Cycle",
+        cycle_type: "organizing",
+        start_date: Date.current.beginning_of_year,
+        end_date: Date.current.end_of_year,
+        status: "active"
+      ),
+      name: "May Signup Push",
+      start_date: Date.current.beginning_of_month,
+      end_date: Date.current.end_of_month,
+      due_date: Date.current.end_of_month,
+      status: "open"
+    )
+
+    post "/api/v1/supporters",
+      params: {
+        supporter: {
+          first_name: "Quota",
+          last_name: "Signup",
+          contact_number: "671-555-3030",
+          village_id: village.id,
+          opt_in_text: false,
+          opt_in_email: false
+        }
+      },
+      as: :json
+
+    assert_response :created
+    assert_equal period.id, Supporter.find(response.parsed_body.dig("supporter", "id")).quota_period_id
+    assert_equal period.name, response.parsed_body.dig("supporter", "quota_period_name")
+  end
+
   test "removed demo contact does not block future attributed signup" do
     village = Village.find_or_create_by!(name: "Barrigada")
     referral_code = ReferralCode.create!(

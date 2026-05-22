@@ -41,6 +41,75 @@ class Api::V1::ReferralCodesControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, response.parsed_body.dig("pagination", "total")
   end
 
+  test "index can report signup link counts for the active quota period" do
+    period = QuotaPeriod.create!(
+      campaign_cycle: CampaignCycle.create!(
+        name: "2026 DPG Organizing Cycle",
+        cycle_type: "organizing",
+        start_date: Date.current.beginning_of_year,
+        end_date: Date.current.end_of_year,
+        status: "active"
+      ),
+      name: "May Signup Push",
+      start_date: Date.current.beginning_of_month,
+      end_date: Date.current.end_of_month,
+      due_date: Date.current.end_of_month,
+      status: "open"
+    )
+    code = ReferralCode.create!(
+      code: "PERIOD-BAR-1234",
+      display_name: "Period link",
+      village: @village,
+      created_by_user: @admin,
+      active: true,
+      metadata: { "source_type" => "village" }
+    )
+    Supporter.create!(
+      first_name: "Period",
+      last_name: "Signup",
+      contact_number: "671-555-2026",
+      village: @village,
+      source: "qr_signup",
+      attribution_method: "qr_self_signup",
+      referral_code: code,
+      quota_period: period,
+      leader_code: code.code,
+      contact_classification: "new_intake",
+      review_status: "pending",
+      status: "active"
+    )
+    Supporter.create!(
+      first_name: "Lifetime",
+      last_name: "Signup",
+      contact_number: "671-555-2027",
+      village: @village,
+      source: "qr_signup",
+      attribution_method: "qr_self_signup",
+      referral_code: code,
+      leader_code: code.code,
+      contact_classification: "new_intake",
+      review_status: "pending",
+      status: "active"
+    )
+
+    get "/api/v1/referral_codes?quota_period_id=active", headers: auth_headers(@admin)
+
+    assert_response :success
+    row = response.parsed_body["referral_codes"].find { |item| item["id"] == code.id }
+    assert_equal 2, row["signup_count"]
+    assert_equal 1, row["period_signup_count"]
+    assert_equal 2, row["lifetime_signup_count"]
+    assert_equal period.id, response.parsed_body.dig("selected_quota_period", "id")
+
+    get "/api/v1/referral_codes?quota_period_id=not-a-period", headers: auth_headers(@admin)
+
+    assert_response :success
+    row = response.parsed_body["referral_codes"].find { |item| item["id"] == code.id }
+    assert_equal 2, row["signup_count"]
+    assert_equal 0, row["period_signup_count"]
+    assert_nil response.parsed_body["selected_quota_period"]
+  end
+
   test "unused signup link can be deleted" do
     code = ReferralCode.create!(
       code: "UNUSED-BAR-1234",

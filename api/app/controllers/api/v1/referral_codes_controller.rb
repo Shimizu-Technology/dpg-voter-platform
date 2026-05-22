@@ -13,24 +13,26 @@ module Api
 
       # GET /api/v1/referral_codes
       def index
-        scope = referral_code_scope
-          .includes(:village, :assigned_user, :created_by_user)
-          .left_joins(:supporters)
-          .select("referral_codes.*, COUNT(supporters.id) AS supporters_count")
-          .group("referral_codes.id")
+        scope = referral_code_scope.includes(:village, :assigned_user, :created_by_user)
         scope = apply_status_filter(scope)
         scope = apply_search_filter(scope)
 
         per_page = [ [ params.fetch(:per_page, 10).to_i, 1 ].max, 50 ].min
         page = [ params.fetch(:page, 1).to_i, 1 ].max
-        total = scope.except(:select, :group, :order).distinct.count(:id)
+        total = scope.count
         total_pages = total.zero? ? 1 : (total.to_f / per_page).ceil
         page = [ page, total_pages ].min
-        codes = scope.order(active: :desc, created_at: :desc).offset((page - 1) * per_page).limit(per_page)
+        codes = scope.order(active: :desc, created_at: :desc).offset((page - 1) * per_page).limit(per_page).to_a
+        period = resolved_quota_period
+        active_period = QuotaPeriod.active_for
+        period_counts = referral_counts(codes, period: period)
+        lifetime_counts = referral_counts(codes)
 
         render json: {
-          referral_codes: codes.map { |code| referral_code_json(code) },
+          referral_codes: codes.map { |code| referral_code_json(code, period_counts: period_counts, lifetime_counts: lifetime_counts) },
           signup_base_url: signup_base_url,
+          active_quota_period: active_period && quota_period_summary(active_period),
+          selected_quota_period: period.is_a?(QuotaPeriod) ? quota_period_summary(period) : nil,
           pagination: {
             page: page,
             per_page: per_page,
@@ -39,7 +41,8 @@ module Api
           },
           filters: {
             status: status_filter,
-            q: search_query
+            q: search_query,
+            quota_period_id: params[:quota_period_id].presence || "all"
           }
         }
       end
@@ -194,6 +197,34 @@ module Api
         params[:q].to_s.strip
       end
 
+      def resolved_quota_period
+        requested = params[:quota_period_id].to_s
+        return QuotaPeriod.active_for if requested == "active"
+        return nil if requested.blank? || requested == "all"
+        return QuotaPeriod.find_by(id: requested) if requested.match?(/\A\d+\z/)
+
+        :invalid
+      end
+
+      def referral_counts(codes, period: nil)
+        ids = Array(codes).map(&:id)
+        return {} if ids.empty? || period == :invalid
+
+        scope = Supporter.where(referral_code_id: ids)
+        scope = scope.where(quota_period_id: period.id) if period
+        scope.group(:referral_code_id).count
+      end
+
+      def quota_period_summary(period)
+        {
+          id: period.id,
+          name: period.name,
+          start_date: period.start_date,
+          end_date: period.end_date,
+          status: period.status
+        }
+      end
+
       def find_referral_code
         code = referral_code_scope.find_by(id: params[:id])
         unless code
@@ -270,8 +301,9 @@ module Api
         ENV["FRONTEND_URL"].presence || "http://localhost:5173"
       end
 
-      def referral_code_json(code)
-        count = code.respond_to?(:supporters_count) ? code.supporters_count.to_i : code.supporters.count
+      def referral_code_json(code, period_counts: nil, lifetime_counts: nil)
+        lifetime_count = lifetime_counts ? lifetime_counts[code.id].to_i : code.supporters.count
+        count = period_counts ? period_counts[code.id].to_i : lifetime_count
         url = "#{signup_base_url.to_s.delete_suffix('/')}/signup/#{CGI.escape(code.code)}"
         {
           id: code.id,
@@ -287,7 +319,9 @@ module Api
           source_type: code.source_type,
           precinct_id: code.precinct_id,
           notes: code.notes,
-          signup_count: count,
+          signup_count: lifetime_count,
+          period_signup_count: count,
+          lifetime_signup_count: lifetime_count,
           signup_url: url,
           created_at: code.created_at&.iso8601,
           updated_at: code.updated_at&.iso8601

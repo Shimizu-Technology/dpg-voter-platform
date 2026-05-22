@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getSupporters, exportSupporters, getVillages, reviewIntakeSupporter, updateSupporter } from '../../lib/api';
+import { getSupporters, exportSupporters, getVillages, getQuotaPeriods, reviewIntakeSupporter, updateSupporter } from '../../lib/api';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Search, ClipboardPlus, Download, ArrowUpDown, ChevronLeft, CheckCircle, MessageSquare, X, AlertTriangle } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -88,6 +88,18 @@ interface SupporterItem {
   } | null;
   status: string;
   created_at: string;
+}
+
+interface QuotaPeriodOption {
+  id: number;
+  name: string;
+  active: boolean;
+  status: string;
+}
+
+interface QuotaPeriodsResponse {
+  quota_periods: QuotaPeriodOption[];
+  active_quota_period?: QuotaPeriodOption | null;
 }
 
 interface SupportersResponse {
@@ -289,6 +301,7 @@ export default function SupportersPage() {
   const [villageFilter, setVillageFilter] = useState(searchParams.get('village_id') || '');
   const [precinctFilter, setPrecinctFilter] = useState(searchParams.get('precinct_id') || '');
   const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '');
+  const [quotaPeriodFilter, setQuotaPeriodFilter] = useState(searchParams.get('quota_period_id') || '');
   const [optInFilter, setOptInFilter] = useState(searchParams.get('opt_in') || '');
   const [verificationFilter, setVerificationFilter] = useState(searchParams.get('verification_status') || '');
   const [classificationFilter, setClassificationFilter] = useState(searchParams.get('contact_classification') || defaultClassificationFilter(isIntakeView));
@@ -322,6 +335,7 @@ export default function SupportersPage() {
   const excludeContactClassificationParam = classificationFilter === REVIEWED_CLASSIFICATION_FILTER ? 'new_intake' : undefined;
 
   const { data: villageData } = useQuery({ queryKey: ['villages'], queryFn: getVillages });
+  const { data: quotaPeriodsData } = useQuery<QuotaPeriodsResponse>({ queryKey: ['quota-periods'], queryFn: getQuotaPeriods });
   const villages: VillageOption[] = useMemo(() => villageData?.villages || [], [villageData]);
   const scopedVillageIds = sessionData?.user?.scoped_village_ids ?? null;
   const accessibleVillages: VillageOption[] = useMemo(() => {
@@ -357,6 +371,7 @@ export default function SupportersPage() {
     if (effectiveVillageFilter) params.set('village_id', effectiveVillageFilter);
     if (precinctFilter) params.set('precinct_id', precinctFilter);
     if (sourceFilter) params.set('source', sourceFilter);
+    if (quotaPeriodFilter) params.set('quota_period_id', quotaPeriodFilter);
     if (optInFilter) params.set('opt_in', optInFilter);
     if (verificationFilter) params.set('verification_status', verificationFilter);
     if (classificationFilter && classificationFilter !== defaultClassificationFilter(isIntakeView)) params.set('contact_classification', classificationFilter);
@@ -370,15 +385,16 @@ export default function SupportersPage() {
     params.set('per_page', String(perPage));
     if (returnTo) params.set('return_to', returnTo);
     setSearchParams(params, { replace: true });
-  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, isIntakeView, setSearchParams]);
+  }, [debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage, returnTo, isIntakeView, setSearchParams]);
 
   const { data, isFetching } = useQuery<SupportersResponse>({
-    queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
+    queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page, perPage],
     queryFn: () => getSupporters({
       search: debouncedSearch,
       village_id: effectiveVillageFilter || undefined,
       precinct_id: precinctFilter || undefined,
       source: sourceFilter || undefined,
+      quota_period_id: quotaPeriodFilter || undefined,
       opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
       opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
       verification_status: verificationFilter || undefined,
@@ -407,7 +423,7 @@ export default function SupportersPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => setVisibleRows(80), 0);
     return () => window.clearTimeout(timer);
-  }, [progressiveRenderingEnabled, page, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage]);
+  }, [progressiveRenderingEnabled, page, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, perPage]);
 
   useEffect(() => {
     if (!progressiveRenderingEnabled) return;
@@ -424,12 +440,13 @@ export default function SupportersPage() {
     const totalPages = data.pagination.pages;
     if (page < totalPages) {
       void queryClient.prefetchQuery({
-        queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
+        queryKey: ['supporters', viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, page + 1, perPage],
         queryFn: () => getSupporters({
           search: debouncedSearch,
           village_id: effectiveVillageFilter || undefined,
           precinct_id: precinctFilter || undefined,
           source: sourceFilter || undefined,
+          quota_period_id: quotaPeriodFilter || undefined,
           opt_in_email: optInFilter === 'email' || optInFilter === 'both' ? 'true' : undefined,
           opt_in_text: optInFilter === 'text' || optInFilter === 'both' ? 'true' : undefined,
           verification_status: verificationFilter || undefined,
@@ -447,7 +464,7 @@ export default function SupportersPage() {
         }),
       });
     }
-  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
+  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
 
   const assignPrecinctMutation = useMutation({
     mutationFn: ({ supporterId, precinctId }: { supporterId: number; precinctId: number }) =>
@@ -607,6 +624,7 @@ export default function SupportersPage() {
                   village_id: effectiveVillageFilter || undefined,
                   precinct_id: precinctFilter || undefined,
                   source: sourceFilter || undefined,
+                  quota_period_id: quotaPeriodFilter || undefined,
                   opt_in: optInFilter || undefined,
                   verification_status: verificationFilter || undefined,
                   contact_classification: contactClassificationParam,
@@ -696,6 +714,21 @@ export default function SupportersPage() {
             <option value="qr_signup">QR signup</option>
             <option value="staff_entry">Staff entry</option>
             <option value="bulk_import">Excel import</option>
+          </select>
+          <select
+            value={quotaPeriodFilter}
+            onChange={(e) => {
+              setQuotaPeriodFilter(e.target.value);
+              setPage(1);
+            }}
+            className="md:col-span-2 px-3 py-3 border border-[var(--border-soft)] rounded-xl bg-[var(--surface-raised)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary focus:border-transparent min-w-0"
+          >
+            <option value="">All periods</option>
+            {quotaPeriodsData?.active_quota_period && <option value="active">Current active period</option>}
+            {(quotaPeriodsData?.quota_periods || []).map((period) => (
+              <option key={period.id} value={period.id}>{period.name}</option>
+            ))}
+            <option value="none">No period</option>
           </select>
           <select
             value={optInFilter}

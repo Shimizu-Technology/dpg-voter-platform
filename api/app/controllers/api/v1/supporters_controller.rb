@@ -43,6 +43,7 @@ module Api
         effective_leader_code = referral_code&.code
         source = create_source(effective_leader_code)
         attribution_method = create_attribution_method(effective_leader_code)
+        quota_period = QuotaPeriod.active_for
         intake_status = create_intake_status
         public_review_status = create_public_review_status
         created_supporters = []
@@ -60,6 +61,7 @@ module Api
               public_review_status: public_review_status,
               leader_code: effective_leader_code,
               referral_code: referral_code,
+              quota_period: quota_period,
               household_group: household_group,
               household_primary: household_group.present?,
               entered_by_user_id: current_user&.id
@@ -78,6 +80,7 @@ module Api
                 public_review_status: public_review_status,
                 leader_code: effective_leader_code,
                 referral_code: referral_code,
+                quota_period: quota_period,
                 household_group: household_group,
                 household_primary: false,
                 entered_by_user_id: current_user&.id
@@ -488,6 +491,7 @@ module Api
         end
         supporters = supporters.where(status: params[:status]) if params[:status].present?
         supporters = supporters.where(source: params[:source]) if params[:source].present?
+        supporters = apply_quota_period_filter(supporters, params[:quota_period_id])
         supporters = supporters.where(review_status: params[:review_status]) if params[:review_status].present?
         supporters = supporters.where(public_review_status: params[:public_review_status]) if params[:public_review_status].present?
         supporters = supporters.where(registered_voter_status: params[:registered_voter_status]) if params[:registered_voter_status].present?
@@ -1169,6 +1173,7 @@ module Api
         end
         supporters = supporters.where(status: params[:status]) if params[:status].present?
         supporters = supporters.where(source: params[:source]) if params[:source].present?
+        supporters = apply_quota_period_filter(supporters, params[:quota_period_id])
         supporters = supporters.where(review_status: params[:review_status]) if params[:review_status].present?
         supporters = supporters.where(public_review_status: params[:public_review_status]) if params[:public_review_status].present?
         supporters = supporters.where(registered_voter_status: params[:registered_voter_status]) if params[:registered_voter_status].present?
@@ -1189,6 +1194,22 @@ module Api
         supporters = apply_supporter_search(supporters, params[:search]) if params[:search].present?
 
         apply_index_sort(supporters)
+      end
+
+      def apply_quota_period_filter(supporters, quota_period_id)
+        return supporters if quota_period_id.blank? || quota_period_id == "all"
+
+        if quota_period_id == "active"
+          active_period = QuotaPeriod.active_for
+          return supporters.none unless active_period
+
+          return supporters.where(quota_period_id: active_period.id)
+        end
+
+        return supporters.where(quota_period_id: nil) if quota_period_id == "none"
+        return supporters.where(quota_period_id: quota_period_id) if quota_period_id.to_s.match?(/\A\d+\z/)
+
+        supporters.none
       end
 
       def public_supporter_params
@@ -1629,6 +1650,8 @@ module Api
           referral_code_id: supporter.referral_code_id,
           referral_display_name: supporter.referral_code&.display_name,
           referral_code_active: supporter.referral_code&.active,
+          quota_period_id: supporter.quota_period_id,
+          quota_period_name: supporter.quota_period&.name,
           referred_from_village_id: supporter.referred_from_village_id,
           referred_from_village_name: supporter.referred_from_village&.name,
           verification_reason: reason_payload[:verification_reason],
@@ -1764,7 +1787,7 @@ module Api
         )
       end
 
-      def build_submitted_supporter(attributes, source:, attribution_method:, intake_status:, public_review_status:, leader_code:, referral_code:, household_group:, household_primary:, entered_by_user_id:)
+      def build_submitted_supporter(attributes, source:, attribution_method:, intake_status:, public_review_status:, leader_code:, referral_code:, quota_period:, household_group:, household_primary:, entered_by_user_id:)
         supporter = Supporter.new(attributes)
         supporter.source = source
         supporter.attribution_method = attribution_method
@@ -1774,6 +1797,7 @@ module Api
         supporter.review_status = supporter.contact_classification == "new_intake" ? "pending" : "approved"
         supporter.leader_code = leader_code
         supporter.referral_code = referral_code if referral_code
+        supporter.quota_period = quota_period if quota_period
         supporter.household_group = household_group if household_group
         supporter.household_primary = household_group.present? && household_primary
         supporter.entered_by_user_id = entered_by_user_id if staff_entry_mode? && entered_by_user_id.present?

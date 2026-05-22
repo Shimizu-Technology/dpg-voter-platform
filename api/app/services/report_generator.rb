@@ -44,7 +44,8 @@ class ReportGenerator
     support_need: nil,
     registration_outreach_status: nil,
     support_follow_up_status: nil,
-    outreach_status: nil
+    outreach_status: nil,
+    quota_period_id: nil
   )
     @report_type = report_type
     @village_id = village_id
@@ -59,6 +60,7 @@ class ReportGenerator
     @support_need = support_need
     @registration_outreach_status = registration_outreach_status.presence || outreach_status
     @support_follow_up_status = support_follow_up_status
+    @quota_period_id = quota_period_id
   end
 
   def generate
@@ -123,7 +125,24 @@ class ReportGenerator
     scope = scope.where(volunteer_status: @volunteer_status) if @volunteer_status.present?
     scope = scope.where(registration_outreach_status: @registration_outreach_status) if @registration_outreach_status.present?
     scope = scope.where(support_follow_up_status: @support_follow_up_status) if @support_follow_up_status.present?
+    scope = apply_quota_period_filter(scope)
     apply_support_need_filter(scope)
+  end
+
+  def apply_quota_period_filter(scope)
+    return scope if @quota_period_id.blank? || @quota_period_id == "all"
+
+    if @quota_period_id == "active"
+      active_period = QuotaPeriod.active_for
+      return scope.none unless active_period
+
+      return scope.where(quota_period_id: active_period.id)
+    end
+
+    return scope.where(quota_period_id: nil) if @quota_period_id == "none"
+    return scope.where(quota_period_id: @quota_period_id) if @quota_period_id.to_s.match?(/\A\d+\z/)
+
+    scope.none
   end
 
   def apply_support_need_filter(scope)

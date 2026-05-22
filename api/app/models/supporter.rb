@@ -38,6 +38,7 @@ class Supporter < ApplicationRecord
   belongs_to :block, optional: true
   belongs_to :household_group, optional: true
   belongs_to :referral_code, optional: true
+  belongs_to :quota_period, optional: true
   belongs_to :entered_by, class_name: "User", foreign_key: :entered_by_user_id, optional: true
   belongs_to :turnout_updated_by_user, class_name: "User", optional: true
   belongs_to :verified_by, class_name: "User", foreign_key: :verified_by_user_id, optional: true

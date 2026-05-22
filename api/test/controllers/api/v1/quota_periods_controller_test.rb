@@ -1,0 +1,190 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+class Api::V1::QuotaPeriodsControllerTest < ActionDispatch::IntegrationTest
+  setup do
+    @admin = User.create!(
+      clerk_id: "clerk-quota-admin-#{SecureRandom.hex(4)}",
+      email: "quota-admin-#{SecureRandom.hex(4)}@example.com",
+      name: "Quota Admin",
+      role: "campaign_admin"
+    )
+    @cycle = CampaignCycle.create!(
+      name: "2026 DPG Organizing Cycle",
+      cycle_type: "organizing",
+      start_date: Date.new(2026, 1, 1),
+      end_date: Date.new(2026, 12, 31),
+      status: "active"
+    )
+  end
+
+  test "admin can create and list quota periods" do
+    assert_difference -> { QuotaPeriod.count }, 1 do
+      post "/api/v1/quota_periods",
+        params: {
+          quota_period: {
+            name: "Quota Period 1",
+            start_date: "2026-05-01",
+            end_date: "2026-05-31",
+            due_date: "2026-06-03",
+            quota_target: 250,
+            status: "open"
+          }
+        },
+        headers: auth_headers(@admin),
+        as: :json
+    end
+
+    assert_response :created
+    assert_equal "Quota Period 1", response.parsed_body.dig("quota_period", "name")
+    assert_equal true, response.parsed_body.dig("quota_period", "active")
+
+    get "/api/v1/quota_periods", headers: auth_headers(@admin)
+    assert_response :success
+    assert_equal 1, response.parsed_body["quota_periods"].length
+    assert_equal "Quota Period 1", response.parsed_body.dig("active_quota_period", "name")
+  end
+
+  test "period counts separate direct public signups from qr signups" do
+    village = Village.find_or_create_by!(name: "Dededo")
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Signup Source Period",
+      start_date: Date.new(2026, 5, 1),
+      end_date: Date.new(2026, 5, 31),
+      due_date: Date.new(2026, 6, 3),
+      status: "open"
+    )
+    Supporter.create!(
+      first_name: "Direct",
+      last_name: "Signup",
+      contact_number: "671-555-2001",
+      village: village,
+      source: "public_signup",
+      attribution_method: "public_signup",
+      contact_classification: "new_intake",
+      status: "active",
+      quota_period: period
+    )
+    Supporter.create!(
+      first_name: "Qr",
+      last_name: "Signup",
+      contact_number: "671-555-2002",
+      village: village,
+      source: "qr_signup",
+      attribution_method: "qr_self_signup",
+      contact_classification: "new_intake",
+      status: "active",
+      quota_period: period
+    )
+
+    get "/api/v1/quota_periods", headers: auth_headers(@admin)
+
+    assert_response :success
+    counts = response.parsed_body.dig("quota_periods", 0, "counts")
+    assert_equal 1, counts["public_signups"]
+    assert_equal 1, counts["qr_signups"]
+  end
+
+  test "active quota period cannot be archived" do
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Active Period",
+      start_date: Date.new(2026, 5, 1),
+      end_date: Date.new(2026, 5, 31),
+      due_date: Date.new(2026, 6, 3),
+      status: "open"
+    )
+
+    post "/api/v1/quota_periods/#{period.id}/archive", headers: auth_headers(@admin), as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "open", period.reload.status
+    assert_equal "quota_period_archive_failed", response.parsed_body["code"]
+  end
+
+  test "update cannot archive the active quota period by status bypass" do
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Active Period For Update",
+      start_date: Date.new(2026, 5, 1),
+      end_date: Date.new(2026, 5, 31),
+      due_date: Date.new(2026, 6, 3),
+      status: "open"
+    )
+
+    patch "/api/v1/quota_periods/#{period.id}",
+      params: { quota_period: { name: "Renamed Active Period", status: "archived" } },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    assert_equal "Renamed Active Period", period.reload.name
+    assert_equal "open", period.status
+  end
+
+  test "closed quota period can be archived" do
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Closed Period",
+      start_date: Date.new(2026, 5, 1),
+      end_date: Date.new(2026, 5, 31),
+      due_date: Date.new(2026, 6, 3),
+      status: "closed"
+    )
+
+    post "/api/v1/quota_periods/#{period.id}/archive", headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    assert_equal "archived", period.reload.status
+  end
+
+  test "activate returns unprocessable when database active-period constraint is hit" do
+    period = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Period With Race",
+      start_date: Date.new(2026, 7, 1),
+      end_date: Date.new(2026, 7, 31),
+      due_date: Date.new(2026, 8, 3),
+      status: "closed"
+    )
+
+    original_activate = QuotaPeriod.instance_method(:activate!)
+    QuotaPeriod.define_method(:activate!) { raise ActiveRecord::RecordNotUnique, "duplicate open period" }
+
+    post "/api/v1/quota_periods/#{period.id}/activate", headers: auth_headers(@admin), as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "quota_period_activate_failed", response.parsed_body["code"]
+  ensure
+    QuotaPeriod.define_method(:activate!, original_activate) if original_activate
+  end
+
+  test "only one period can be open at a time unless activated" do
+    first = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Period 1",
+      start_date: Date.new(2026, 5, 1),
+      end_date: Date.new(2026, 5, 31),
+      due_date: Date.new(2026, 6, 3),
+      status: "open"
+    )
+    second = QuotaPeriod.create!(
+      campaign_cycle: @cycle,
+      name: "Period 2",
+      start_date: Date.new(2026, 6, 1),
+      end_date: Date.new(2026, 6, 30),
+      due_date: Date.new(2026, 7, 3),
+      status: "closed"
+    )
+
+    post "/api/v1/quota_periods/#{second.id}/activate", headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    assert_equal "closed", first.reload.status
+    assert_equal "open", second.reload.status
+    assert_equal 1, AuditLog.where(auditable: first, action: "quota_period_auto_closed").count
+    assert_equal 1, AuditLog.where(auditable: second, action: "quota_period_activated").count
+  end
+end

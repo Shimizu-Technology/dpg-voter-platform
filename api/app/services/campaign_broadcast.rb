@@ -35,6 +35,17 @@ class CampaignBroadcast
       })
     end
 
+    # Quota period settings or counts changed
+    def quota_period_updated(period, action: "updated")
+      broadcast(:quota_period_updated, {
+        quota_period_id: period&.id,
+        name: period&.name,
+        status: period&.status,
+        action: action,
+        updated_at: period&.updated_at&.iso8601
+      })
+    end
+
     # Dashboard stats refresh (can be triggered periodically or on demand)
     def stats_update(stats)
       broadcast(:stats_update, stats)
