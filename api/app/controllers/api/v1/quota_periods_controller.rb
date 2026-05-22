@@ -173,7 +173,7 @@ module Api
       end
 
       def village_counts(period)
-        Supporter.where(quota_period_id: period.id)
+        Supporter.contacts.where(quota_period_id: period.id)
           .joins(:village)
           .group("villages.id", "villages.name")
           .order("villages.name ASC")
