@@ -176,22 +176,55 @@ class Api::V1::SmsControllerTest < ActionDispatch::IntegrationTest
       status: "failed"
     )
 
+    with_live_outreach_enabled do
+      assert_enqueued_with(job: SmsResendFailedJob) do
+        post "/api/v1/sms/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      end
+      assert_response :accepted
+      post "/api/v1/sms/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      assert_response :success
+    end
+
+    assert_equal 1, enqueued_jobs.count { |job| job[:job] == SmsResendFailedJob }
+    assert_equal 1, original_delivery.resends.count
+    assert_equal "queued", original_delivery.resends.first.status
+  end
+
+  test "sms resend failed job sends queued resend deliveries" do
+    village = Village.create!(name: "SMS Async Resend Village")
+    supporter = Supporter.create!(
+      first_name: "Async", last_name: "Retry", print_name: "Async Retry",
+      contact_number: "6715556150",
+      village: village,
+      source: "staff_entry",
+      opt_in_text: true,
+      status: "active"
+    )
+    blast = SmsBlast.create!(status: "completed", message: "DPG retry", total_recipients: 1, failed_count: 1, initiated_by: @coordinator)
+    original_delivery = OutreachDelivery.create!(
+      channel: "sms",
+      sms_blast: blast,
+      supporter: supporter,
+      recipient: "+16715556150",
+      provider: "clicksend",
+      status: "failed"
+    )
+
     original = ClicksendClient.method(:send_batch)
-    calls = 0
     ClicksendClient.define_singleton_method(:send_batch) do |messages|
-      calls += 1
-      { sent: messages.size, failed: 0, results: messages.map { |message| { to: message[:to], supporter_id: message[:supporter_id], success: true, message_id: "RESENT-#{calls}", error: nil } } }
+      { sent: messages.size, failed: 0, results: messages.map { |message| { to: message[:to], supporter_id: message[:supporter_id], success: true, message_id: "sms-resent-async", error: nil } } }
     end
 
     with_live_outreach_enabled do
-      post "/api/v1/sms/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
-      assert_response :success
-      post "/api/v1/sms/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
-      assert_response :success
+      perform_enqueued_jobs do
+        post "/api/v1/sms/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      end
     end
 
-    assert_equal 1, calls
-    assert_equal 1, original_delivery.resends.count
+    assert_response :accepted
+    resend = original_delivery.resends.first
+    assert_equal "sent", resend.status
+    assert_equal "sms-resent-async", resend.provider_message_id
   ensure
     ClicksendClient.define_singleton_method(:send_batch, original) if original
   end

@@ -155,43 +155,31 @@ module Api
         return live_outreach_disabled_response unless live_outreach_enabled?
 
         deliveries = blast.outreach_deliveries.resendable.not_already_resent.includes(:supporter).to_a
-        return render json: { resent: 0, message: "No failed or undelivered SMS recipients to resend." } if deliveries.empty?
+        return render json: { queued: 0, message: "No failed or undelivered SMS recipients to resend." } if deliveries.empty?
 
-        phones_and_bodies = deliveries.map { |delivery| { to: delivery.recipient, body: blast.message, supporter_id: delivery.supporter_id } }
-        result = ClicksendClient.send_batch(phones_and_bodies)
-        result_by_supporter_id = result[:results].index_by { |row| row[:supporter_id] }
         now = Time.current
-
-        deliveries.each do |original|
-          row = result_by_supporter_id[original.supporter_id]
-          next unless row
-
-          OutreachDelivery.create!(
-            channel: "sms",
-            sms_blast: blast,
-            supporter: original.supporter,
-            resend_of: original,
-            recipient: row[:to].presence || original.recipient,
-            provider: "clicksend",
-            provider_message_id: row[:message_id],
-            status: row[:success] ? "sent" : "failed",
-            provider_status_text: row[:error],
-            sent_at: row[:success] ? now : nil,
-            failed_at: row[:success] ? nil : now,
-            last_event_at: now,
-            metadata: { resend: true }
-          )
-          SupporterContactAttempt.create!(
-            supporter: original.supporter,
-            recorded_by_user_id: current_user.id,
-            channel: "sms",
-            outcome: row[:success] ? "attempted" : "unavailable",
-            note: "SMS resend #{row[:success] ? 'queued/sent' : 'failed'}: #{blast.message.to_s.truncate(120)}#{row[:message_id].present? ? " Provider ID: #{row[:message_id]}." : ''}#{row[:error].present? ? " Error: #{row[:error]}." : ''}",
-            recorded_at: now
-          )
+        resend_delivery_ids = OutreachDelivery.transaction do
+          deliveries.map do |original|
+            OutreachDelivery.create!(
+              channel: "sms",
+              sms_blast: blast,
+              supporter: original.supporter,
+              resend_of: original,
+              recipient: original.recipient,
+              provider: "clicksend",
+              status: "queued",
+              last_event_at: now,
+              metadata: { resend: true }
+            ).id
+          end
         end
+        SmsResendFailedJob.perform_later(delivery_ids: resend_delivery_ids, recorded_by_user_id: current_user.id)
 
-        render json: { resent: result[:sent], failed: result[:failed], delivery_counts: blast.outreach_deliveries.group(:status).count }
+        render json: {
+          queued: resend_delivery_ids.size,
+          delivery_counts: blast.outreach_deliveries.group(:status).count,
+          message: "Queued #{resend_delivery_ids.size} failed SMS recipient#{'s' unless resend_delivery_ids.size == 1} for resend."
+        }, status: :accepted
       end
 
       private
