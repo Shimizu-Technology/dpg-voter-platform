@@ -8,7 +8,7 @@
 - `Democratic-Party/2) - Democratic Pary Meeting with Mrs. Stephanie and her team - April 2nd, 2026.md`
 - `Democratic-Party/3) Demoing app with the Democratic Party.md`
 
-**Current implementation note, May 20, 2026:** The foundation, QR attribution, GEC search/linking, household lookup, role labels/permissions, contact history, editable contact-attempt corrections, follow-up lane sync, Duplicate Contact Review, redesigned Reports workspace, and DPG/GEC cross-reference reports are now merged to `main`. Leon completed initial production QA and the first live DPG demo walkthrough. Auntie Stephanie and DPG team members validated the platform direction and surfaced concrete beta polish needs: less strict GEC search, better address matching, QR-code downloads, signup-link cleanup, safe demo-contact cleanup, SMS delivery/resend visibility, and DPG-owned quota/period tracking. The next unknown is not whether DPG wants list imports; they confirmed active/inactive party lists exist. The unknown is the exact shape of those files, so schema-specific list import work should wait for real DPG samples.
+**Current implementation note, May 22, 2026:** The foundation, QR attribution, GEC search/linking, household lookup, role labels/permissions, contact history, editable contact-attempt corrections, follow-up lane sync, Duplicate Contact Review, redesigned Reports workspace, DPG/GEC cross-reference reports, beta search/usability polish, and DPG quota/period foundation are now merged to `main` through PR #41. Leon completed initial production QA and the first live DPG demo walkthrough. Auntie Stephanie and DPG team members validated the platform direction and surfaced concrete beta polish needs: less strict GEC search, better address matching, QR-code downloads, signup-link cleanup, safe demo-contact cleanup, SMS delivery/resend visibility, and DPG-owned quota/period tracking. The next implementation item is SMS/email delivery status and resend. The next unknown is not whether DPG wants list imports; they confirmed active/inactive party lists exist. The unknown is the exact shape of those files, so schema-specific list import work should wait for real DPG samples.
 
 ## What DPG clearly asked for
 
@@ -189,12 +189,12 @@ Starter/foundation:
 - public signup link works
 - QR generation and signup-link attribution are implemented for general signup plus village/canvasser/outreach/custom source links
 - inactive links are ignored for future attribution so stale links fall back to normal public signup
-- QR-code download is needed so DPG can reuse codes in flyers, group chats, and outreach materials
+- QR-code download is implemented so DPG can reuse codes in flyers, group chats, and outreach materials
 - unused links should be deletable; used links should be archived/deactivated to preserve attribution history
 
 Core build:
 
-- print-ready/downloadable QR assets after DPG tests the workflow
+- additional print-ready QR templates after DPG tests the workflow
 - additional village/precinct/event attribution labels if DPG wants them
 
 ### 11. Poll watcher / election-day operations
@@ -227,9 +227,9 @@ Core build:
 - period filters for signup-link, user, village, and report counts
 - duplicate cleanup rules so the same person is not double-counted where DPG expects unique-person counts
 
-Current implementation branch:
+Current status:
 
-- `feature/dpg-quota-period-foundation` adds period management, active-period assignment for public/QR/staff signups, signup-link period counts, dashboard active-period summary, and report period filtering.
+- PR #41 merged the quota/period foundation to `main`: period management, active-period assignment for public/QR/staff signups, signup-link period counts with lifetime totals, dashboard active-period summary, period filters for Contacts/Intake/Reports/Signup Links, realtime cache invalidation, period drilldowns, and DB/model safeguards for one active period.
 - Detailed goal rules, leaderboards, and unique-person quota credit should wait for DPG feedback.
 
 Open questions:
@@ -304,7 +304,7 @@ Status: implemented. Membership is hidden from the active manual workflow and re
 - SMS/email templates: implemented starter templates.
 - recipient review: implemented through dry-run preview and count confirmation before live sends.
 - SMS delivery status and resend-to-failed/undelivered: requested in the May 20 demo, pending provider-status integration.
-- DPG quota/period tracking: requested in the May 20 demo; foundation is in implementation with detailed goal/leaderboard rules pending DPG feedback.
+- DPG quota/period tracking: requested in the May 20 demo; foundation merged in PR #41 with detailed goal/leaderboard rules pending DPG feedback.
 - exports/import reports: DPG/GEC contact cross-reference reports are implemented; explicit non-GEC list types and official member-roster/registered-Democrat list-lineage reporting remain pending actual DPG list samples.
 
 ## Phase 5: Election operations
