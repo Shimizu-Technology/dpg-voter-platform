@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_22_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_22_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -367,6 +367,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_170000) do
     t.index ["email_blast_id"], name: "index_outreach_deliveries_on_email_blast_id"
     t.index ["provider_message_id"], name: "index_outreach_deliveries_on_provider_message_id"
     t.index ["resend_of_id"], name: "index_outreach_deliveries_on_resend_of_id"
+    t.index ["resend_of_id"], name: "index_outreach_deliveries_unique_resend_of", unique: true, where: "(resend_of_id IS NOT NULL)"
     t.index ["sms_blast_id", "status"], name: "index_outreach_deliveries_on_sms_blast_id_and_status"
     t.index ["sms_blast_id"], name: "index_outreach_deliveries_on_sms_blast_id"
     t.index ["status"], name: "index_outreach_deliveries_on_status"

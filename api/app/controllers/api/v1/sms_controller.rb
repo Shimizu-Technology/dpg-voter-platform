@@ -158,22 +158,24 @@ module Api
         return render json: { queued: 0, message: "No failed or undelivered SMS recipients to resend." } if deliveries.empty?
 
         now = Time.current
-        resend_delivery_ids = OutreachDelivery.transaction do
-          deliveries.map do |original|
-            OutreachDelivery.create!(
-              channel: "sms",
-              sms_blast: blast,
-              supporter: original.supporter,
-              resend_of: original,
-              recipient: original.recipient,
-              provider: "clicksend",
-              status: "queued",
-              last_event_at: now,
-              metadata: { resend: true }
-            ).id
-          end
+        rows = deliveries.map do |original|
+          {
+            channel: "sms",
+            sms_blast_id: blast.id,
+            supporter_id: original.supporter_id,
+            resend_of_id: original.id,
+            recipient: original.recipient,
+            provider: "clicksend",
+            status: "queued",
+            last_event_at: now,
+            metadata: { resend: true },
+            created_at: now,
+            updated_at: now
+          }
         end
-        SmsResendFailedJob.perform_later(delivery_ids: resend_delivery_ids, recorded_by_user_id: current_user.id)
+        result = OutreachDelivery.insert_all(rows, unique_by: :index_outreach_deliveries_unique_resend_of, returning: %w[id])
+        resend_delivery_ids = result.rows.flatten
+        SmsResendFailedJob.perform_later(delivery_ids: resend_delivery_ids, recorded_by_user_id: current_user.id) if resend_delivery_ids.any?
 
         render json: {
           queued: resend_delivery_ids.size,
