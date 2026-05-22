@@ -164,7 +164,7 @@ module Api
         if delivery
           delivery.mark_provider_event!(
             status: OutreachDeliveryStatus.normalize_resend_event(event["type"]),
-            occurred_at: Time.zone.parse(event["created_at"].to_s) || Time.current,
+            occurred_at: webhook_event_time(event),
             metadata: { resend_event: event }
           )
         end
@@ -185,6 +185,12 @@ module Api
       end
 
       private
+
+      def webhook_event_time(event)
+        Time.zone.parse(event["created_at"].to_s) || Time.current
+      rescue ArgumentError, TypeError
+        Time.current
+      end
 
       def delivery_json(delivery)
         supporter = delivery.supporter
