@@ -63,7 +63,17 @@ module Api
 
       # POST /api/v1/quota_periods/:id/activate
       def activate
+        auto_closed_periods = QuotaPeriod.open.where.not(id: @quota_period.id).to_a
+
         @quota_period.activate!
+
+        auto_closed_periods.each do |period|
+          log_audit!(
+            period.reload,
+            action: "quota_period_auto_closed",
+            changed_data: { status: { from: "open", to: "closed" }, activated_quota_period_id: @quota_period.id }
+          )
+        end
         log_audit!(@quota_period, action: "quota_period_activated", changed_data: { status: "open" })
         CampaignBroadcast.quota_period_updated(@quota_period, action: "activated")
         render json: { quota_period: quota_period_json(@quota_period.reload, active_period: @quota_period) }

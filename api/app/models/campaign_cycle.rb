@@ -17,12 +17,12 @@ class CampaignCycle < ApplicationRecord
 
   def self.current_or_create_default!
     active.ordered.first || create_or_find_default_cycle!
+  rescue ActiveRecord::RecordNotUnique
+    active.ordered.first || find_by!(name: default_cycle_name)
   end
 
   def self.create_or_find_default_cycle!
-    default_name = "#{Date.current.year} DPG Organizing Cycle"
-
-    create_or_find_by!(name: default_name) do |cycle|
+    create_or_find_by!(name: default_cycle_name) do |cycle|
       cycle.cycle_type = "organizing"
       cycle.start_date = Date.current.beginning_of_year
       cycle.end_date = Date.current.end_of_year
@@ -30,6 +30,10 @@ class CampaignCycle < ApplicationRecord
       cycle.monthly_quota_target = 0
       cycle.settings = {}
     end
+  end
+
+  def self.default_cycle_name
+    "#{Date.current.year} DPG Organizing Cycle"
   end
 
   private

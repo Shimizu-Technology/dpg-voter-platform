@@ -143,5 +143,7 @@ class Api::V1::QuotaPeriodsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal "closed", first.reload.status
     assert_equal "open", second.reload.status
+    assert_equal 1, AuditLog.where(auditable: first, action: "quota_period_auto_closed").count
+    assert_equal 1, AuditLog.where(auditable: second, action: "quota_period_activated").count
   end
 end
