@@ -116,7 +116,7 @@ class Supporter < ApplicationRecord
   scope :public_review_approved, -> { where(public_review_status: "approved", source: PUBLIC_SOURCES) }
   scope :public_review_rejected, -> { where(public_review_status: "rejected", source: PUBLIC_SOURCES) }
   scope :public_origin, -> { where(source: PUBLIC_SOURCES) }
-  scope :for_quota_period, ->(period_id) { where(quota_period_id: period_id) if period_id.present? }
+  scope :for_quota_period, ->(period_id) { period_id.present? ? where(quota_period_id: period_id) : none }
   scope :accepted_public_signups, -> { public_origin.review_approved }
   scope :engaged_contacts, -> { contacts.where(contact_classification: "active_contact").where.not(support_status: "not_supporting") }
   scope :official_supporters, -> {
