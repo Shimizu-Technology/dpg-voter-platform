@@ -32,7 +32,7 @@ module Api
           referral_codes: codes.map { |code| referral_code_json(code, period_counts: period_counts, lifetime_counts: lifetime_counts) },
           signup_base_url: signup_base_url,
           active_quota_period: active_period && quota_period_summary(active_period),
-          selected_quota_period: period && quota_period_summary(period),
+          selected_quota_period: period.is_a?(QuotaPeriod) ? quota_period_summary(period) : nil,
           pagination: {
             page: page,
             per_page: per_page,
@@ -201,13 +201,14 @@ module Api
         requested = params[:quota_period_id].to_s
         return QuotaPeriod.active_for if requested == "active"
         return nil if requested.blank? || requested == "all"
+        return QuotaPeriod.find_by(id: requested) if requested.match?(/\A\d+\z/)
 
-        QuotaPeriod.find_by(id: requested.to_i)
+        :invalid
       end
 
       def referral_counts(codes, period: nil)
         ids = Array(codes).map(&:id)
-        return {} if ids.empty?
+        return {} if ids.empty? || period == :invalid
 
         scope = Supporter.where(referral_code_id: ids)
         scope = scope.where(quota_period_id: period.id) if period

@@ -25,16 +25,18 @@ class CampaignCycle < ApplicationRecord
     cycle = find_by(name: default_cycle_name)
     return activate_default_cycle!(cycle) if cycle
 
-    create!(
-      name: default_cycle_name,
-      cycle_type: "organizing",
-      start_date: Date.current.beginning_of_year,
-      end_date: Date.current.end_of_year,
-      status: "active",
-      monthly_quota_target: 0,
-      settings: {}
-    )
-  rescue ActiveRecord::RecordNotUnique
+    transaction(requires_new: true) do
+      create!(
+        name: default_cycle_name,
+        cycle_type: "organizing",
+        start_date: Date.current.beginning_of_year,
+        end_date: Date.current.end_of_year,
+        status: "active",
+        monthly_quota_target: 0,
+        settings: {}
+      )
+    end
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
     activate_default_cycle!(find_by!(name: default_cycle_name))
   end
 

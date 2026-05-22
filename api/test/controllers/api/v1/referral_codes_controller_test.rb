@@ -100,6 +100,14 @@ class Api::V1::ReferralCodesControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, row["period_signup_count"]
     assert_equal 2, row["lifetime_signup_count"]
     assert_equal period.id, response.parsed_body.dig("selected_quota_period", "id")
+
+    get "/api/v1/referral_codes?quota_period_id=not-a-period", headers: auth_headers(@admin)
+
+    assert_response :success
+    row = response.parsed_body["referral_codes"].find { |item| item["id"] == code.id }
+    assert_equal 2, row["signup_count"]
+    assert_equal 0, row["period_signup_count"]
+    assert_nil response.parsed_body["selected_quota_period"]
   end
 
   test "unused signup link can be deleted" do
