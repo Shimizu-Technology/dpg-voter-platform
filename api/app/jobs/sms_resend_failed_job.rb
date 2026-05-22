@@ -44,13 +44,17 @@ class SmsResendFailedJob < ApplicationJob
     now = Time.current
 
     deliveries.each do |delivery|
-      update_delivery_from_result(delivery, result_by_supporter_id[delivery.supporter_id], recorded_by_user_id, now)
+      row = result_by_supporter_id[delivery.supporter_id]
+      unless row
+        mark_delivery_failed(delivery, "ClickSend resend returned no result for this recipient", now)
+        next
+      end
+
+      update_delivery_from_result(delivery, row, recorded_by_user_id, now)
     end
   end
 
   def update_delivery_from_result(delivery, row, recorded_by_user_id, now)
-    return unless row
-
     success = row[:success]
     delivery.update!(
       recipient: row[:to].presence || delivery.recipient,
@@ -64,6 +68,17 @@ class SmsResendFailedJob < ApplicationJob
     create_contact_attempt(delivery, recorded_by_user_id, success, row, now)
   rescue StandardError => e
     Rails.logger.error("[SmsResendFailedJob] resend tracking failed for delivery=#{delivery.id}: #{e.class} #{e.message}")
+  end
+
+  def mark_delivery_failed(delivery, message, now)
+    delivery.update!(
+      status: "failed",
+      provider_status_text: message,
+      failed_at: now,
+      last_event_at: now
+    )
+  rescue StandardError => e
+    Rails.logger.error("[SmsResendFailedJob] failed to mark missing ClickSend result for delivery=#{delivery.id}: #{e.class} #{e.message}")
   end
 
   def create_contact_attempt(delivery, recorded_by_user_id, success, row, now)
