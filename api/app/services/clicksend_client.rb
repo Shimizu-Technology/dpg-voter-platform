@@ -23,10 +23,11 @@ class ClicksendClient
       # Truncate sender ID to ClickSend's 11-char limit
       from = from[0...11] if from.length > 11
 
-      # E.164 format
-      formatted_to = to.strip
-      formatted_to = "+1#{formatted_to}" if formatted_to.match?(/\A\d{10}\z/)
-      formatted_to = "+#{formatted_to}" unless formatted_to.start_with?("+")
+      formatted_to = format_sms_recipient(to)
+      unless formatted_to
+        Rails.logger.warn("[ClicksendClient] Invalid SMS recipient: #{mask_phone(to)}")
+        return { success: false, error: "invalid_phone" }
+      end
 
       # ClickSend doesn't like $ signs
       encoded_body = body.gsub("$", "USD ")
@@ -101,16 +102,28 @@ class ClicksendClient
       from = from[0...11] if from.length > 11
 
       messages = phones_and_bodies.map do |item|
-        formatted_to = item[:to].strip
-        formatted_to = "+1#{formatted_to}" if formatted_to.match?(/\A\d{10}\z/)
-        formatted_to = "+#{formatted_to}" unless formatted_to.start_with?("+")
+        formatted_to = format_sms_recipient(item[:to])
 
         {
           source: "dpg_voter_platform",
           from: from,
           body: item[:body].gsub("$", "USD "),
           to: formatted_to,
-          supporter_id: item[:supporter_id]
+          supporter_id: item[:supporter_id],
+          original_to: item[:to]
+        }
+      end
+      invalid_messages, messages = messages.partition { |message| message[:to].blank? }
+
+      if invalid_messages.any?
+        Rails.logger.warn("[ClicksendClient] Skipping #{invalid_messages.size} invalid SMS recipient#{'s' unless invalid_messages.size == 1}")
+      end
+
+      if messages.empty?
+        return {
+          results: invalid_messages.map { |m| batch_result(m, to: m[:original_to], success: false, message_id: nil, error: "invalid_phone") },
+          sent: 0,
+          failed: invalid_messages.size
         }
       end
 
@@ -128,13 +141,18 @@ class ClicksendClient
         "Authorization" => "Basic #{auth}",
         "Content-Type"  => "application/json"
       })
-      request.body = { messages: messages.map { |message| message.except(:supporter_id) } }.to_json
+      request.body = { messages: messages.map { |message| message.except(:supporter_id, :original_to) } }.to_json
 
       begin
         response = http.request(request)
       rescue StandardError => e
         Rails.logger.error("[ClicksendClient] Batch HTTP error: #{e.message}")
-        return { results: messages.map { |m| batch_result(m, success: false, message_id: nil, error: e.message) }, sent: 0, failed: messages.size }
+        return {
+          results: messages.map { |m| batch_result(m, success: false, message_id: nil, error: e.message) } +
+            invalid_messages.map { |m| batch_result(m, to: m[:original_to], success: false, message_id: nil, error: "invalid_phone") },
+          sent: 0,
+          failed: messages.size + invalid_messages.size
+        }
       end
 
       sent = 0
@@ -189,6 +207,11 @@ class ClicksendClient
         results = messages.map { |m| batch_result(m, success: false, message_id: nil, error: "http_#{response.code}") }
       end
 
+      if invalid_messages.any?
+        failed += invalid_messages.size
+        results.concat(invalid_messages.map { |m| batch_result(m, to: m[:original_to], success: false, message_id: nil, error: "invalid_phone") })
+      end
+
       Rails.logger.info("[ClicksendClient] Batch complete: #{sent} sent, #{failed} failed")
       { results: results, sent: sent, failed: failed }
     end
@@ -239,6 +262,15 @@ class ClicksendClient
     rescue StandardError => e
       Rails.logger.error("[ClicksendClient] GET #{path} failed: #{e.message}")
       { success: false, error: e.message }
+    end
+
+    def format_sms_recipient(phone)
+      digits = phone.to_s.gsub(/\D/, "")
+      return "+1#{digits}" if digits.match?(/\A671\d{7}\z/)
+      return "+#{digits}" if digits.match?(/\A1671\d{7}\z/)
+      return "+1671#{digits}" if digits.match?(/\A\d{7}\z/)
+
+      nil
     end
 
     def batch_result(message, to: nil, success:, message_id:, error:)
