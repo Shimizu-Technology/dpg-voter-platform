@@ -8,7 +8,7 @@
 - `Democratic-Party/2) - Democratic Pary Meeting with Mrs. Stephanie and her team - April 2nd, 2026.md`
 - `Democratic-Party/3) Demoing app with the Democratic Party.md`
 
-**Current implementation note, May 22, 2026:** The foundation, QR attribution, GEC search/linking, household lookup, role labels/permissions, contact history, editable contact-attempt corrections, follow-up lane sync, Duplicate Contact Review, redesigned Reports workspace, DPG/GEC cross-reference reports, beta search/usability polish, and DPG quota/period foundation are now merged to `main` through PR #41. Leon completed initial production QA and the first live DPG demo walkthrough. Auntie Stephanie and DPG team members validated the platform direction and surfaced concrete beta polish needs: less strict GEC search, better address matching, QR-code downloads, signup-link cleanup, safe demo-contact cleanup, SMS delivery/resend visibility, and DPG-owned quota/period tracking. The next implementation item is SMS/email delivery status and resend. The next unknown is not whether DPG wants list imports; they confirmed active/inactive party lists exist. The unknown is the exact shape of those files, so schema-specific list import work should wait for real DPG samples.
+**Current implementation note, May 23, 2026:** The foundation, QR attribution, GEC search/linking, household lookup, role labels/permissions, contact history, editable contact-attempt corrections, follow-up lane sync, Duplicate Contact Review, redesigned Reports workspace, DPG/GEC cross-reference reports, beta search/usability polish, DPG quota/period foundation, SMS/email delivery status with failed-only resend, and intake review conflict/error handling are now merged to `main` through PR #44. Leon completed initial production QA and the first live DPG demo walkthrough. Auntie Stephanie and DPG team members validated the platform direction and surfaced concrete beta polish needs; the direct May 20 asks around search, QR links, safe cleanup, quotas/periods, and outreach delivery/resend have now been implemented. The next unknown is not whether DPG wants list imports; they confirmed active/inactive party lists exist. The unknown is the exact shape of those files, so schema-specific list import work should wait for real DPG samples. Election Day/poll-watcher work should be scoped with DPG and Mike Weekly before implementation.
 
 ## What DPG clearly asked for
 
@@ -49,6 +49,7 @@ Core requirement:
 - imported DPG rows can appear in Intake when they need cleanup/dedupe/matching
 - staff can approve/reject intake, mark duplicate/invalid/archived, and separately set support and volunteer status
 - staff can link a contact to a GEC voter or mark possible/no match
+- stale/non-pending intake review attempts show the backend reason clearly inside the modal
 - possible GEC matches should show the actual candidate record before staff confirms it
 
 ### 3. GEC/public voter-list workspace
@@ -177,7 +178,7 @@ Core requirement:
 - live blast governance and recipient approval workflow: implemented through dry-run recipient preview plus required matching recipient-count confirmation for live sends
 - outreach actions should create contact history records: implemented for SMS/email blast attempts
 - reminder flows
-- per-recipient SMS status visibility and resend-to-failed/undelivered recipients
+- per-recipient SMS/email status visibility and resend-to-failed/undelivered/bounced/delayed/suppressed/unknown recipients
 - possible autodialer integration
 
 ### 10. QR signup / frictionless signup
@@ -199,20 +200,25 @@ Core build:
 
 ### 11. Poll watcher / election-day operations
 
-DPG explicitly discussed poll watchers, Election Day voted/not-voted tracking, and war-room style reporting.
+DPG explicitly discussed poll watchers, Election Day voted/not-voted tracking, and war-room style reporting. This is the next major product discovery track after controlled beta QA and production hardening.
 
 Starter/foundation:
 
 - do **not** ship Josh/Tina's implementation
-- keep out of starter UI unless it is clearly generic and stable
+- keep out of starter UI until DPG defines the workflow
+- reuse neutral building blocks only: users/roles, precincts, GEC voters, audit logs, realtime updates, and reports
 
-Core build:
+Core build to scope with DPG/Mike Weekly:
 
-- design with DPG from scratch
 - DPG-owned poll watcher workflow
-- precinct-scoped poll watcher access
-- voted/not-voted tracking
+- poll watcher role and training mode
+- precinct/polling-place assignments
+- fast voted/not-voted checkoff by voter/precinct
+- audit trail for checkoff changes
 - turnout/call-list dashboard
+- war-room summary by village/precinct/time
+- escalation/issue notes from polling places
+- data visibility rules for poll watchers vs admins
 - Mike Weekly should be included in scoping/training before the August 1 primary
 
 ### 12. DPG quota/period tracking
@@ -240,29 +246,31 @@ Open questions:
 
 ### 13. Maps/GIS/heatmaps
 
-DPG asked about mapping voter locations, precinct maps, and possible heat maps.
+DPG asked about mapping voter locations, precinct maps, and possible heat maps. This remains deferred until DPG confirms the use case and the address/geocoding quality is good enough.
 
-Starter/foundation:
+Potential build:
 
-- defer
-
-Core build:
-
-- map voter locations by public/DPG data
+- map GEC voters and DPG contacts by geocoded address where reliable
 - precinct/village visualizations
-- heatmaps if useful
+- organizer territory maps
+- turnout or contact-density heatmaps
+- household/canvass route map support
+
+Open constraints:
+
+- Guam addresses and PO boxes may not geocode cleanly
+- mapping may require Google Maps/Mapbox costs and API keys
+- voter privacy/role visibility needs DPG approval
 
 ### 14. OCR/photo/ID scanning
 
-DPG discussed paper/photo/OCR type possibilities indirectly through blue-sheet automation and later potential scan/import flows.
+DPG discussed paper/photo/OCR type possibilities indirectly through paper intake/import possibilities. This remains deferred.
 
-Starter/foundation:
-
-- defer unless already generic and hidden behind admin/test flow
-
-Core build:
+Potential build:
 
 - DPG-specific paper/OCR intake only if DPG defines the form/process
+- photo/ID capture only if there is a clear lawful/operational need and DPG approves access rules
+- scanned signup/card import queue with human review
 - avoid Josh/Tina blue-block-list assumptions
 
 ---
@@ -303,13 +311,18 @@ Status: implemented. Membership is hidden from the active manual workflow and re
 - signup-link delete/archive lifecycle: implemented.
 - SMS/email templates: implemented starter templates.
 - recipient review: implemented through dry-run preview and count confirmation before live sends.
-- SMS delivery status and resend-to-failed/undelivered: requested in the May 20 demo, pending provider-status integration.
+- SMS/email delivery status and resend-to-failed/undelivered/bounced/delayed/suppressed/unknown: implemented through recipient-level provider tracking, ClickSend receipt sync, Resend webhooks, and failed-only resend jobs.
 - DPG quota/period tracking: requested in the May 20 demo; foundation merged in PR #41 with detailed goal/leaderboard rules pending DPG feedback.
 - exports/import reports: DPG/GEC contact cross-reference reports are implemented; explicit non-GEC list types and official member-roster/registered-Democrat list-lineage reporting remain pending actual DPG list samples.
 
 ## Phase 5: Election operations
 
-- poll watcher
+Scope next with DPG/Mike Weekly before implementation:
+
+- poll watcher role and training mode
+- precinct/polling-place assignments
 - voted/not-voted tracking
+- audit trail for turnout/checkoff edits
 - war-room dashboard
-- maps/heatmaps
+- GOTV call-list/priority follow-up views
+- maps/heatmaps only if useful and technically reliable

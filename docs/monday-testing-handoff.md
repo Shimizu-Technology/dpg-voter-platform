@@ -50,7 +50,7 @@ Live SMS/email sends should only be tested with controlled DPG-approved recipien
 - DPG/GEC contact cross-reference reports are implemented; official member-roster and registered-Democrat list-lineage reports still need real DPG list samples.
 - Support/lean/donation tracking is not finished.
 - QR/share attribution is implemented; print-ready/downloadable QR assets are not finished.
-- Election Day, poll watcher, turnout, and war-room workflows are not built yet.
+- Election Day, poll watcher, turnout, and war-room workflows are not built yet and should be scoped with DPG/Mike Weekly before implementation.
 - Maps/GIS, autodialer, OCR, and ID/photo intake are later add-ons.
 
 ## Smoke test script
@@ -144,7 +144,12 @@ Live SMS/email sends should only be tested with controlled DPG-approved recipien
 - Try starter templates.
 - Run dry-run preview and inspect recipient count/sample.
 - Confirm live send is blocked until recipient review/count confirmation is present.
+- Select a recent controlled blast and confirm the delivery panel loads.
+- Use Check receipts for SMS where ClickSend receipts are available.
+- Confirm resend failed targets only failed/undelivered/delayed/unknown recipients.
 - Open Email Blasts and repeat the same dry-run flow.
+- Select a recent controlled email blast and confirm Refresh status reloads the delivery rows.
+- Confirm resend failed targets only failed/bounced/delayed/suppressed/unknown recipients.
 - Do not send a live blast unless approved by Leon/DPG and using a controlled recipient set.
 
 ## Success criteria for the current deployed QA pass
@@ -199,4 +204,6 @@ Ask testers to send:
 - Contact-attempt correction, address normalization, GEC candidate review, and follow-up status sync are merged.
 - Outreach queue latest-attempt display and inline logging are merged.
 - Communications governance for SMS/email blasts is merged.
-- The next recommended product phase is guided DPG workflow review plus real list-sample collection, then explicit list types and roster/registered-Democrat list-lineage reporting.
+- SMS/email delivery status and failed-only resend is merged.
+- Intake review stale-row/error visibility fixes are merged.
+- The next recommended product phase is guided DPG workflow review, production hardening, real list-sample collection, and Election Day/poll-watcher scoping before explicit list types and roster/registered-Democrat list-lineage reporting.

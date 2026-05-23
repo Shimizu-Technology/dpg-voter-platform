@@ -8,14 +8,17 @@ This repository is a clean DPG-specific application forked from Shimizu Technolo
 - Reusable neutral foundation remains: public signup, contacts/supporters, voter help, imports/exports, reports, users/roles, districts/precincts, settings, and audit logs.
 
 ## Deferred unless DPG explicitly scopes it
-- Election-day command center
-- Poll-site observer operations
-- Gamified collection targets
+- Election-day command center until scoped with DPG/Mike Weekly
+- Poll-site observer operations until scoped with DPG/Mike Weekly
+- Gamified collection targets beyond DPG-owned quota/period foundation
 - Campaign-specific event, sign, or parade workflows
-- OCR paper-form pipeline
+- GIS/maps/heatmaps until DPG confirms use case and data quality
+- OCR/photo/ID paper-form pipeline until DPG defines forms and access rules
+- Autodialer integration until DPG identifies the tool/process
 
 ## Current planning docs
 - `current-project-status.md` - latest project status, what is implemented, caveats, and deferred work.
-- `next-implementation-plan.md` - immediate guided walkthrough checklist and next product phases after PR #37.
+- `next-implementation-plan.md` - immediate guided walkthrough checklist and next product phases after PR #44.
 - `dpg-product-blueprint.md` - source-of-truth product model and long-term platform plan.
 - `monday-testing-handoff.md` - tester walkthrough script; historical filename, now used as the general DPG handoff.
+- `remaining-work-roadmap.md` - post-PR #44 roadmap for beta QA, production hardening, Election Day/poll watchers, list imports, GIS/OCR/autodialer, and other deferred modules.
