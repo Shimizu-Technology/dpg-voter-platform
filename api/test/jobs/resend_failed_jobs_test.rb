@@ -49,6 +49,40 @@ class ResendFailedJobsTest < ActiveJob::TestCase
     SmsSyncReceiptsJob.const_set(:BATCH_DELAY, previous_batch_delay)
   end
 
+  test "sms receipt sync job does not regress terminal delivery statuses" do
+    user = User.create!(clerk_id: "clerk-sms-sync-terminal", email: "sms-sync-terminal@example.com", name: "SMS Sync Terminal", role: "district_coordinator")
+    village = Village.create!(name: "SMS Sync Terminal Village")
+    supporter = Supporter.create!(
+      first_name: "Terminal", last_name: "Recipient", print_name: "Terminal Recipient",
+      contact_number: "6715556399",
+      village: village,
+      source: "staff_entry",
+      opt_in_text: true,
+      status: "active"
+    )
+    blast = SmsBlast.create!(status: "completed", message: "DPG update", total_recipients: 1, sent_count: 1, initiated_by: user)
+    delivery = OutreachDelivery.create!(
+      channel: "sms",
+      sms_blast: blast,
+      supporter: supporter,
+      recipient: supporter.contact_number,
+      provider: "clicksend",
+      provider_message_id: "MSG-terminal",
+      status: "delivered"
+    )
+
+    calls = 0
+    with_stubbed_singleton_method(ClicksendClient, :sms_receipt, lambda { |_message_id|
+      calls += 1
+      { success: true, receipt: { "status_code" => 0, "status_text" => "Unknown" } }
+    }) do
+      SmsSyncReceiptsJob.perform_now(sms_blast_id: blast.id)
+    end
+
+    assert_equal 0, calls
+    assert_equal "delivered", delivery.reload.status
+  end
+
   test "sms resend job resets queued deliveries when batch send is interrupted" do
     user = User.create!(clerk_id: "clerk-sms-resend-job", email: "sms-resend-job@example.com", name: "SMS Resend Job", role: "district_coordinator")
     village = Village.create!(name: "SMS Job Village")

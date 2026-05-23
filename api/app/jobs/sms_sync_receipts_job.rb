@@ -5,6 +5,7 @@ class SmsSyncReceiptsJob < ApplicationJob
 
   BATCH_SIZE = 100
   BATCH_DELAY = 1.0
+  TERMINAL_STATUSES = %w[delivered undelivered failed bounced suppressed complained].freeze
 
   def perform(sms_blast_id:)
     blast = SmsBlast.find_by(id: sms_blast_id)
@@ -22,7 +23,10 @@ class SmsSyncReceiptsJob < ApplicationJob
   private
 
   def syncable_deliveries(blast)
-    blast.outreach_deliveries.where(provider: "clicksend").where.not(provider_message_id: [ nil, "" ])
+    blast.outreach_deliveries
+      .where(provider: "clicksend")
+      .where.not(provider_message_id: [ nil, "" ])
+      .where.not(status: TERMINAL_STATUSES)
   end
 
   def sync_batch(deliveries)
