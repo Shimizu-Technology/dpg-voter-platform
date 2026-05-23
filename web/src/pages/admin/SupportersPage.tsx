@@ -329,6 +329,7 @@ export default function SupportersPage() {
   });
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [reviewModalError, setReviewModalError] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const debouncedSearch = useDebouncedValue(search, 250);
   const contactClassificationParam = [REVIEWED_CLASSIFICATION_FILTER, ALL_CLASSIFICATIONS_FILTER].includes(classificationFilter) ? undefined : classificationFilter || undefined;
@@ -508,12 +509,16 @@ export default function SupportersPage() {
       void queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
     onError: (error: unknown) => {
+      const message = getErrorMessage(error, 'Could not save this intake review.');
       setActionMessage(null);
-      setActionError(getErrorMessage(error, 'Could not save this intake review.'));
+      setActionError(message);
+      setReviewModalError(message);
+      void queryClient.invalidateQueries({ queryKey: ['supporters'] });
     },
   });
 
   const openIntakeReview = (supporter: SupporterItem, classification = 'active_contact') => {
+    setReviewModalError(null);
     setReviewingSupporter(supporter);
     setReviewDraft({
       decision: isTerminalIntakeClassification(classification) ? 'reject' : 'approve',
@@ -529,14 +534,17 @@ export default function SupportersPage() {
 
   const submitIntakeReview = () => {
     if (!reviewingSupporter) return;
+    setReviewModalError(null);
     if (reviewingSupporter.potential_duplicate && reviewDraft.decision === 'approve') {
       setActionMessage(null);
       setActionError('Resolve or dismiss the duplicate warning before approving this contact into DPG records. You can also reject this intake as Duplicate.');
+      setReviewModalError('Resolve or dismiss the duplicate warning before approving this contact into DPG records. You can also reject this intake as Duplicate.');
       return;
     }
     if (hasAnyIntakeContactAttemptField(reviewDraft) && !hasCompleteIntakeContactAttempt(reviewDraft)) {
       setActionMessage(null);
       setActionError('Choose both a contact method and outcome for outreach, or leave outreach blank.');
+      setReviewModalError('Choose both a contact method and outcome for outreach, or leave outreach blank.');
       return;
     }
     reviewIntakeMutation.mutate({ supporterId: reviewingSupporter.id, draft: reviewDraft });
@@ -1253,6 +1261,11 @@ export default function SupportersPage() {
                 </button>
               </div>
               <div className="space-y-4 px-5 py-4">
+                {reviewModalError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {reviewModalError}
+                  </div>
+                )}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="space-y-1.5">
                       <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Record status</span>

@@ -32,10 +32,10 @@ export function contactAttemptOutcomeLabel(outcome?: string | null) {
 }
 
 export function getErrorMessage(error: unknown, fallback = 'The request failed.') {
-  if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error && 'response' in error) {
     const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
     return response?.data?.message || response?.data?.error || fallback;
   }
+  if (error instanceof Error) return error.message;
   return fallback;
 }
