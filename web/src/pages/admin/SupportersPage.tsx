@@ -401,6 +401,7 @@ export default function SupportersPage() {
       verification_status: verificationFilter || undefined,
       contact_classification: contactClassificationParam,
       exclude_contact_classification: excludeContactClassificationParam,
+      review_status: isIntakeView ? 'pending' : undefined,
       support_status: supportStatusFilter || undefined,
       registered_voter_status: registeredStatusFilter || undefined,
       support_need: supportNeedFilter || undefined,
