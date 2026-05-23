@@ -989,14 +989,23 @@ module Api
           )
         end
 
-        supporter.update!(
+        old_review_state = supporter.slice("contact_classification", "review_status")
+        updates = {
           review_status: "approved",
           reviewed_at: Time.current,
           reviewed_by_user_id: current_user.id
-        )
+        }
+        if supporter.contact_classification == "new_intake"
+          updates[:contact_classification] = "active_contact"
+          updates[:classified_at] = Time.current
+          updates[:classified_by_user_id] = current_user.id
+        end
+
+        supporter.update!(updates)
 
         log_audit!(supporter, action: "supporter_review_approved", changed_data: {
-          "review_status" => [ "pending", "approved" ]
+          "before" => old_review_state,
+          "after" => supporter.slice("contact_classification", "review_status")
         }, normalize: true)
         CampaignBroadcast.supporter_updated(supporter, action: "supporter_review_approved")
 
