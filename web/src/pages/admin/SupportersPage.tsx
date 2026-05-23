@@ -453,6 +453,7 @@ export default function SupportersPage() {
           verification_status: verificationFilter || undefined,
           contact_classification: contactClassificationParam,
           exclude_contact_classification: excludeContactClassificationParam,
+          review_status: isIntakeView ? 'pending' : undefined,
           support_status: supportStatusFilter || undefined,
           registered_voter_status: registeredStatusFilter || undefined,
           support_need: supportNeedFilter || undefined,
@@ -465,7 +466,7 @@ export default function SupportersPage() {
         }),
       });
     }
-  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient]);
+  }, [data, page, perPage, viewKey, debouncedSearch, effectiveVillageFilter, precinctFilter, sourceFilter, quotaPeriodFilter, optInFilter, verificationFilter, classificationFilter, supportStatusFilter, contactClassificationParam, excludeContactClassificationParam, registeredStatusFilter, supportNeedFilter, lifecycleFilter, unassignedPrecinct, sortBy, sortDir, queryClient, isIntakeView]);
 
   const assignPrecinctMutation = useMutation({
     mutationFn: ({ supporterId, precinctId }: { supporterId: number; precinctId: number }) =>
