@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Mail, Send, Users, Zap, CheckCircle, AlertTriangle, Eye } from 'lucide-react';
+import { Mail, Send, Users, Zap, CheckCircle, AlertTriangle, Eye, RefreshCw } from 'lucide-react';
 import { getEmailStatus, sendEmailBlast, getVillages, getEmailBlasts, getEmailBlastDeliveries, resendFailedEmailBlast } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
 import type { OutreachRecipient } from '../../lib/outreachTypes';
@@ -99,7 +99,7 @@ export default function EmailPage() {
     queryFn: getEmailBlasts,
   });
 
-  const { data: deliveryData, refetch: refetchDeliveries } = useQuery<{ deliveries: DeliveryRow[]; counts: Record<string, number> }>({
+  const { data: deliveryData, refetch: refetchDeliveries, isFetching: deliveriesFetching } = useQuery<{ deliveries: DeliveryRow[]; counts: Record<string, number> }>({
     queryKey: ['emailBlastDeliveries', selectedBlastId],
     queryFn: () => getEmailBlastDeliveries(selectedBlastId!),
     enabled: selectedBlastId !== null,
@@ -302,11 +302,11 @@ export default function EmailPage() {
               </p>
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
               <button
                 onClick={() => previewMutation.mutate()}
                 disabled={!subject || !body || previewMutation.isPending}
-                className="btn-secondary flex-1 flex items-center justify-center gap-2"
+                className="flex-1 rounded-xl border border-primary bg-[var(--surface-raised)] px-4 py-3 text-sm font-semibold text-primary transition-all hover:bg-blue-50 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {previewMutation.isPending ? (
                   <>
@@ -314,7 +314,7 @@ export default function EmailPage() {
                   </>
                 ) : (
                   <>
-                    <Eye className="w-4 h-4" /> Preview Recipients
+                    <Eye className="w-4 h-4" /> Preview (Dry Run)
                   </>
                 )}
               </button>
@@ -325,7 +325,7 @@ export default function EmailPage() {
                   }
                 }}
                 disabled={!canSend || sendMutation.isPending}
-                className="btn-primary flex-1 flex items-center justify-center gap-2"
+                className="flex-1 rounded-xl bg-cta px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {sendMutation.isPending ? (
                   <>
@@ -359,7 +359,7 @@ export default function EmailPage() {
 
         {/* Preview Result */}
         {previewResult && (
-          <div className="app-card mb-4 border-l-4 border-l-blue-500">
+          <div className="app-card p-5 mb-4 border-l-4 border-l-blue-500">
             <h3 className="font-medium text-[var(--text-primary)] mb-3 flex items-center gap-2">
               <Eye className="w-5 h-5 text-blue-500" /> Preview Results
             </h3>
@@ -426,7 +426,7 @@ export default function EmailPage() {
 
         {/* Sent Result */}
         {sentResult && (
-          <div className="app-card mb-4 border-l-4 border-l-green-500">
+          <div className="app-card p-5 mb-4 border-l-4 border-l-green-500">
             <div className="flex items-center gap-3">
               <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
               <div>
@@ -443,9 +443,14 @@ export default function EmailPage() {
           <EmailDeliveryPanel
             deliveries={deliveryData.deliveries}
             counts={deliveryData.counts}
+            onRefresh={() => {
+              void refetchDeliveries();
+              void refetchBlasts();
+            }}
             onResend={() => {
               if (window.confirm('Resend this email only to failed, bounced, delayed, suppressed, or unknown recipients?')) resendFailedMutation.mutate();
             }}
+            refreshing={deliveriesFetching}
             resending={resendFailedMutation.isPending}
           />
         )}
@@ -496,12 +501,16 @@ export default function EmailPage() {
 function EmailDeliveryPanel({
   deliveries,
   counts,
+  onRefresh,
   onResend,
+  refreshing,
   resending,
 }: {
   deliveries: DeliveryRow[];
   counts: Record<string, number>;
+  onRefresh: () => void;
   onResend: () => void;
+  refreshing: boolean;
   resending: boolean;
 }) {
   const deliveryIdsWithResends = new Set(deliveries.map((delivery) => delivery.resend_of_id).filter((id): id is number => id != null));
@@ -514,14 +523,25 @@ function EmailDeliveryPanel({
           <h3 className="font-medium text-[var(--text-primary)]">Email delivery status</h3>
           <p className="text-xs text-[var(--text-secondary)]">Resend webhooks update delivered, bounced, delayed, failed, and spam complaint states.</p>
         </div>
-        <button
-          type="button"
-          onClick={onResend}
-          disabled={resending || resendableCount === 0}
-          className="rounded-lg bg-cta px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-        >
-          {resending ? 'Resending...' : `Resend failed (${resendableCount})`}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh status'}
+          </button>
+          <button
+            type="button"
+            onClick={onResend}
+            disabled={resending || resendableCount === 0}
+            className="rounded-lg bg-cta px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            {resending ? 'Resending...' : `Resend failed (${resendableCount})`}
+          </button>
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2 text-xs">
         {Object.entries(counts).map(([status, count]) => (
