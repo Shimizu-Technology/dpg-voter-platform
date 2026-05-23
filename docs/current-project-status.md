@@ -321,8 +321,8 @@ Because the app is already deployed and the QR/search/usability polish, DPG quot
 3. **Collect real DPG list samples**
    DPG requested official member roster, registered Democrat, supporter/contact, and custom list cross-reference work. Do not build schema-specific importers until DPG provides actual files or sample columns. GEC import is the exception because we already have real GEC files.
 
-4. **Election Day/poll-watcher discovery**
-   Scope poll watcher roles, precinct assignments, voted/not-voted checkoff, war-room turnout dashboards, and Mike Weekly training needs with DPG before building. Do not copy Josh/Tina election-day workflows.
+4. **Election Day/poll-watcher implementation**
+   The adjacent `campaign-tracker` poll watcher/war-room implementation has been reviewed and is a legitimate technical blueprint for DPG because DPG explicitly requested poll watcher and voted/not-voted workflows. Build the DPG version in phases: Poll Watcher MVP first, then Election Day Dashboard, assignment/admin polish, and training mode. Adapt language, permissions, ride-to-polls metrics, and visibility rules to DPG; do not import another campaign's private operating playbook.
 
 5. **List types + list-lineage reporting after samples**
    Add DPG contacts/supporters, official member roster, registered Democrat, and custom list imports once samples exist. Then refine cross-reference reports so list origin, DPG support status, future official membership status, and GEC voter status are clear.
@@ -342,3 +342,5 @@ Because the app is already deployed and the QR/search/usability polish, DPG quot
 - `docs/monday-testing-handoff.md` - now a general DPG tester handoff script despite the old filename.
 - `docs/clean-room-implementation-plan.md` - boundary rules and cleanup rationale.
 - `docs/proprietary-vs-reusable-review.md` - Josh/Tina vs reusable platform analysis.
+- `docs/remaining-work-roadmap.md` - post-PR #44 roadmap of remaining product tracks.
+- `docs/poll-watcher-implementation-plan.md` - detailed campaign-tracker review and DPG poll watcher implementation plan.

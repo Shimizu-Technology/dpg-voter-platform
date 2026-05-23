@@ -67,8 +67,8 @@ Recommended next sequence:
 2. **Production readiness**
    Confirm DPG-specific Render/Netlify/Neon/Clerk services, backups, domain/CORS, live outreach credentials, Resend webhook secret, and Clerk production-mode settings.
 
-3. **Election Day / poll-watcher scoping**
-   Meet with DPG and Mike Weekly before implementation. Define poll watcher roles, precinct assignments, voted/not-voted checkoff, audit expectations, war-room dashboards, training timeline, and what data poll watchers can/cannot see. Do not copy Josh/Tina election-day workflows.
+3. **Election Day / poll-watcher implementation**
+   Use the adjacent `campaign-tracker` poll watcher/war-room implementation as the technical blueprint, but adapt it to DPG language, permissions, and operations. Start with a conservative Poll Watcher MVP, then add the DPG Election Day Dashboard. See `docs/poll-watcher-implementation-plan.md` for the detailed review and plan.
 
 4. **Real DPG list samples**
    Collect active list, inactive list, official member roster, registered Democrat list, and supporter/contact file samples before schema-specific list importers.
@@ -241,17 +241,16 @@ Still future:
 
 ### 6. Election Day / poll-watcher scope
 
-Do not copy Josh/Tina election-day workflows directly. Scope this with DPG first.
+Status: recommended next major build. The `campaign-tracker` app has a mature implementation that is legitimate to use as a technical blueprint because DPG explicitly requested poll watcher, voted/not-voted, and war-room workflows. The DPG implementation must still use DPG-specific language, roles, visibility rules, and dashboard assumptions.
 
-Likely build:
+Recommended build sequence:
 
-- poll watcher role
-- assigned precinct access
-- fast voter checkoff
-- real-time voted/not-voted tracking
-- turnout dashboard
-- war-room/call-list view
-- audit trail for turnout changes
+- PR 1: Poll Watcher MVP with role, precinct assignments, active election-day GEC list, mobile voter search/checkoff, turnout audit logging, and observed-elsewhere handling
+- PR 2: DPG Election Day Dashboard with village/precinct turnout, not-yet-voted linked DPG supporters, ride-to-polls requests, exceptions, and recent poll watcher activity
+- PR 3: user assignment/admin polish for Poll Watcher role and multiple precinct assignments
+- PR 4: training/test mode and DPG/Mike Weekly handoff checklist
+
+See `docs/poll-watcher-implementation-plan.md` for the detailed plan.
 
 ### 7. Later add-ons
 

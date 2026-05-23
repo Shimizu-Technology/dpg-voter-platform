@@ -57,31 +57,41 @@ After the guided beta pass, update handoff language around anything DPG finds co
 
 ### 4. Election Day / poll watchers
 
-This is the most important next feature area, but it should be scoped before implementation with DPG and Mike Weekly.
+This is the most important next feature area. The adjacent `campaign-tracker` application has a mature poll watcher and war-room implementation, and we should use it as the technical blueprint for DPG while adapting language, permissions, and assumptions to DPG's party operations needs. See `docs/poll-watcher-implementation-plan.md` for the detailed review and build plan.
 
-Likely scope:
+Recommended phased scope:
 
-- Poll Watcher role
-- precinct/polling-place assignments
-- mobile-first voter search/checkoff
-- voted/not-voted status by voter and precinct
-- fast line/check-in workflow for poll watchers
-- audit trail for every turnout/checkoff change
-- issue/escalation notes from polling places
-- admin war-room dashboard by village/precinct/time
-- GOTV/call-list view for not-yet-voted supporters or contacts
-- training mode or test election mode
-- role visibility rules so poll watchers only see what they need
+1. Poll Watcher MVP:
+   - Poll Watcher role
+   - precinct/polling-place assignments
+   - active election-day GEC list
+   - mobile-first voter search/checkoff
+   - voted/not-voted/observed-elsewhere status by voter and precinct
+   - audit trail for every turnout/checkoff change
+   - minimal poll watcher visibility
+2. Election Day Dashboard:
+   - village/precinct turnout summary
+   - issue/escalation notes from polling places
+   - not-yet-voted linked DPG supporters/contacts
+   - ride-to-polls requests
+   - observed-elsewhere reconciliation queue
+   - admin/field organizer dashboard by village/precinct/time
+3. User assignment/training polish:
+   - precinct assignment UI
+   - training/test mode
+   - DPG/Mike Weekly training checklist
 
 Open questions:
 
 - What exactly can poll watchers legally/operationally record?
+- Should they mark individual voters, submit aggregate counts, or both?
 - Will they search by name, registration number, precinct list, or paper roster order?
 - Who can correct a mistaken voted/not-voted mark?
-- How often does the war room need updates?
+- Should poll watchers see any DPG contact/phone info, or only GEC voter rows?
+- How often does the dashboard need updates?
 - What training date is needed before the August 1 primary?
 
-Clean-room guardrail: do not copy Josh/Tina election-day operating workflows or private playbooks. Reuse only neutral platform primitives like roles, precincts, GEC voters, audit logs, and realtime updates.
+Clean-room guardrail: do not copy Josh/Tina election-day operating workflows or private playbooks. Reuse only neutral platform primitives like roles, precincts, GEC voters, audit logs, and realtime updates, and implement DPG-specific language/workflows because DPG explicitly requested this module.
 
 ### 5. DPG list imports and list lineage
 

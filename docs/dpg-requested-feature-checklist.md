@@ -200,7 +200,7 @@ Core build:
 
 ### 11. Poll watcher / election-day operations
 
-DPG explicitly discussed poll watchers, Election Day voted/not-voted tracking, and war-room style reporting. This is the next major product discovery track after controlled beta QA and production hardening.
+DPG explicitly discussed poll watchers, Election Day voted/not-voted tracking, and war-room style reporting. This is the next major product track after controlled beta QA and production hardening. The adjacent `campaign-tracker` implementation has been reviewed and should be used as the technical blueprint while adapting the workflow to DPG language, permissions, and operational needs.
 
 Starter/foundation:
 
@@ -208,18 +208,22 @@ Starter/foundation:
 - keep out of starter UI until DPG defines the workflow
 - reuse neutral building blocks only: users/roles, precincts, GEC voters, audit logs, realtime updates, and reports
 
-Core build to scope with DPG/Mike Weekly:
+Core build plan:
 
 - DPG-owned poll watcher workflow
 - poll watcher role and training mode
 - precinct/polling-place assignments
-- fast voted/not-voted checkoff by voter/precinct
+- active election-day GEC list
+- fast voted/not-voted/observed-elsewhere checkoff by voter/precinct
 - audit trail for checkoff changes
-- turnout/call-list dashboard
-- war-room summary by village/precinct/time
+- DPG Election Day dashboard by village/precinct/time
+- not-yet-voted linked DPG supporters/contacts
+- ride-to-polls requests
 - escalation/issue notes from polling places
 - data visibility rules for poll watchers vs admins
 - Mike Weekly should be included in scoping/training before the August 1 primary
+
+See `docs/poll-watcher-implementation-plan.md` for the implementation plan.
 
 ### 12. DPG quota/period tracking
 

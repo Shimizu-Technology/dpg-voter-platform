@@ -22,3 +22,4 @@ This repository is a clean DPG-specific application forked from Shimizu Technolo
 - `dpg-product-blueprint.md` - source-of-truth product model and long-term platform plan.
 - `monday-testing-handoff.md` - tester walkthrough script; historical filename, now used as the general DPG handoff.
 - `remaining-work-roadmap.md` - post-PR #44 roadmap for beta QA, production hardening, Election Day/poll watchers, list imports, GIS/OCR/autodialer, and other deferred modules.
+- `poll-watcher-implementation-plan.md` - detailed review of the adjacent campaign-tracker poll watcher/war-room implementation and the DPG adaptation plan.
