@@ -60,6 +60,10 @@ export function useCampaignUpdates(onEvent?: (event: CampaignEvent) => void, ena
         'referral-codes',
         'reports-list',
       ],
+      poll_report: [
+        'poll_watcher',
+        'dashboard',
+      ],
     };
 
     const keys = invalidations[event.type] || [];

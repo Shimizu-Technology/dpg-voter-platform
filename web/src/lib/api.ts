@@ -119,6 +119,15 @@ export const getEmailBlasts = () => api.get('/email/blasts').then(r => r.data);
 export const getEmailBlastStatus = (id: number) => api.get(`/email/blasts/${id}`).then(r => r.data);
 export const getEmailBlastDeliveries = (id: number) => api.get(`/email/blasts/${id}/deliveries`).then(r => r.data);
 export const resendFailedEmailBlast = (id: number) => api.post(`/email/blasts/${id}/resend_failed`).then(r => r.data);
+
+// Election Day / poll watcher
+export const getPollWatcher = () => api.get('/poll_watcher').then(r => r.data);
+export const submitPollReport = (data: JsonRecord) => api.post('/poll_watcher/report', { report: data }).then(r => r.data);
+export const getPrecinctHistory = (id: number) => api.get(`/poll_watcher/precinct/${id}/history`).then(r => r.data);
+export const getPollWatcherStrikeList = (params: QueryParams) =>
+  api.get('/poll_watcher/strike_list', { params }).then(r => r.data);
+export const updateStrikeListTurnout = (voterId: number, data: JsonRecord) =>
+  api.patch(`/poll_watcher/strike_list/${voterId}/turnout`, { turnout: data }).then(r => r.data);
 // Import
 export const uploadImportPreview = (file: File) => {
   const form = new FormData();

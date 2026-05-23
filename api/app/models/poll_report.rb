@@ -12,10 +12,10 @@ class PollReport < ApplicationRecord
   scope :today, -> { where("reported_at >= ?", Date.current.beginning_of_day) }
   scope :chronological, -> { order(reported_at: :desc) }
 
-  # Get the latest report for each precinct
+  # Get the latest report for each precinct. Keep this portable across PostgreSQL
+  # and SQLite so controller tests do not depend on DISTINCT ON.
   def self.latest_per_precinct
-    where.not(report_type: "not_on_list")
-      .select("DISTINCT ON (precinct_id) *")
-      .order(:precinct_id, reported_at: :desc)
+    eligible = where.not(report_type: "not_on_list")
+    where(id: eligible.select("MAX(poll_reports.id)").group(:precinct_id))
   end
 end

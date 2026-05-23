@@ -58,18 +58,25 @@ module Api
             can_access_data_team: can_access_data_team?,
             can_access_reports: can_access_reports?,
             can_access_qr: can_access_qr?,
+            can_access_poll_watcher: can_access_poll_watcher?,
             can_import_supporters: can_import_supporters?,
             can_export_supporters: can_export_supporters?,
             can_upload_gec: can_upload_gec?,
             can_bulk_vet: can_bulk_vet?,
             can_review_public: can_review_public?,
-            default_route: "/admin",
+            default_route: default_route_for_current_user,
             manageable_roles: manageable_roles_for_current_user
           }
         }
       end
 
       private
+
+      def default_route_for_current_user
+        return "/admin/poll-watcher" if current_user.poll_watcher?
+
+        "/admin"
+      end
     end
   end
 end

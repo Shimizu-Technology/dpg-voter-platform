@@ -46,6 +46,25 @@ class CampaignBroadcast
       })
     end
 
+    # Election Day poll watcher report submitted
+    def poll_report(report)
+      precinct = report.precinct
+      registered_voters = precinct&.registered_voters.to_i
+      turnout_pct = registered_voters.positive? ? (report.voter_count * 100.0 / registered_voters).round(1) : nil
+
+      broadcast(:poll_report, {
+        report_id: report.id,
+        precinct_id: precinct&.id,
+        precinct_number: precinct&.number,
+        village_id: precinct&.village_id,
+        village_name: precinct&.village&.name,
+        voter_count: report.voter_count,
+        report_type: report.report_type,
+        turnout_pct: turnout_pct,
+        reported_at: report.reported_at&.iso8601
+      })
+    end
+
     # Dashboard stats refresh (can be triggered periodically or on demand)
     def stats_update(stats)
       broadcast(:stats_update, stats)

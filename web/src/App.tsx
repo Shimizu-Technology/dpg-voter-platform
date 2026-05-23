@@ -35,6 +35,7 @@ const SignupLinksPage = lazy(() => import('./pages/admin/SignupLinksPage'));
 const QuotaPeriodsPage = lazy(() => import('./pages/admin/QuotaPeriodsPage'));
 const AuditLogsPage = lazy(() => import('./pages/admin/AuditLogsPage'));
 const OutreachPage = lazy(() => import('./pages/admin/OutreachPage'));
+const PollWatcherPage = lazy(() => import('./pages/admin/PollWatcherPage'));
 const TeamReportsPage = lazy(() => import('./pages/team/TeamReportsPage'));
 
 function LazyFallback() {
@@ -81,7 +82,26 @@ type PermissionKey =
   | 'can_access_duplicates'
   | 'can_access_audit_logs'
   | 'can_access_qr'
+  | 'can_access_poll_watcher'
   | 'can_access_data_team';
+
+function AdminHomeRoute() {
+  const { data, isLoading } = useSession();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <div className="w-8 h-8 border-[3px] border-(--border-soft) border-t-blue-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (data?.permissions?.can_access_poll_watcher && !data.permissions.can_view_supporters) {
+    return <Navigate to={data.permissions.default_route || '/admin/poll-watcher'} replace />;
+  }
+
+  return <DashboardPage />;
+}
 
 function PermissionRoute({ permission, children }: { permission: PermissionKey; children: React.ReactNode }) {
   const { data, isLoading } = useSession();
@@ -135,7 +155,7 @@ export default function App() {
             <Route path="/thank-you" element={<ThankYouPage />} />
 
             {/* Admin — requires Clerk auth */}
-            <Route path="/admin" element={<AdminRoute><DashboardPage /></AdminRoute>} />
+            <Route path="/admin" element={<AdminRoute><AdminHomeRoute /></AdminRoute>} />
             <Route path="/admin/supporters" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupportersPage key="contacts" /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/intake" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupportersPage key="intake" /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/supporters/:id" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><SupporterDetailPage /></PermissionRoute></AdminRoute>} />
@@ -155,6 +175,7 @@ export default function App() {
             <Route path="/admin/districts" element={<AdminRoute><PermissionRoute permission="can_manage_configuration"><DistrictsPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/precincts" element={<AdminRoute><PermissionRoute permission="can_manage_configuration"><PrecinctSettingsPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/outreach" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><OutreachPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/poll-watcher" element={<AdminRoute><PermissionRoute permission="can_access_poll_watcher"><PollWatcherPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/audit-logs" element={<AdminRoute><PermissionRoute permission="can_access_audit_logs"><AuditLogsPage /></PermissionRoute></AdminRoute>} />
 
             {/* Legacy workspace aliases */}
