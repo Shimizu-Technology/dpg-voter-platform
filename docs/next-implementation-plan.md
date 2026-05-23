@@ -1,15 +1,15 @@
 # DPG Voter Platform - Next Implementation Plan
 
 **Created:** May 14, 2026
-**Last updated:** May 22, 2026
-**Status:** Updated after PR #40 beta usability polish and PR #41 DPG quota/period foundation merged to `main`
-**Base commit:** `43daeaa`
+**Last updated:** May 23, 2026
+**Status:** Updated after PR #43 outreach delivery/resend and PR #44 intake review/error handling polish merged to `main`
+**Base commit:** `e0ceb08`
 
 ## Current posture
 
 The DPG platform has completed its first live demo walkthrough with Auntie Stephanie and DPG team members. The demo went well: DPG understood the Intake/GEC/QR/household/duplicate workflows and began discussing real operational use with village organizers, signup contests, quotas/periods, Mike Weekly's poll-watcher team, and future list imports.
 
-The app should now be treated as a controlled beta build for a small DPG tester group, not yet a broad staff rollout. PR #40 addressed the immediate beta usability polish around GEC/address search, QR-code downloads, signup-link lifecycle, and safe demo-data cleanup. PR #41 added the DPG-owned quota/period foundation. The remaining direct demo ask to implement next is SMS/email delivery visibility and resend-to-failed/undelivered recipients.
+The app should now be treated as a controlled beta build for a small DPG tester group, not yet a broad staff rollout. PR #40 addressed the immediate beta usability polish around GEC/address search, QR-code downloads, signup-link lifecycle, and safe demo-data cleanup. PR #41 added the DPG-owned quota/period foundation. PR #43 implemented SMS/email delivery visibility and resend-to-failed/undelivered recipients. PR #44 fixed intake review stale-row/error visibility issues found during local testing and polished the email blast testing flow.
 
 Already in place:
 
@@ -23,12 +23,13 @@ Already in place:
 - Household/address lookup with create/link actions and conservative address normalization.
 - Contact detail with relationship classification, GEC check, follow-up lanes, contact history, editable audited contact-attempt corrections, and audit history.
 - Follow-Up Queue for registration, voter-help, and volunteer follow-up, connected to Contact History.
-- SMS/email dry-run governance, starter templates, and contact-history logging.
+- SMS/email dry-run governance, starter templates, contact-history logging, recipient delivery status, provider receipt/webhook tracking, and failed-only resend.
 - Redesigned Reports workspace, including DPG/GEC cross-reference reports and mismatch reporting.
 - DPG-facing role labels and tightened import/export/contact-attempt permissions.
 - Duplicate Contact Review for DPG contact cleanup, with persistent dismissed-pair history, grouped sidebar count, merge safeguards, and Intake approval blocking for unresolved duplicate warnings.
 - Beta GEC/address search and QR/signup-link lifecycle polish from PR #40.
 - DPG quota/period foundation from PR #41: period management, active-period attribution, dashboard/Signup Links/Reports/Contacts/Intake period filters, period drilldowns, realtime invalidation, and one-active-period safeguards.
+- Intake review conflict/error feedback from PR #44: pending-only Intake queries, inline modal errors, approved-intake data repair, and Guam phone normalization for ClickSend.
 
 ## Before broader DPG rollout
 
@@ -47,27 +48,33 @@ Already in place:
    - reports/exports
    - users/roles
    - audit log
-   - SMS/email dry runs
-4. Collect actual DPG list samples before building list-specific importers beyond GEC and generic contact import.
-5. Update tester handoff language based on where Auntie Stephanie and DPG testers get confused.
+   - SMS/email dry runs, delivery status refresh, and failed-only resend using controlled recipients/fake failures first
+4. Confirm production outreach settings before any real SMS/email use: `DPG_LIVE_OUTREACH_ENABLED`, ClickSend credentials, Resend sender/domain, and `RESEND_WEBHOOK_SIGNING_SECRET`.
+5. Collect actual DPG list samples before building list-specific importers beyond GEC and generic contact import.
+6. Update tester handoff language based on where Auntie Stephanie and DPG testers get confused.
 
 ## Next product recommendation
 
-### SMS/email delivery status and resend
+### Guided beta, production hardening, and Election Day discovery
 
-The next product step should address the remaining concrete May 20 demo ask: DPG wants to see who received/did not receive outreach messages and resend only to failed/undelivered recipients.
+The direct May 20 demo asks around GEC/address search, QR link lifecycle, quota/periods, and SMS/email delivery/resend are now implemented. The next work should shift from feature catch-up to controlled operational validation and DPG-specific Phase 2 discovery.
 
-Recommended next branch:
+Recommended next sequence:
 
-- add recipient-level delivery records for SMS and email blasts
-- store ClickSend `message_id` and Resend email IDs per recipient
-- ingest ClickSend delivery receipts via polling and/or delivery-receipt rules
-- ingest Resend webhook events (`sent`, `delivered`, `delivery_delayed`, `failed`, `bounced`, `complained`, `suppressed`)
-- show blast detail recipient/status tables
-- add resend-only-failed/undelivered actions with safe contact-history logging
-- keep live outreach gated behind existing preview/expected-recipient-count governance
+1. **Guided DPG beta testing**
+   Walk Auntie Stephanie and a small tester group through safe records across Intake, Contacts, GEC, Households, Duplicates, Reports, SMS/email dry runs, delivery status, and failed-only resend.
 
-DPG also confirmed that official active/inactive party lists exist, but schema-specific importers should still wait for actual DPG sample files.
+2. **Production readiness**
+   Confirm DPG-specific Render/Netlify/Neon/Clerk services, backups, domain/CORS, live outreach credentials, Resend webhook secret, and Clerk production-mode settings.
+
+3. **Election Day / poll-watcher implementation**
+   Use the adjacent `campaign-tracker` poll watcher/war-room implementation as the technical blueprint, but adapt it to DPG language, permissions, and operations. Start with a conservative Poll Watcher MVP, then add the DPG Election Day Dashboard. See `docs/poll-watcher-implementation-plan.md` for the detailed review and plan.
+
+4. **Real DPG list samples**
+   Collect active list, inactive list, official member roster, registered Democrat list, and supporter/contact file samples before schema-specific list importers.
+
+5. **Deferred add-on discovery**
+   GIS/maps/heatmaps, OCR/photo intake, ID scanning, and autodialer integration remain valid ideas, but should be scoped only after DPG confirms real operational need and data/process constraints.
 
 ## Next product phases
 
@@ -113,16 +120,24 @@ Clarify before detailed dashboards:
 
 ### 3. SMS/email delivery status and resend
 
-DPG asked to see who received/did not receive messages and to resend only to people who did not receive the first message.
+Status: merged in PR #43, with email UI/refresh and ClickSend Guam-phone polish in PR #44.
 
-Initial scope:
+Implemented scope:
 
 - per-recipient SMS and email delivery status storage
-- blast detail recipient/status table
-- failed/undelivered resend action
-- ClickSend delivery receipt polling and/or delivery receipt rule support
-- Resend webhook event ingestion and signature verification
-- provider IDs stored per recipient so statuses can reconcile back to the original blast
+- provider message IDs for ClickSend and Resend
+- SMS blast delivery table and ClickSend receipt sync
+- Email blast delivery table and Resend webhook ingestion
+- failed/undelivered/bounced/delayed/suppressed/unknown resend actions
+- idempotent resend tracking through `outreach_deliveries`
+- live send governance remains preview/count-confirmation gated
+
+Still needs QA:
+
+- controlled real-provider SMS test
+- controlled real-provider email test
+- Resend webhook production configuration
+- staff confirmation that the status/resend UI is understandable
 
 ### 4. DPG list imports and list lineage
 
@@ -224,27 +239,26 @@ Still future:
 - poll watcher role
 - precinct-specific Election Day access rules
 
-### 6. Election-day scope
+### 6. Election Day / poll-watcher scope
 
-Do not copy Josh/Tina election-day workflows directly. Scope this with DPG first.
+Status: recommended next major build. The `campaign-tracker` app has a mature implementation that is legitimate to use as a technical blueprint because DPG explicitly requested poll watcher, voted/not-voted, and war-room workflows. The DPG implementation must still use DPG-specific language, roles, visibility rules, and dashboard assumptions.
 
-Likely build:
+Recommended build sequence:
 
-- poll watcher role
-- assigned precinct access
-- fast voter checkoff
-- real-time voted/not-voted tracking
-- turnout dashboard
-- war-room/call-list view
-- audit trail for turnout changes
+- PR 1: Poll Watcher MVP with role, precinct assignments, active election-day GEC list, mobile voter search/checkoff, turnout audit logging, and observed-elsewhere handling
+- PR 2: DPG Election Day Dashboard with village/precinct turnout, not-yet-voted linked DPG supporters, ride-to-polls requests, exceptions, and recent poll watcher activity
+- PR 3: user assignment/admin polish for Poll Watcher role and multiple precinct assignments
+- PR 4: training/test mode and DPG/Mike Weekly handoff checklist
+
+See `docs/poll-watcher-implementation-plan.md` for the detailed plan.
 
 ### 7. Later add-ons
 
-- GIS/maps/heatmaps
-- ID/photo intake
-- OCR paper-form intake based on DPG-defined forms
-- autodialer export or integration
-- advanced analytics
+- GIS/maps/heatmaps after address/geocoding quality and DPG map use cases are confirmed
+- ID/photo intake after DPG defines what ID/photo data should be captured and who may access it
+- OCR paper-form intake based on DPG-defined forms, not Josh/Tina blue-sheet assumptions
+- autodialer export or integration after DPG names the tool/process
+- advanced analytics after list types and Election Day data model are clearer
 
 ## Communication posture
 

@@ -1,7 +1,7 @@
 # DPG Deployment And QA Checklist
 
-**Last updated:** May 22, 2026
-**Current verified branch:** `feature/outreach-delivery-status-resend` after PR #42 docs cleanup
+**Last updated:** May 23, 2026
+**Current verified branch:** `main` at `e0ceb08` after PR #44 merge
 
 ## Current deployment status
 
@@ -42,7 +42,7 @@ The main remaining risk is not missing code for the current foundation. It is DP
 
 ## CI and source verification
 
-Latest merged PR #37 passed:
+Latest merged PR #44 passed:
 
 - [x] `api_lint`
 - [x] `api_scan_ruby`
@@ -50,14 +50,21 @@ Latest merged PR #37 passed:
 - [x] `web_lint_build`
 - [x] Greptile review
 
-Latest local PR #37 verification:
+Latest local PR #44 verification:
 
-- [x] Rails focused cross-reference report tests passed.
-- [x] Rails full test suite passed before merge.
-- [x] Rails zeitwerk check passed.
+- [x] Rails focused supporter/controller and ClickSend tests passed.
 - [x] RuboCop passed.
 - [x] Web lint passed.
 - [x] Web build passed, with the existing Vite large chunk warning.
+
+Latest local PR #43 full verification:
+
+- [x] Rails full test suite passed.
+- [x] Rails zeitwerk check passed.
+- [x] RuboCop passed.
+- [x] Brakeman passed with existing ignore file.
+- [x] Bundler audit passed.
+- [x] Web lint/build passed.
 
 Local repo note:
 
@@ -71,7 +78,8 @@ Local repo note:
 - [ ] Public signup submits a test contact.
 - [ ] Thank-you page renders with DPG copy.
 - [ ] Submitted public signup appears in Contacts.
-- [ ] Submitted public signup appears in Intake / `new_intake`.
+- [ ] Submitted public signup appears in Intake while `review_status=pending`.
+- [ ] Approved signup leaves Intake and appears in Contacts as `active_contact`.
 - [ ] Submitted public signup does not count as a supporter until classified.
 
 ## Deployed admin smoke test
@@ -84,6 +92,7 @@ These are the highest priority because the admin side has not yet been thoroughl
 - [ ] Intake filter loads.
 - [ ] Contact detail loads.
 - [ ] Contact classification update saves and persists.
+- [ ] Intake review errors appear inside the review modal when a stale/non-pending row is reviewed.
 - [ ] Contact voter-help/support fields save and persist.
 - [ ] Contact History timeline loads.
 - [ ] Manual contact-attempt logging works.
@@ -142,6 +151,7 @@ These are the highest priority because the admin side has not yet been thoroughl
 - [ ] SMS starter templates populate the message box.
 - [ ] SMS dry-run returns recipient count and sample recipients.
 - [ ] SMS live send is blocked unless recipient review/count confirmation is present.
+- [ ] Guam phone formats such as `6714830219`, `(671) 483-0219`, `+1 671 483 0219`, and 7-digit local numbers are normalized before ClickSend sending in controlled tests.
 - [ ] Controlled single-recipient SMS live test succeeds only when DPG approves.
 - [ ] Email status page/API loads.
 - [ ] Email blast page loads.
@@ -154,6 +164,7 @@ These are the highest priority because the admin side has not yet been thoroughl
 - [ ] ClickSend receipt sync updates recipient delivery status where receipts are available.
 - [ ] SMS resend-to-failed sends only failed/undelivered/delayed/unknown recipients.
 - [ ] Email blast recipient delivery table loads after a controlled blast.
+- [ ] Email delivery status refresh button reloads the selected blast rows without a full page refresh.
 - [ ] Resend webhook updates delivered/bounced/failed/delayed/suppressed recipient status.
 - [ ] Email resend-to-failed sends only failed/bounced/delayed/suppressed/unknown recipients.
 
@@ -164,6 +175,7 @@ These are the highest priority because the admin side has not yet been thoroughl
 - DPG can begin guided familiarization once admin access is created.
 - Do not describe the app as a finished Election Day command center yet.
 - Live outreach is configured/gated, but real sends should only happen intentionally with approved recipients/content.
+- Resend delivery webhooks require `RESEND_WEBHOOK_SIGNING_SECRET`; ClickSend receipt sync is manual/polling-based in the current UI.
 - Auntie Stephanie should be created as `campaign_admin` using her preferred email until DPG role names are polished.
 
 ## Known deferred modules
@@ -172,7 +184,7 @@ These are the highest priority because the admin side has not yet been thoroughl
 - Official DPG member-roster and registered-Democrat list-lineage reports after DPG provides real list samples.
 - Membership stays hidden from the active manual UI until DPG defines the official member-roster workflow; the backend field is reserved for that future work.
 - Any remaining permission/export/delete tuning after DPG tests the current DPG-facing role model.
-- Print-ready/downloadable QR assets beyond the current in-browser QR/share-link attribution workflow.
+- Additional print-ready QR flyer/card templates beyond current QR download.
 - Support/lean/donation tracking.
 - DPG-defined district grouping.
 - Advanced canvassing route/assignment tooling.
