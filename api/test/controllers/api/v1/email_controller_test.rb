@@ -97,6 +97,233 @@ class Api::V1::EmailControllerTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body)
     assert_equal true, payload["queued"]
     assert_equal 1, payload["total_targeted"]
+    assert EmailBlast.exists?(payload["blast_id"])
+  end
+
+  test "email resend failed does not resend the same original twice" do
+    village = Village.create!(name: "Email Resend Village")
+    supporter = Supporter.create!(
+      first_name: "Email", last_name: "Retry", print_name: "Email Retry",
+      contact_number: "6715557100",
+      email: "retry@example.com",
+      village: village,
+      source: "staff_entry",
+      opt_in_email: true,
+      status: "active"
+    )
+    blast = EmailBlast.create!(status: "completed", subject: "DPG retry", body: "Hello {first_name}", initiated_by: @coordinator)
+    original_delivery = OutreachDelivery.create!(
+      channel: "email",
+      email_blast: blast,
+      supporter: supporter,
+      recipient: supporter.email,
+      provider: "resend",
+      status: "failed"
+    )
+
+    with_live_outreach_enabled do
+      assert_enqueued_with(job: EmailResendFailedJob) do
+        post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      end
+      assert_response :accepted
+      post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      assert_response :success
+    end
+
+    assert_equal 1, enqueued_jobs.count { |job| job[:job] == EmailResendFailedJob }
+    assert_equal 1, original_delivery.resends.count
+    assert_equal "queued", original_delivery.resends.first.status
+  end
+
+  test "email resend failed job sends queued resend deliveries" do
+    village = Village.create!(name: "Email Async Resend Village")
+    supporter = Supporter.create!(
+      first_name: "Async", last_name: "Retry", print_name: "Async Retry",
+      contact_number: "6715557150",
+      email: "async-retry@example.com",
+      village: village,
+      source: "staff_entry",
+      opt_in_email: true,
+      status: "active"
+    )
+    blast = EmailBlast.create!(status: "completed", subject: "DPG retry", body: "Hello {first_name}", initiated_by: @coordinator)
+    original_delivery = OutreachDelivery.create!(
+      channel: "email",
+      email_blast: blast,
+      supporter: supporter,
+      recipient: supporter.email,
+      provider: "resend",
+      status: "failed"
+    )
+
+    original = Resend::Emails.method(:send)
+    Resend::Emails.define_singleton_method(:send) { |_payload| { id: "email-resent-async" } }
+
+    with_live_outreach_enabled do
+      perform_enqueued_jobs do
+        post "/api/v1/email/blasts/#{blast.id}/resend_failed", headers: auth_headers(@coordinator)
+      end
+    end
+
+    assert_response :accepted
+    resend = original_delivery.resends.first
+    assert_equal "sent", resend.status
+    assert_equal "email-resent-async", resend.provider_message_id
+  ensure
+    Resend::Emails.define_singleton_method(:send, original) if original
+  end
+
+  test "resend webhook updates email delivery status" do
+    village = Village.create!(name: "Webhook Village")
+    supporter = Supporter.create!(
+      first_name: "Webhook", last_name: "Target", print_name: "Webhook Target",
+      contact_number: "6715557000",
+      email: "webhook@example.com",
+      village: village,
+      source: "staff_entry",
+      opt_in_email: true,
+      status: "active"
+    )
+    blast = EmailBlast.create!(status: "completed", subject: "DPG update", body: "Hello", initiated_by: @coordinator)
+    delivery = OutreachDelivery.create!(
+      channel: "email",
+      email_blast: blast,
+      supporter: supporter,
+      recipient: supporter.email,
+      provider: "resend",
+      provider_message_id: "email-1",
+      status: "sent"
+    )
+
+    post "/api/v1/email/webhooks/resend",
+      params: {
+        type: "email.delivered",
+        created_at: Time.current.iso8601,
+        data: { email_id: "email-1" }
+      }.to_json,
+      headers: { "CONTENT_TYPE" => "application/json" }
+
+    assert_response :success
+    assert_equal "delivered", delivery.reload.status
+  end
+
+  test "resend webhook falls back when event timestamp is malformed" do
+    village = Village.create!(name: "Malformed Webhook Village")
+    supporter = Supporter.create!(
+      first_name: "Malformed", last_name: "Target", print_name: "Malformed Target",
+      contact_number: "6715557050",
+      email: "malformed@example.com",
+      village: village,
+      source: "staff_entry",
+      opt_in_email: true,
+      status: "active"
+    )
+    blast = EmailBlast.create!(status: "completed", subject: "DPG update", body: "Hello", initiated_by: @coordinator)
+    delivery = OutreachDelivery.create!(
+      channel: "email",
+      email_blast: blast,
+      supporter: supporter,
+      recipient: supporter.email,
+      provider: "resend",
+      provider_message_id: "email-malformed",
+      status: "sent"
+    )
+
+    post "/api/v1/email/webhooks/resend",
+      params: {
+        type: "email.delivered",
+        created_at: "not-a-time",
+        data: { email_id: "email-malformed" }
+      }.to_json,
+      headers: { "CONTENT_TYPE" => "application/json" }
+
+    assert_response :success
+    assert_equal "delivered", delivery.reload.status
+    assert delivery.last_event_at.present?
+  end
+
+  test "resend webhook ignores events without email id" do
+    village = Village.create!(name: "Blank Webhook Village")
+    supporter = Supporter.create!(
+      first_name: "Blank", last_name: "Webhook", print_name: "Blank Webhook",
+      contact_number: "6715557200",
+      email: "blank-webhook@example.com",
+      village: village,
+      source: "staff_entry",
+      opt_in_email: true,
+      status: "active"
+    )
+    blast = EmailBlast.create!(status: "completed", subject: "DPG update", body: "Hello", initiated_by: @coordinator)
+    delivery = OutreachDelivery.create!(
+      channel: "email",
+      email_blast: blast,
+      supporter: supporter,
+      recipient: supporter.email,
+      provider: "resend",
+      provider_message_id: nil,
+      status: "failed"
+    )
+
+    post "/api/v1/email/webhooks/resend",
+      params: {
+        type: "email.delivered",
+        created_at: Time.current.iso8601,
+        data: {}
+      }.to_json,
+      headers: { "CONTENT_TYPE" => "application/json" }
+
+    assert_response :success
+    assert_equal "failed", delivery.reload.status
+  end
+
+  test "resend webhook rejects malformed signing secret" do
+    previous_secret = ENV["RESEND_WEBHOOK_SIGNING_SECRET"]
+    ENV["RESEND_WEBHOOK_SIGNING_SECRET"] = "whsec_not-valid-base64@@@"
+
+    post "/api/v1/email/webhooks/resend",
+      params: {
+        type: "email.delivered",
+        created_at: Time.current.iso8601,
+        data: { email_id: "email-malformed-secret" }
+      }.to_json,
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "svix-id" => "msg_bad_secret",
+        "svix-timestamp" => Time.current.to_i.to_s,
+        "svix-signature" => "v1,invalid"
+      }
+
+    assert_response :unauthorized
+  ensure
+    ENV["RESEND_WEBHOOK_SIGNING_SECRET"] = previous_secret
+  end
+
+  test "resend webhook rejects stale signed payloads" do
+    previous_secret = ENV["RESEND_WEBHOOK_SIGNING_SECRET"]
+    secret_bytes = "test-secret-for-svix"
+    ENV["RESEND_WEBHOOK_SIGNING_SECRET"] = "whsec_#{Base64.strict_encode64(secret_bytes)}"
+    body = {
+      type: "email.delivered",
+      created_at: Time.current.iso8601,
+      data: { email_id: "email-stale" }
+    }.to_json
+    timestamp = 10.minutes.ago.to_i.to_s
+    svix_id = "msg_test"
+    signed_payload = "#{svix_id}.#{timestamp}.#{body}"
+    signature = Base64.strict_encode64(OpenSSL::HMAC.digest("SHA256", secret_bytes, signed_payload))
+
+    post "/api/v1/email/webhooks/resend",
+      params: body,
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "svix-id" => svix_id,
+        "svix-timestamp" => timestamp,
+        "svix-signature" => "v1,#{signature}"
+      }
+
+    assert_response :unauthorized
+  ensure
+    ENV["RESEND_WEBHOOK_SIGNING_SECRET"] = previous_secret
   end
 
   private

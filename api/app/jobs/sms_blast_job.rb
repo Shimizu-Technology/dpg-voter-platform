@@ -53,9 +53,11 @@ class SmsBlastJob < ApplicationJob
       end
 
       begin
-        log_contact_attempts!(batch, phones_and_bodies, result[:results], blast)
+        result_rows_by_supporter_id = result_rows_by_supporter_id(batch, phones_and_bodies, result[:results])
+        create_deliveries!(batch, result_rows_by_supporter_id, blast)
+        log_contact_attempts!(batch, result_rows_by_supporter_id, blast)
       rescue StandardError => e
-        Rails.logger.error("[SmsBlastJob] Failed to log contact attempts for blast #{blast.id}: #{e.message}")
+        Rails.logger.error("[SmsBlastJob] Failed to record delivery/contact attempts for blast #{blast.id}: #{e.message}")
       end
     end
 
@@ -73,21 +75,50 @@ class SmsBlastJob < ApplicationJob
     OutreachRecipientQuery.sms_scope(base_scope: Supporter.all, filters: filters)
   end
 
-  def log_contact_attempts!(supporters, phones_and_bodies, result_rows, blast)
-    return if blast.initiated_by_user_id.blank?
-
+  def result_rows_by_supporter_id(_supporters, phones_and_bodies, result_rows)
     messages_by_phone = phones_and_bodies.each_with_object({}) do |message, memo|
       key = normalized_phone_key(message[:to])
       memo[key] ||= []
       memo[key] << message
     end
 
-    result_rows_by_supporter_id = result_rows.each_with_object({}) do |row, memo|
+    result_rows.each_with_object({}) do |row, memo|
       supporter_id = row[:supporter_id] || messages_by_phone[normalized_phone_key(row[:to])]&.shift&.dig(:supporter_id)
       memo[supporter_id] = row if supporter_id
     end
-    now = Time.current
+  end
 
+  def create_deliveries!(supporters, result_rows_by_supporter_id, blast)
+    now = Time.current
+    deliveries = supporters.filter_map do |supporter|
+      result = result_rows_by_supporter_id[supporter.id]
+      next unless result
+
+      status = result[:success] ? "sent" : "failed"
+      {
+        channel: "sms",
+        sms_blast_id: blast.id,
+        supporter_id: supporter.id,
+        recipient: result[:to].presence || supporter.contact_number,
+        provider: "clicksend",
+        provider_message_id: result[:message_id],
+        status: status,
+        provider_status_text: result[:error],
+        sent_at: result[:success] ? now : nil,
+        failed_at: result[:success] ? nil : now,
+        last_event_at: now,
+        created_at: now,
+        updated_at: now
+      }
+    end
+
+    OutreachDelivery.insert_all!(deliveries) if deliveries.any?
+  end
+
+  def log_contact_attempts!(supporters, result_rows_by_supporter_id, blast)
+    return if blast.initiated_by_user_id.blank?
+
+    now = Time.current
     attempts = supporters.filter_map do |supporter|
       result = result_rows_by_supporter_id[supporter.id]
       next unless result

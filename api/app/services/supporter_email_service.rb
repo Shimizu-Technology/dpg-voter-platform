@@ -26,7 +26,7 @@ class SupporterEmailService
 
     # Send a blast email to multiple supporters.
     # Returns { sent: count, failed: count, errors: [] }
-    def send_blast(subject:, body_html:, supporters:, recorded_by_user_id: nil)
+    def send_blast(subject:, body_html:, supporters:, recorded_by_user_id: nil, email_blast: nil)
       return { sent: 0, failed: 0, errors: [ "Email not configured" ] } unless configured?
 
       sent = 0
@@ -38,40 +38,102 @@ class SupporterEmailService
       supporters.find_each do |supporter|
         next if supporter.email.blank?
 
+        personalized_subject = personalize(subject, supporter)
+
         begin
           personalized = personalize(body_html, supporter)
-          Resend::Emails.send(
+          response = Resend::Emails.send(
             {
               from: from_email,
               to: supporter.email,
-              subject: personalize(subject, supporter),
-              html: blast_wrapper_html(personalized)
-            }
-          )
-          sent += 1
-          contact_attempts << contact_attempt_attributes(
-            supporter_id: supporter.id,
-            recorded_by_user_id: recorded_by_user_id,
-            outcome: "attempted",
-            note: "Email blast sent: #{personalize(subject, supporter).to_s.truncate(120)}",
-            recorded_at: now
+              subject: personalized_subject,
+              html: blast_wrapper_html(personalized),
+              tags: email_blast ? [ { name: "email_blast_id", value: email_blast.id.to_s } ] : nil
+            }.compact
           )
         rescue StandardError => e
           failed += 1
+          record_delivery_failure(email_blast, supporter, e.message)
           contact_attempts << contact_attempt_attributes(
             supporter_id: supporter.id,
             recorded_by_user_id: recorded_by_user_id,
             outcome: "unavailable",
-            note: "Email blast failed: #{personalize(subject, supporter).to_s.truncate(120)}. Error: #{e.message}",
+            note: "Email blast failed: #{personalized_subject.to_s.truncate(120)}. Error: #{e.message}",
             recorded_at: now
           )
           errors << "#{supporter.email}: #{e.message}" if errors.length < 10
           Rails.logger.error("[SupporterEmail] blast failed for #{supporter.email}: #{e.class} #{e.message}")
+          next
         end
+
+        sent += 1
+        record_delivery_success(email_blast, supporter, extract_email_id(response), errors)
+        contact_attempts << contact_attempt_attributes(
+          supporter_id: supporter.id,
+          recorded_by_user_id: recorded_by_user_id,
+          outcome: "attempted",
+          note: "Email blast sent: #{personalized_subject.to_s.truncate(120)}",
+          recorded_at: now
+        )
       end
 
       SupporterContactAttempt.insert_all!(contact_attempts.compact) if contact_attempts.any?
       { sent: sent, failed: failed, errors: errors }
+    end
+
+    def record_delivery_success(email_blast, supporter, provider_message_id, errors)
+      return unless email_blast
+
+      create_delivery!(
+        email_blast: email_blast,
+        supporter: supporter,
+        recipient: supporter.email,
+        provider_message_id: provider_message_id,
+        status: "sent"
+      )
+    rescue StandardError => e
+      errors << "#{supporter.email}: delivery tracking failed after send: #{e.message}" if errors.length < 10
+      Rails.logger.error("[SupporterEmail] delivery tracking failed after successful send for #{supporter.email}: #{e.class} #{e.message}")
+    end
+
+    def record_delivery_failure(email_blast, supporter, error)
+      return unless email_blast
+
+      create_delivery!(
+        email_blast: email_blast,
+        supporter: supporter,
+        recipient: supporter.email,
+        provider_message_id: nil,
+        status: "failed",
+        error: error
+      )
+    rescue StandardError => e
+      Rails.logger.error("[SupporterEmail] failed-send delivery tracking failed for #{supporter.email}: #{e.class} #{e.message}")
+    end
+
+    def create_delivery!(email_blast:, supporter:, recipient:, provider_message_id:, status:, error: nil)
+      now = Time.current
+      OutreachDelivery.create!(
+        channel: "email",
+        email_blast: email_blast,
+        supporter: supporter,
+        recipient: recipient,
+        provider: "resend",
+        provider_message_id: provider_message_id,
+        status: status,
+        provider_status_text: error,
+        sent_at: status == "sent" ? now : nil,
+        failed_at: status == "failed" ? now : nil,
+        last_event_at: now
+      )
+    end
+
+    def extract_email_id(response)
+      if response.respond_to?(:id)
+        response.id
+      elsif response.is_a?(Hash)
+        response[:id] || response["id"] || response.dig(:data, :id) || response.dig("data", "id")
+      end
     end
 
     def configured?

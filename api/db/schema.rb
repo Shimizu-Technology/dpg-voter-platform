@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_22_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_22_211000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -122,6 +122,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_140000) do
     t.index ["supporter_id", "dismissed_supporter_id"], name: "index_duplicate_pair_dismissals_on_pair", unique: true
     t.index ["supporter_id"], name: "index_duplicate_pair_dismissals_on_supporter_id"
     t.check_constraint "supporter_id < dismissed_supporter_id", name: "duplicate_pair_dismissals_ordered_pair"
+  end
+
+  create_table "email_blasts", force: :cascade do |t|
+    t.text "body"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.jsonb "error_log", default: [], null: false
+    t.integer "failed_count", default: 0, null: false
+    t.jsonb "filters", default: {}, null: false
+    t.bigint "initiated_by_user_id", null: false
+    t.integer "sent_count", default: 0, null: false
+    t.datetime "started_at"
+    t.string "status", default: "pending", null: false
+    t.string "subject", null: false
+    t.integer "total_recipients", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_email_blasts_on_created_at"
+    t.index ["initiated_by_user_id"], name: "index_email_blasts_on_initiated_by_user_id"
+    t.index ["status"], name: "index_email_blasts_on_status"
   end
 
   create_table "event_rsvps", force: :cascade do |t|
@@ -321,6 +340,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_140000) do
     t.bigint "village_id", null: false
     t.index ["shared_contact_number"], name: "index_household_groups_on_shared_contact_number"
     t.index ["village_id"], name: "index_household_groups_on_village_id"
+  end
+
+  create_table "outreach_deliveries", force: :cascade do |t|
+    t.string "channel", null: false
+    t.datetime "created_at", null: false
+    t.datetime "delivered_at"
+    t.bigint "email_blast_id"
+    t.datetime "failed_at"
+    t.datetime "last_event_at"
+    t.jsonb "metadata", default: {}, null: false
+    t.string "provider", null: false
+    t.string "provider_error_code"
+    t.string "provider_message_id"
+    t.string "provider_status_code"
+    t.string "provider_status_text"
+    t.string "recipient", null: false
+    t.bigint "resend_of_id"
+    t.datetime "sent_at"
+    t.bigint "sms_blast_id"
+    t.string "status", default: "queued", null: false
+    t.bigint "supporter_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["channel"], name: "index_outreach_deliveries_on_channel"
+    t.index ["email_blast_id", "status"], name: "index_outreach_deliveries_on_email_blast_id_and_status"
+    t.index ["email_blast_id"], name: "index_outreach_deliveries_on_email_blast_id"
+    t.index ["provider_message_id"], name: "index_outreach_deliveries_on_provider_message_id"
+    t.index ["resend_of_id"], name: "index_outreach_deliveries_unique_resend_of", unique: true, where: "(resend_of_id IS NOT NULL)"
+    t.index ["sms_blast_id", "status"], name: "index_outreach_deliveries_on_sms_blast_id_and_status"
+    t.index ["sms_blast_id"], name: "index_outreach_deliveries_on_sms_blast_id"
+    t.index ["status"], name: "index_outreach_deliveries_on_status"
+    t.index ["supporter_id"], name: "index_outreach_deliveries_on_supporter_id"
   end
 
   create_table "poll_reports", force: :cascade do |t|
@@ -754,6 +804,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_140000) do
   add_foreign_key "duplicate_pair_dismissals", "supporters"
   add_foreign_key "duplicate_pair_dismissals", "supporters", column: "dismissed_supporter_id"
   add_foreign_key "duplicate_pair_dismissals", "users", column: "resolved_by_id"
+  add_foreign_key "email_blasts", "users", column: "initiated_by_user_id"
   add_foreign_key "event_rsvps", "events"
   add_foreign_key "event_rsvps", "supporters"
   add_foreign_key "events", "campaigns"
@@ -770,6 +821,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_140000) do
   add_foreign_key "gec_voters", "users", column: "turnout_updated_by_user_id"
   add_foreign_key "gec_voters", "villages"
   add_foreign_key "household_groups", "villages"
+  add_foreign_key "outreach_deliveries", "email_blasts"
+  add_foreign_key "outreach_deliveries", "outreach_deliveries", column: "resend_of_id"
+  add_foreign_key "outreach_deliveries", "sms_blasts"
+  add_foreign_key "outreach_deliveries", "supporters"
   add_foreign_key "poll_reports", "precincts"
   add_foreign_key "poll_reports", "users"
   add_foreign_key "poll_watcher_precinct_assignments", "precincts"

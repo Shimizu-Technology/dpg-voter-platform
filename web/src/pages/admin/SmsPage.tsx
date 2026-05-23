@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { MessageSquare, Send, Users, Zap, DollarSign, CheckCircle, AlertTriangle, Phone, Settings } from 'lucide-react';
-import { getSmsStatus, sendTestSms, sendSmsBlast, getSmsBlasts, getSmsBlastStatus } from '../../lib/api';
+import { getSmsStatus, sendTestSms, sendSmsBlast, getSmsBlasts, getSmsBlastStatus, getSmsBlastDeliveries, syncSmsBlastReceipts, resendFailedSmsBlast } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
 import { DEFAULT_GUAM_PHONE_PREFIX } from '../../lib/phone';
 import type { OutreachRecipient } from '../../lib/outreachTypes';
@@ -35,6 +35,23 @@ interface SmsStatus {
   balance?: number;
   sender_id?: string;
 }
+
+interface DeliveryRow {
+  id: number;
+  supporter_id: number;
+  supporter_name: string;
+  recipient: string;
+  status: string;
+  provider_message_id?: string | null;
+  provider_status_text?: string | null;
+  sent_at?: string | null;
+  delivered_at?: string | null;
+  failed_at?: string | null;
+  last_event_at?: string | null;
+  resend_of_id?: number | null;
+}
+
+const RESENDABLE_STATUSES = new Set(['failed', 'bounced', 'undelivered', 'suppressed', 'delivery_delayed', 'unknown']);
 
 const SMS_TEMPLATES = [
   {
@@ -170,6 +187,7 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
   const [result, setResult] = useState<SmsBlastResult | null>(null);
   const [recipientReviewAccepted, setRecipientReviewAccepted] = useState(false);
   const [activeBlastId, setActiveBlastId] = useState<number | null>(null);
+  const [selectedBlastId, setSelectedBlastId] = useState<number | null>(null);
 
   const resetReview = () => {
     setResult(null);
@@ -190,13 +208,36 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
   });
 
   // Recent blast history
-  const { data: blastsData } = useQuery({
+  const { data: blastsData, refetch: refetchBlasts } = useQuery({
     queryKey: ['smsBlasts'],
     queryFn: getSmsBlasts,
     refetchInterval: activeBlastId && !blastProgress?.finished ? 5000 : false,
   });
 
+  const { data: deliveryData, refetch: refetchDeliveries } = useQuery<{ deliveries: DeliveryRow[]; counts: Record<string, number> }>({
+    queryKey: ['smsBlastDeliveries', selectedBlastId],
+    queryFn: () => getSmsBlastDeliveries(selectedBlastId!),
+    enabled: selectedBlastId !== null,
+  });
+
+  const syncReceiptsMutation = useMutation({
+    mutationFn: () => syncSmsBlastReceipts(selectedBlastId!),
+    onSuccess: () => {
+      void refetchDeliveries();
+      void refetchBlasts();
+    },
+  });
+
+  const resendFailedMutation = useMutation({
+    mutationFn: () => resendFailedSmsBlast(selectedBlastId!),
+    onSuccess: () => {
+      void refetchDeliveries();
+      void refetchBlasts();
+    },
+  });
+
   const dryRunMutation = useMutation({
+
     mutationFn: () => sendSmsBlast({
       message,
       registered_voter: filters.registered ? 'true' : undefined,
@@ -217,7 +258,10 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
     }),
     onSuccess: (data) => {
       setResult(data);
-      if (data.blast_id) setActiveBlastId(data.blast_id);
+      if (data.blast_id) {
+        setActiveBlastId(data.blast_id);
+        setSelectedBlastId(data.blast_id);
+      }
     },
   });
 
@@ -389,13 +433,32 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
         </div>
       )}
 
+      {selectedBlastId && deliveryData && (
+        <DeliveryPanel
+          title="SMS delivery status"
+          deliveries={deliveryData.deliveries}
+          counts={deliveryData.counts}
+          onSync={() => syncReceiptsMutation.mutate()}
+          onResend={() => {
+            if (window.confirm('Resend this SMS only to failed, undelivered, delayed, or unknown recipients?')) resendFailedMutation.mutate();
+          }}
+          syncing={syncReceiptsMutation.isPending}
+          resending={resendFailedMutation.isPending}
+        />
+      )}
+
       {/* Recent blast history */}
       {recentBlasts.length > 0 && (
         <div className="app-card p-4">
           <h3 className="font-semibold text-[var(--text-primary)] mb-3 text-sm">Recent Blasts</h3>
           <div className="space-y-2">
             {recentBlasts.slice(0, 5).map((blast: { id: number; status: string; message: string; sent_count: number; failed_count: number; total_recipients: number; started_at: string; initiated_by: string }) => (
-              <div key={blast.id} className="flex items-center justify-between text-sm border-b border-[var(--border-subtle)] pb-2">
+              <button
+                key={blast.id}
+                type="button"
+                onClick={() => setSelectedBlastId(blast.id)}
+                className={`w-full text-left flex items-center justify-between text-sm border-b border-[var(--border-subtle)] pb-2 ${selectedBlastId === blast.id ? 'rounded-lg bg-green-50 px-2 py-2' : ''}`}
+              >
                 <div className="min-w-0 flex-1">
                   <p className="text-[var(--text-primary)] truncate">{blast.message}</p>
                   <p className="text-xs text-[var(--text-muted)]">
@@ -413,11 +476,76 @@ function BlastTab({ liveEnabled }: { liveEnabled: boolean }) {
                   </span>
                   <p className="text-xs text-[var(--text-secondary)] mt-0.5">{blast.sent_count}/{blast.total_recipients}</p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function DeliveryPanel({
+  title,
+  deliveries,
+  counts,
+  onSync,
+  onResend,
+  syncing,
+  resending,
+}: {
+  title: string;
+  deliveries: DeliveryRow[];
+  counts: Record<string, number>;
+  onSync: () => void;
+  onResend: () => void;
+  syncing: boolean;
+  resending: boolean;
+}) {
+  const deliveryIdsWithResends = new Set(deliveries.map((delivery) => delivery.resend_of_id).filter((id): id is number => id != null));
+  const resendableCount = deliveries.filter((delivery) => RESENDABLE_STATUSES.has(delivery.status) && !deliveryIdsWithResends.has(delivery.id)).length;
+
+  return (
+    <div className="app-card p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="font-semibold text-[var(--text-primary)] text-sm">{title}</h3>
+          <p className="text-xs text-[var(--text-secondary)]">Provider updates may arrive after the blast is queued.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onSync} disabled={syncing} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">
+            {syncing ? 'Checking...' : 'Check receipts'}
+          </button>
+          <button type="button" onClick={onResend} disabled={resending || resendableCount === 0} className="rounded-lg bg-cta px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
+            {resending ? 'Resending...' : `Resend failed (${resendableCount})`}
+          </button>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+        {Object.entries(counts).map(([status, count]) => (
+          <span key={status} className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">{status.replaceAll('_', ' ')}: {count}</span>
+        ))}
+      </div>
+      <div className="mt-3 max-h-80 overflow-auto rounded-xl border border-slate-100">
+        {deliveries.length === 0 ? (
+          <div className="p-4 text-sm text-slate-500">No recipient delivery rows yet.</div>
+        ) : deliveries.map((delivery) => (
+          <div key={delivery.id} className="grid gap-2 border-b border-slate-100 p-3 text-sm last:border-b-0 sm:grid-cols-[1.4fr_1fr_0.8fr] sm:items-center">
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-slate-800">{delivery.supporter_name}</p>
+              <p className="truncate text-xs text-slate-500">{delivery.recipient}</p>
+            </div>
+            <div className="text-xs text-slate-500">
+              <p className="truncate">{delivery.provider_status_text || delivery.provider_message_id || 'Awaiting provider update'}</p>
+              {delivery.last_event_at && <p>{new Date(delivery.last_event_at).toLocaleString()}</p>}
+            </div>
+            <div className="sm:text-right">
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{delivery.status.replaceAll('_', ' ')}</span>
+              {delivery.resend_of_id && <p className="mt-1 text-xs text-slate-400">Resend</p>}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

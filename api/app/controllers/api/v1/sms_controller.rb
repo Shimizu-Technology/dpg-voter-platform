@@ -6,7 +6,7 @@ module Api
       include Authenticatable
       include OutreachGovernance
       before_action :authenticate_request
-      before_action :require_coordinator_or_above!, only: [ :send_single, :blast, :blasts, :blast_status ]
+      before_action :require_coordinator_or_above!, only: [ :send_single, :blast, :blasts, :blast_status, :blast_deliveries, :sync_blast_receipts, :resend_failed ]
 
       # GET /api/v1/sms/status
       # Check ClickSend account status + balance
@@ -123,11 +123,93 @@ module Api
           started_at: blast.started_at,
           completed_at: blast.completed_at,
           error_log: blast.error_log&.first(10),
+          delivery_counts: blast.outreach_deliveries.group(:status).count,
           finished: blast.finished?
         }
       end
 
+      def blast_deliveries
+        blast = SmsBlast.find_by(id: params[:id])
+        return render_api_error(message: "Blast not found", status: :not_found, code: "blast_not_found") unless blast
+
+        render json: delivery_payload(blast.outreach_deliveries.includes(:supporter).recent_first)
+      end
+
+      def sync_blast_receipts
+        blast = SmsBlast.find_by(id: params[:id])
+        return render_api_error(message: "Blast not found", status: :not_found, code: "blast_not_found") unless blast
+
+        syncable_count = blast.outreach_deliveries
+          .where(provider: "clicksend")
+          .where.not(provider_message_id: [ nil, "" ])
+          .where.not(status: SmsSyncReceiptsJob::TERMINAL_STATUSES)
+          .count
+        SmsSyncReceiptsJob.perform_later(sms_blast_id: blast.id)
+
+        render json: {
+          queued: syncable_count,
+          delivery_counts: blast.outreach_deliveries.group(:status).count,
+          message: "Queued ClickSend receipt sync for #{syncable_count} SMS recipient#{'s' unless syncable_count == 1}."
+        }, status: :accepted
+      end
+
+      def resend_failed
+        blast = SmsBlast.find_by(id: params[:id])
+        return render_api_error(message: "Blast not found", status: :not_found, code: "blast_not_found") unless blast
+        return live_outreach_disabled_response unless live_outreach_enabled?
+
+        deliveries = blast.outreach_deliveries.resendable.not_already_resent.includes(:supporter).to_a
+        return render json: { queued: 0, message: "No failed or undelivered SMS recipients to resend." } if deliveries.empty?
+
+        now = Time.current
+        rows = deliveries.map do |original|
+          {
+            channel: "sms",
+            sms_blast_id: blast.id,
+            supporter_id: original.supporter_id,
+            resend_of_id: original.id,
+            recipient: original.recipient,
+            provider: "clicksend",
+            status: "queued",
+            last_event_at: now,
+            metadata: { resend: true },
+            created_at: now,
+            updated_at: now
+          }
+        end
+        result = OutreachDelivery.insert_all(rows, unique_by: :index_outreach_deliveries_unique_resend_of, returning: %w[id])
+        resend_delivery_ids = result.rows.flatten
+        SmsResendFailedJob.perform_later(delivery_ids: resend_delivery_ids, recorded_by_user_id: current_user.id) if resend_delivery_ids.any?
+
+        render json: {
+          queued: resend_delivery_ids.size,
+          delivery_counts: blast.outreach_deliveries.group(:status).count,
+          message: "Queued #{resend_delivery_ids.size} failed SMS recipient#{'s' unless resend_delivery_ids.size == 1} for resend."
+        }, status: :accepted
+      end
+
       private
+
+      def delivery_payload(scope)
+        deliveries = scope.limit(500).map do |delivery|
+          supporter = delivery.supporter
+          {
+            id: delivery.id,
+            supporter_id: supporter.id,
+            supporter_name: supporter.print_name,
+            recipient: delivery.recipient,
+            status: delivery.status,
+            provider_message_id: delivery.provider_message_id,
+            provider_status_text: delivery.provider_status_text,
+            sent_at: delivery.sent_at,
+            delivered_at: delivery.delivered_at,
+            failed_at: delivery.failed_at,
+            last_event_at: delivery.last_event_at,
+            resend_of_id: delivery.resend_of_id
+          }
+        end
+        { deliveries: deliveries, counts: scope.unscope(:order).group(:status).count }
+      end
 
       def live_outreach_enabled?
         ActiveModel::Type::Boolean.new.cast(ENV["DPG_LIVE_OUTREACH_ENABLED"]) == true

@@ -1,12 +1,16 @@
 # frozen_string_literal: true
 
+require "base64"
+require "openssl"
+
 module Api
   module V1
     class EmailController < ApplicationController
       include Authenticatable
       include OutreachGovernance
       before_action :authenticate_request
-      before_action :require_coordinator_or_above!, only: [ :blast ]
+      skip_before_action :authenticate_request, only: [ :resend_webhook ]
+      before_action :require_coordinator_or_above!, only: [ :blast, :blasts, :blast_status, :blast_deliveries, :resend_failed ]
 
       # POST /api/v1/email/blast
       # Send email to filtered supporters who opted in
@@ -42,18 +46,132 @@ module Api
         return live_outreach_disabled_response unless live_outreach_enabled?
         return recipient_review_required_response(count) unless OutreachRecipientQuery.reviewed?(params, expected_count: count)
 
-        SendEmailBlastJob.perform_later(
+        blast = EmailBlast.create!(
+          status: "pending",
           subject: subject,
           body: body,
           filters: filters,
-          initiated_by_user_id: current_user.id
+          total_recipients: count,
+          initiated_by: current_user
         )
+
+        SendEmailBlastJob.perform_later(email_blast_id: blast.id)
 
         render json: {
           queued: true,
+          blast_id: blast.id,
           total_targeted: count,
           message: "Email blast queued successfully"
         }, status: :accepted
+      end
+
+      def blasts
+        render json: {
+          blasts: EmailBlast.recent.includes(:initiated_by).map do |blast|
+            {
+              id: blast.id,
+              status: blast.status,
+              subject: blast.subject,
+              total_recipients: blast.total_recipients,
+              sent_count: blast.sent_count,
+              failed_count: blast.failed_count,
+              progress_pct: blast.progress_pct,
+              started_at: blast.started_at,
+              completed_at: blast.completed_at,
+              initiated_by: blast.initiated_by&.name || blast.initiated_by&.email
+            }
+          end
+        }
+      end
+
+      def blast_status
+        blast = EmailBlast.find_by(id: params[:id])
+        return render_api_error(message: "Email blast not found", status: :not_found, code: "email_blast_not_found") unless blast
+
+        render json: {
+          id: blast.id,
+          status: blast.status,
+          subject: blast.subject,
+          total_recipients: blast.total_recipients,
+          sent_count: blast.sent_count,
+          failed_count: blast.failed_count,
+          progress_pct: blast.progress_pct,
+          delivery_counts: blast.outreach_deliveries.group(:status).count,
+          started_at: blast.started_at,
+          completed_at: blast.completed_at,
+          error_log: blast.error_log&.first(10),
+          finished: blast.finished?
+        }
+      end
+
+      def blast_deliveries
+        blast = EmailBlast.find_by(id: params[:id])
+        return render_api_error(message: "Email blast not found", status: :not_found, code: "email_blast_not_found") unless blast
+
+        deliveries = blast.outreach_deliveries.includes(:supporter).recent_first.limit(500)
+        render json: {
+          deliveries: deliveries.map { |delivery| delivery_json(delivery) },
+          counts: blast.outreach_deliveries.group(:status).count
+        }
+      end
+
+      def resend_failed
+        blast = EmailBlast.find_by(id: params[:id])
+        return render_api_error(message: "Email blast not found", status: :not_found, code: "email_blast_not_found") unless blast
+        return live_outreach_disabled_response unless live_outreach_enabled?
+
+        deliveries = blast.outreach_deliveries.resendable.not_already_resent.includes(:supporter).to_a
+        return render json: { queued: 0, message: "No failed or undelivered email recipients to resend." } if deliveries.empty?
+
+        now = Time.current
+        rows = deliveries.map do |original|
+          {
+            channel: "email",
+            email_blast_id: blast.id,
+            supporter_id: original.supporter_id,
+            resend_of_id: original.id,
+            recipient: original.recipient,
+            provider: "resend",
+            status: "queued",
+            last_event_at: now,
+            metadata: { resend: true },
+            created_at: now,
+            updated_at: now
+          }
+        end
+        result = OutreachDelivery.insert_all(rows, unique_by: :index_outreach_deliveries_unique_resend_of, returning: %w[id])
+        resend_delivery_ids = result.rows.flatten
+        EmailResendFailedJob.perform_later(delivery_ids: resend_delivery_ids, recorded_by_user_id: current_user.id) if resend_delivery_ids.any?
+
+        render json: {
+          queued: resend_delivery_ids.size,
+          delivery_counts: blast.outreach_deliveries.group(:status).count,
+          message: "Queued #{resend_delivery_ids.size} failed email recipient#{'s' unless resend_delivery_ids.size == 1} for resend."
+        }, status: :accepted
+      end
+
+      def resend_webhook
+        raw_body = request.raw_post
+        unless valid_resend_signature?(raw_body)
+          return render_api_error(message: "Invalid webhook signature", status: :unauthorized, code: "invalid_webhook_signature")
+        end
+
+        event = JSON.parse(raw_body)
+        email_id = event.dig("data", "email_id").to_s
+        return render json: { ok: true } if email_id.blank?
+
+        delivery = OutreachDelivery.find_by(provider: "resend", provider_message_id: email_id)
+        if delivery
+          delivery.mark_provider_event!(
+            status: OutreachDeliveryStatus.normalize_resend_event(event["type"]),
+            occurred_at: webhook_event_time(event),
+            metadata: { resend_event: event }
+          )
+        end
+
+        render json: { ok: true }
+      rescue JSON::ParserError
+        render_api_error(message: "Invalid webhook payload", status: :bad_request, code: "invalid_webhook_payload")
       end
 
       # GET /api/v1/email/status
@@ -67,6 +185,56 @@ module Api
       end
 
       private
+
+      def webhook_event_time(event)
+        Time.zone.parse(event["created_at"].to_s) || Time.current
+      rescue ArgumentError, TypeError
+        Time.current
+      end
+
+      def delivery_json(delivery)
+        supporter = delivery.supporter
+        {
+          id: delivery.id,
+          supporter_id: supporter.id,
+          supporter_name: supporter.print_name,
+          recipient: delivery.recipient,
+          status: delivery.status,
+          provider_message_id: delivery.provider_message_id,
+          provider_status_text: delivery.provider_status_text,
+          sent_at: delivery.sent_at,
+          delivered_at: delivery.delivered_at,
+          failed_at: delivery.failed_at,
+          last_event_at: delivery.last_event_at,
+          resend_of_id: delivery.resend_of_id
+        }
+      end
+
+      def valid_resend_signature?(raw_body)
+        secret = ENV["RESEND_WEBHOOK_SIGNING_SECRET"].to_s
+        return true if secret.blank? && Rails.env.test?
+        return false if secret.blank?
+
+        svix_id = request.headers["svix-id"].to_s
+        svix_timestamp = request.headers["svix-timestamp"].to_s
+        svix_signature = request.headers["svix-signature"].to_s
+        return false if svix_id.blank? || svix_timestamp.blank? || svix_signature.blank?
+
+        timestamp = Integer(svix_timestamp)
+        return false if (Time.current.to_i - timestamp).abs > 300
+
+        signed_payload = "#{svix_id}.#{svix_timestamp}.#{raw_body}"
+        key = Base64.strict_decode64(secret.delete_prefix("whsec_"))
+        expected = Base64.strict_encode64(OpenSSL::HMAC.digest("SHA256", key, signed_payload))
+        svix_signature.split(" ").any? do |signature|
+          version, value = signature.split(",", 2)
+          version == "v1" && ActiveSupport::SecurityUtils.secure_compare(value, expected)
+        rescue ArgumentError
+          false
+        end
+      rescue ArgumentError
+        false
+      end
 
       def live_outreach_enabled?
         ActiveModel::Type::Boolean.new.cast(ENV["DPG_LIVE_OUTREACH_ENABLED"]) == true
