@@ -27,6 +27,9 @@ class OutreachDelivery < ApplicationRecord
   end
 
   def mark_provider_event!(status:, occurred_at: Time.current, provider_status_code: nil, provider_status_text: nil, provider_error_code: nil, metadata: {})
+    occurred_at ||= Time.current
+    return false if last_event_at.present? && occurred_at < last_event_at
+
     attrs = {
       status: status,
       last_event_at: occurred_at,

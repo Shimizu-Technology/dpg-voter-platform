@@ -276,6 +276,28 @@ class Api::V1::EmailControllerTest < ActionDispatch::IntegrationTest
     assert_equal "failed", delivery.reload.status
   end
 
+  test "resend webhook rejects malformed signing secret" do
+    previous_secret = ENV["RESEND_WEBHOOK_SIGNING_SECRET"]
+    ENV["RESEND_WEBHOOK_SIGNING_SECRET"] = "whsec_not-valid-base64@@@"
+
+    post "/api/v1/email/webhooks/resend",
+      params: {
+        type: "email.delivered",
+        created_at: Time.current.iso8601,
+        data: { email_id: "email-malformed-secret" }
+      }.to_json,
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "svix-id" => "msg_bad_secret",
+        "svix-timestamp" => Time.current.to_i.to_s,
+        "svix-signature" => "v1,invalid"
+      }
+
+    assert_response :unauthorized
+  ensure
+    ENV["RESEND_WEBHOOK_SIGNING_SECRET"] = previous_secret
+  end
+
   test "resend webhook rejects stale signed payloads" do
     previous_secret = ENV["RESEND_WEBHOOK_SIGNING_SECRET"]
     secret_bytes = "test-secret-for-svix"

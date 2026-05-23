@@ -224,7 +224,7 @@ module Api
         return false if (Time.current.to_i - timestamp).abs > 300
 
         signed_payload = "#{svix_id}.#{svix_timestamp}.#{raw_body}"
-        key = Base64.decode64(secret.delete_prefix("whsec_"))
+        key = Base64.strict_decode64(secret.delete_prefix("whsec_"))
         expected = Base64.strict_encode64(OpenSSL::HMAC.digest("SHA256", key, signed_payload))
         svix_signature.split(" ").any? do |signature|
           version, value = signature.split(",", 2)
