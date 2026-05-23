@@ -32,8 +32,13 @@ class SendEmailBlastJob < ApplicationJob
     result[:errors].to_a.each { |error| blast&.append_error(error) }
     Rails.logger.info("[EmailBlast] completed: sent=#{result[:sent]} failed=#{result[:failed]}")
   rescue StandardError => e
-    blast&.update(status: "failed", completed_at: Time.current)
-    blast&.append_error("Job error: #{e.message}")
+    begin
+      blast&.update(status: "failed", completed_at: Time.current)
+      blast&.append_error("Job error: #{e.message}")
+    rescue StandardError => cleanup_error
+      Rails.logger.error("[EmailBlast] failed to record job failure after #{e.class}: #{cleanup_error.class} #{cleanup_error.message}")
+    end
     Rails.logger.error("[EmailBlast] failed: #{e.class} #{e.message}")
+    raise
   end
 end

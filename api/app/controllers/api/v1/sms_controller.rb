@@ -139,7 +139,11 @@ module Api
         blast = SmsBlast.find_by(id: params[:id])
         return render_api_error(message: "Blast not found", status: :not_found, code: "blast_not_found") unless blast
 
-        syncable_count = blast.outreach_deliveries.where(provider: "clicksend").where.not(provider_message_id: [ nil, "" ]).count
+        syncable_count = blast.outreach_deliveries
+          .where(provider: "clicksend")
+          .where.not(provider_message_id: [ nil, "" ])
+          .where.not(status: SmsSyncReceiptsJob::TERMINAL_STATUSES)
+          .count
         SmsSyncReceiptsJob.perform_later(sms_blast_id: blast.id)
 
         render json: {
