@@ -358,7 +358,8 @@ module Api
         return {} if voter_ids.blank?
 
         Supporter
-          .working_supporters
+          .contacts
+          .includes(:village, :precinct)
           .where(gec_voter_id: voter_ids)
           .order(:print_name)
           .group_by(&:gec_voter_id)
@@ -388,7 +389,17 @@ module Api
           turnout_source: voter.turnout_source,
           turnout_note: voter.turnout_note,
           turnout_updated_at: voter.turnout_updated_at&.iso8601,
-          supporter_overlay: linked_supporters.present? ? { supporter_count: linked_supporters.size } : nil
+          supporter_overlay: supporter_overlay_payload(linked_supporters)
+        }
+      end
+
+      def supporter_overlay_payload(linked_supporters)
+        return nil if linked_supporters.blank?
+
+        {
+          supporter_count: linked_supporters.size,
+          village_names: linked_supporters.map { |supporter| supporter.village&.name }.compact.uniq.sort,
+          precinct_numbers: linked_supporters.map { |supporter| supporter.precinct&.number }.compact.uniq.sort
         }
       end
 

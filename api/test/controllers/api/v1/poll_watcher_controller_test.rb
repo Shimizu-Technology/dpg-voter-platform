@@ -61,6 +61,17 @@ module Api
         assert_equal "precinct_not_authorized", response.parsed_body.fetch("code")
       end
 
+      test "strike list overlays linked active DPG contacts without requiring supporter status" do
+        get "/api/v1/poll_watcher/strike_list", params: { precinct_id: @precinct.id }, headers: auth_headers(@watcher)
+
+        assert_response :success
+        voter_payload = response.parsed_body.fetch("voters").find { |voter| voter.fetch("id") == @voter.id }
+        overlay = voter_payload.fetch("supporter_overlay")
+        assert_equal 1, overlay.fetch("supporter_count")
+        assert_equal [ @village.name ], overlay.fetch("village_names")
+        assert_equal [ @precinct.number ], overlay.fetch("precinct_numbers")
+      end
+
       test "index uses latest report by reported_at not by id" do
         newer_report = PollReport.create!(
           precinct: @precinct,

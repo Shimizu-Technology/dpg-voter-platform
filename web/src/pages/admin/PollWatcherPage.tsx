@@ -55,6 +55,8 @@ interface StrikeListVoter {
   out_of_precinct?: boolean;
   supporter_overlay?: {
     supporter_count: number;
+    village_names?: string[];
+    precinct_numbers?: string[];
   };
 }
 
@@ -113,6 +115,17 @@ function turnoutStatusLabel(status: StrikeListVoter['turnout_status']) {
   if (status === 'voted') return 'voted';
   if (status === 'observed_elsewhere') return 'observed elsewhere';
   return 'not set';
+}
+
+function linkedContactLocationLabel(voter: StrikeListVoter) {
+  const overlay = voter.supporter_overlay;
+  if (!overlay) return null;
+
+  const villageText = overlay.village_names?.length ? overlay.village_names.join(', ') : null;
+  const precinctText = overlay.precinct_numbers?.length ? `Precinct ${overlay.precinct_numbers.join(', ')}` : null;
+  if (!villageText && !precinctText) return null;
+
+  return `DPG contact village: ${[villageText, precinctText].filter(Boolean).join(' / ')}`;
 }
 
 function turnoutSourceLabel(source?: string | null) {
@@ -346,6 +359,7 @@ export default function PollWatcherPage() {
     const noteOpen = noteOpenByVoter[voter.id] || Boolean(turnoutNoteByVoter[voter.id]);
     const supporterCount = voter.supporter_overlay?.supporter_count || 0;
     const sourceLabel = turnoutSourceLabel(voter.turnout_source);
+    const linkedLocationLabel = linkedContactLocationLabel(voter);
     const isExternalMatch = Boolean(voter.out_of_precinct);
 
     return (
@@ -354,14 +368,14 @@ export default function PollWatcherPage() {
           <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-900">
             <p className="font-semibold">Registered outside Precinct {selectedPrecinct?.number}</p>
             <p className="mt-1">
-              This voter belongs to {voter.village_name || 'another village'} / Precinct {voter.precinct_number || 'unknown'} in the election-day list.
-              Poll watchers cannot directly change out-of-precinct voter records. Submit a <span className="font-semibold">Name Not On List</span> incident with the voter name and context for DPG reconciliation.
+              This voter officially belongs to {voter.village_name || 'another village'} / Precinct {voter.precinct_number || 'unknown'} in the GEC election-day list. DPG contact village stays separate for outreach.
+              Poll watchers cannot directly change out-of-precinct voter records. Submit a <span className="font-semibold">Name Not On List</span> incident if they are heard or seen at this site.
             </p>
           </div>
         ) : null}
 
         {!isExternalMatch && (
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl">
             {TURNOUT_PRIMARY_OPTIONS.map((option) => (
               <button
                 key={`${voter.id}-${option.value}`}
@@ -404,7 +418,7 @@ export default function PollWatcherPage() {
         )}
 
         {!isExternalMatch && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2 max-w-2xl">
             <button
               type="button"
               onClick={() => turnoutMutation.mutate({ voterId: voter.id, turnoutStatus: selectedTurnoutStatus })}
@@ -440,8 +454,9 @@ export default function PollWatcherPage() {
               ? `${supporterCount} linked DPG contact${supporterCount === 1 ? '' : 's'} will stay connected to this turnout status for DPG follow-up.`
               : 'No linked DPG contact for this voter yet, so only turnout can be updated here.'}
         </p>
-        {(voter.turnout_note || voter.turnout_updated_at || sourceLabel) && (
+        {(voter.turnout_note || voter.turnout_updated_at || sourceLabel || linkedLocationLabel) && (
           <div className="mt-2 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-bg)] px-3 py-2 text-[11px] text-[var(--text-secondary)] space-y-1">
+            {linkedLocationLabel && <p className="text-[var(--text-primary)]">{linkedLocationLabel}</p>}
             {sourceLabel && <p>{sourceLabel}</p>}
             {voter.turnout_updated_at && <p>Last updated {new Date(voter.turnout_updated_at).toLocaleString()}</p>}
             {voter.turnout_note && <p className="text-[var(--text-primary)]">{voter.turnout_note}</p>}
@@ -473,7 +488,7 @@ export default function PollWatcherPage() {
   };
 
   return (
-    <WorkspacePage width="full" className="space-y-6">
+    <WorkspacePage width="full" className="space-y-6 max-w-[1500px] mx-auto">
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
@@ -567,7 +582,7 @@ export default function PollWatcherPage() {
                 </p>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-2 mb-3">
                 <input
                   type="text"
                   value={strikeSearch}
@@ -576,7 +591,7 @@ export default function PollWatcherPage() {
                     setStrikePage(1);
                   }}
                   placeholder="Search voter name, address, or registration number..."
-                  className="md:col-span-2 w-full px-3 py-2 border border-[var(--border-soft)] rounded-xl text-sm min-h-[44px]"
+                  className="xl:col-span-2 w-full px-3 py-2 border border-[var(--border-soft)] rounded-xl text-sm min-h-[44px]"
                 />
                 <select
                   value={strikeStatusFilter}
@@ -607,8 +622,8 @@ export default function PollWatcherPage() {
                 <div className="text-sm text-[var(--text-secondary)] py-4">Loading strike list...</div>
               ) : (
                 <>
-                  {/* Mobile: one-at-a-time expandable cards */}
-                  <div className="space-y-2 lg:hidden">
+                  {/* Compact/tablet: one-at-a-time expandable cards */}
+                  <div className="space-y-2 xl:hidden">
                     {[
                       { title: 'Assigned Precinct Voters', items: strikeVoters, emphasized: false },
                       { title: 'Out-of-Precinct Search Matches', items: externalMatches, emphasized: true },
@@ -630,12 +645,12 @@ export default function PollWatcherPage() {
                                 className="w-full text-left"
                                 aria-expanded={expanded}
                               >
-                                <div className="flex items-center justify-between gap-2">
-                                  <div>
-                                    <p className="font-medium text-[var(--text-primary)]">{voter.print_name}</p>
-                                    <p className="text-xs text-[var(--text-secondary)]">{voter.address || voter.voter_registration_number || 'No address listed'}</p>
+                                <div className="flex items-start gap-3">
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    <p className="font-semibold text-[var(--text-primary)] leading-snug break-words">{voter.print_name}</p>
+                                    <p className="text-xs text-[var(--text-secondary)] break-words">{voter.address || voter.voter_registration_number || 'No address listed'}</p>
                                     {voter.out_of_precinct ? (
-                                      <p className="text-[11px] text-amber-800 mt-1">
+                                      <p className="text-[11px] text-amber-800 mt-1 break-words">
                                         Registered in {voter.village_name || 'another village'} / Precinct {voter.precinct_number || 'unknown'}
                                       </p>
                                     ) : voter.supporter_overlay?.supporter_count ? (
@@ -643,17 +658,20 @@ export default function PollWatcherPage() {
                                         {voter.supporter_overlay.supporter_count} linked DPG contact{voter.supporter_overlay.supporter_count === 1 ? '' : 's'}
                                       </p>
                                     ) : null}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-xs border rounded-full px-2 py-1 ${turnoutStatusBadgeClasses(voter.turnout_status)}`}>
+                                    {linkedContactLocationLabel(voter) && (
+                                      <p className="text-[11px] text-primary mt-1 break-words">
+                                        {linkedContactLocationLabel(voter)}
+                                      </p>
+                                    )}
+                                    <span className={`inline-flex w-fit max-w-full text-xs border rounded-full px-2.5 py-1 ${turnoutStatusBadgeClasses(voter.turnout_status)}`}>
                                       {turnoutStatusLabel(voter.turnout_status)}
                                     </span>
-                                    {expanded ? (
-                                      <ChevronUp className="w-4 h-4 text-[var(--text-muted)]" />
-                                    ) : (
-                                      <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
-                                    )}
                                   </div>
+                                  {expanded ? (
+                                    <ChevronUp className="w-4 h-4 text-[var(--text-muted)] shrink-0 mt-1" />
+                                  ) : (
+                                    <ChevronDown className="w-4 h-4 text-[var(--text-muted)] shrink-0 mt-1" />
+                                  )}
                                 </div>
                                 <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                                   {expanded ? 'Tap to collapse' : 'Tap to expand'}
@@ -667,9 +685,9 @@ export default function PollWatcherPage() {
                     ) : null)}
                   </div>
 
-                  {/* Desktop: split list + detail panel */}
-                  <div className="hidden lg:grid lg:grid-cols-3 gap-3">
-                    <div className="lg:col-span-1 space-y-2 max-h-[560px] overflow-y-auto pr-1">
+                  {/* Wide desktop: split list + detail panel */}
+                  <div className="hidden xl:grid xl:grid-cols-[minmax(280px,0.85fr)_minmax(420px,1.15fr)] gap-4">
+                    <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
                       {[
                         { title: 'Assigned Precinct Voters', items: strikeVoters, emphasized: false },
                         { title: 'Out-of-Precinct Search Matches', items: externalMatches, emphasized: true },
@@ -693,13 +711,13 @@ export default function PollWatcherPage() {
                                     : 'border-[var(--border-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-bg)]'
                               }`}
                             >
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="font-medium text-[var(--text-primary)] truncate">{voter.print_name}</p>
-                                <span className={`text-xs border rounded-full px-2 py-1 ${turnoutStatusBadgeClasses(voter.turnout_status)}`}>
+                              <div className="flex items-start justify-between gap-3">
+                                <p className="font-medium text-[var(--text-primary)] leading-snug break-words min-w-0">{voter.print_name}</p>
+                                <span className={`shrink-0 text-xs border rounded-full px-2 py-1 whitespace-nowrap ${turnoutStatusBadgeClasses(voter.turnout_status)}`}>
                                   {turnoutStatusLabel(voter.turnout_status)}
                                 </span>
                               </div>
-                              <p className="text-xs text-[var(--text-secondary)] mt-1">{voter.address || voter.voter_registration_number || 'No address listed'}</p>
+                              <p className="text-xs text-[var(--text-secondary)] mt-1 break-words">{voter.address || voter.voter_registration_number || 'No address listed'}</p>
                               {voter.out_of_precinct ? (
                                 <p className="text-[11px] text-amber-800 mt-1 truncate">
                                   Registered in {voter.village_name || 'another village'} / Precinct {voter.precinct_number || 'unknown'}
@@ -709,12 +727,17 @@ export default function PollWatcherPage() {
                                   {voter.supporter_overlay.supporter_count} linked DPG contact{voter.supporter_overlay.supporter_count === 1 ? '' : 's'}
                                 </p>
                               ) : null}
+                              {linkedContactLocationLabel(voter) && (
+                                <p className="text-[11px] text-primary mt-1 break-words">
+                                  {linkedContactLocationLabel(voter)}
+                                </p>
+                              )}
                             </button>
                           ))}
                         </div>
                       ) : null)}
                     </div>
-                    <div className="lg:col-span-2 border border-[var(--border-soft)] rounded-xl p-3 bg-[var(--surface-raised)] min-h-[320px]">
+                    <div className="border border-[var(--border-soft)] rounded-xl p-4 bg-[var(--surface-raised)] min-h-[320px]">
                       {activeVoter ? (
                         <>
                           <div className="flex items-center justify-between gap-2">
@@ -730,6 +753,11 @@ export default function PollWatcherPage() {
                                   {activeVoter.supporter_overlay.supporter_count} linked DPG contact{activeVoter.supporter_overlay.supporter_count === 1 ? '' : 's'}
                                 </p>
                               ) : null}
+                              {linkedContactLocationLabel(activeVoter) && (
+                                <p className="text-xs text-primary mt-1">
+                                  {linkedContactLocationLabel(activeVoter)}
+                                </p>
+                              )}
                             </div>
                             <span className={`text-xs border rounded-full px-2 py-1 ${turnoutStatusBadgeClasses(activeVoter.turnout_status)}`}>
                               {turnoutStatusLabel(activeVoter.turnout_status)}
