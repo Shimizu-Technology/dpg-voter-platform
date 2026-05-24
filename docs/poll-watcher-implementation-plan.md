@@ -292,6 +292,17 @@ Possible scope:
 - user-facing training checklist
 - safe fake voter/contact records for rehearsal
 
+## GEC election-manual research notes
+
+The Guam Election Commission Election Manual linked from `https://gec.guam.gov/` was reviewed on May 24, 2026. Relevant guidance supports a conservative DPG MVP:
+
+- Poll watchers are observers for recognized parties/candidates. They may observe election conduct, issue voter challenges, and monitor voter participation.
+- Poll watchers must not interfere with precinct officials, enter the barricade/voting area, access the official voter signature roster or official voter documents, ask voters for ID, speak to voters about marking ballots, or campaign/wear campaign identifiers.
+- Wrong-precinct and not-on-roster situations are handled through precinct official/GEC procedures, including registration/polling-location checks and possible provisional ballots.
+- Challenge grounds include precinct residency, whether the person voted that day, voted in another precinct, or voted in another U.S. jurisdiction.
+
+Product implication: DPG poll watcher tools should remain explicitly unofficial DPG operations tools. Poll watchers can track DPG observations for assigned precincts, but out-of-precinct or name-not-on-list situations should be incident/exception reports unless DPG/Mike Weekly confirms a different workflow.
+
 ## Open questions for DPG / Mike Weekly
 
 See also `docs/dpg-open-questions.md` for the current walkthrough question list, including the key distinction between official GEC precinct/village for Election Day checkoff and separate DPG contact village for outreach.
@@ -305,8 +316,9 @@ Confirm before or during PR 1/PR 2 planning:
 5. Should out-of-precinct search be enabled for poll watchers or admin-only? If enabled, should poll watchers only file incidents, or can any trusted role mark an out-of-precinct voter as voted/observed elsewhere?
 6. What should the dashboard prioritize: all GEC turnout, DPG supporters, members, registered Democrats, ride-to-polls, or a combination?
 7. If a DPG contact's self-reported village differs from their official GEC registered village, should the app show them only in the GEC precinct list and surface the DPG contact village as context, or should DPG also want contact-village exception queues?
-8. What training date is needed before the August 1 primary?
-9. What language does DPG want for the dashboard: "War Room," "Election Day Dashboard," or another term?
+8. For normal organizing reports outside Election Day, should DPG continue grouping people by DPG contact/signup village while Election Day tools group by official GEC registered precinct? Current product recommendation: yes, but make labels and exports explicit so staff understand both geographies.
+9. What training date is needed before the August 1 primary?
+10. What language does DPG want for the dashboard: "War Room," "Election Day Dashboard," or another term?
 
 ## Clean-room guardrails
 

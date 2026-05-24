@@ -195,7 +195,7 @@ export default function DashboardPage() {
           value={Number(summary.total_contacts ?? counts?.total_contacts ?? summary.total_supporters ?? 0)}
           icon={UserCheck}
           color="blue"
-          detail="Visible DPG contact list"
+          detail="Grouped by DPG contact village"
           to={permissions?.can_view_supporters ? '/admin/supporters' : undefined}
         />
         <StatCard
@@ -203,7 +203,7 @@ export default function DashboardPage() {
           value={Number(summary.matched_to_gec ?? counts?.matched_to_gec ?? 0)}
           icon={Users}
           color="gray"
-          detail="Contacts matched to GEC"
+          detail="Linked to official GEC records"
         />
       </div>
 
@@ -220,9 +220,19 @@ export default function DashboardPage() {
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Village Engagement Summary</h2>
+        <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-700">DPG Contact Village Summary</h2>
+            <p className="mt-1 text-xs text-gray-500">
+              These rows group people by the DPG contact/signup village used for organizing, not necessarily their official GEC registered village.
+            </p>
+          </div>
+          <Link to="/admin/reports?report=dpg_gec_mismatches" className="inline-flex w-fit items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100">
+            Review DPG/GEC mismatches
+          </Link>
+        </div>
         <p className="text-xs text-gray-500 mb-3">
-          Contact counts show all active DPG contacts, new intake, GEC matches, and follow-up needs by village.
+          Election Day poll watcher lists use official GEC precinct/village. Contacts may still remain assigned here for DPG outreach and village organizing.
         </p>
         {hasScopedVillageView && (
           <p className="text-xs text-gray-500 mb-3">
@@ -238,7 +248,7 @@ export default function DashboardPage() {
           <table className="w-full text-sm min-w-[940px]">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Village</th>
+                <th className="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">DPG Contact Village</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Contacts</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Intake</th>
                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">GEC Matches</th>

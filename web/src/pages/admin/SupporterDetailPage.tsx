@@ -50,6 +50,11 @@ interface SupporterDetail {
   registered_voter_location_note: string | null;
   registered_voter: boolean;
   current_gec_match?: boolean;
+  gec_village_name?: string | null;
+  gec_precinct_number?: string | null;
+  gec_address?: string | null;
+  gec_voter_registration_number?: string | null;
+  dpg_gec_village_mismatch?: boolean;
   wants_to_volunteer: boolean;
   needs_absentee_ballot_help: boolean;
   needs_homebound_voting_help: boolean;
@@ -857,6 +862,10 @@ export default function SupporterDetailPage() {
 
   const gecMatchCandidates = supporter.gec_match_candidates || [];
   const bestGecMatchCandidate = gecMatchCandidates[0];
+  const linkedGecVillage = bestGecMatchCandidate?.village_name || supporter.gec_village_name;
+  const linkedGecPrecinct = bestGecMatchCandidate?.precinct_number || supporter.gec_precinct_number;
+  const linkedGecAddress = bestGecMatchCandidate?.address || supporter.gec_address;
+  const hasVillageMismatch = Boolean(supporter.dpg_gec_village_mismatch);
   const confirmGecMatch = async (candidate?: GecMatchCandidate) => {
     const selectedCandidate = candidate || bestGecMatchCandidate;
     const candidateName = selectedCandidate ? gecCandidateName(selectedCandidate) : 'the best current GEC voter match';
@@ -1038,7 +1047,7 @@ export default function SupporterDetailPage() {
                 placeholder="Street Address"
               />
             </DetailField>
-            <DetailField label="Village">
+            <DetailField label="DPG contact village">
               <select
                 value={String(currentForm.village_id || '')}
                 onChange={(e) => {
@@ -1059,7 +1068,7 @@ export default function SupporterDetailPage() {
                 ))}
               </select>
             </DetailField>
-            <DetailField label="Precinct">
+            <DetailField label="DPG contact precinct">
               <select
                 value={currentForm.precinct_id ? String(currentForm.precinct_id) : ''}
                 onChange={(e) => updateDraft({ precinct_id: e.target.value ? Number(e.target.value) : null })}
@@ -1270,6 +1279,45 @@ export default function SupporterDetailPage() {
             </>
           )}
 
+          {supporter.current_gec_match && (
+            <div className={`mt-4 rounded-xl border px-4 py-3 ${hasVillageMismatch ? 'border-amber-200 bg-amber-50' : 'border-blue-100 bg-blue-50/60'}`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">DPG contact geography vs official GEC geography</h3>
+                {hasVillageMismatch && (
+                  <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                    Different villages
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg bg-white/70 px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">DPG contact/signup village</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {supporter.village_name || 'Unknown'}{supporter.precinct_number ? ` · Precinct ${supporter.precinct_number}` : ''}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">Used for DPG organizing, dashboard grouping, outreach, and village coordinator workflows.</p>
+                </div>
+                <div className="rounded-lg bg-white/70 px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Official GEC registered village</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {linkedGecVillage || 'Unknown'}{linkedGecPrecinct ? ` · Precinct ${linkedGecPrecinct}` : ''}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">Used for Election Day poll watcher lists and voter-file reporting.</p>
+                </div>
+              </div>
+              {linkedGecAddress && (
+                <p className="mt-3 text-xs text-[var(--text-secondary)]">
+                  Official GEC address: <span className="font-medium text-[var(--text-primary)]">{linkedGecAddress}</span>
+                </p>
+              )}
+              {hasVillageMismatch && (
+                <p className="mt-3 text-sm text-amber-800">
+                  Keep both contexts visible: this contact can remain in {supporter.village_name || 'the DPG contact village'} for outreach while appearing under {linkedGecVillage || 'their official GEC village'} for Election Day checkoff.
+                </p>
+              )}
+            </div>
+          )}
+
           {hasAssignmentHistory(supporter) && (
             <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -1413,7 +1461,7 @@ export default function SupporterDetailPage() {
                       {gecCandidateName(bestGecMatchCandidate)}
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                      Contact details above stay as DPG outreach info. This official GEC record is used for voter-list matching.
+                      Contact details above stay as DPG outreach info. This official GEC record is used for voter-list matching and Election Day precinct lists.
                     </p>
                   </div>
                   <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-green-800">

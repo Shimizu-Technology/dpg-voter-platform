@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getReportsList, getVillages, getDistricts, getPrecincts, getQuotaPeriods, getReportPreview, downloadReport } from '../../lib/api';
 import { captureAnalyticsEvent } from '../../lib/analytics';
@@ -72,7 +72,7 @@ const reportDescriptions: Record<string, string> = {
   dpg_contacts_unlinked_from_gec: 'DPG contacts without a confirmed GEC voter link. Use this for registration follow-up, cleanup, and manual matching work.',
   gec_voters_not_in_dpg: 'Current public GEC voters with no linked DPG contact. Use this to find outreach gaps by village or precinct.',
   possible_gec_matches: 'DPG contacts with likely GEC candidates that staff should review before confirming a voter-file link.',
-  dpg_gec_mismatches: 'Linked DPG contacts where the DPG-entered address, village, or precinct differs from the official GEC voter-file record.',
+  dpg_gec_mismatches: 'Linked DPG contacts where DPG contact/signup geography differs from the official GEC voter-file address, village, or precinct.',
 };
 
 const reportUseCases: Record<string, string> = {
@@ -82,7 +82,7 @@ const reportUseCases: Record<string, string> = {
   dpg_contacts_unlinked_from_gec: 'Use for cleanup, manual matching, and registration-help follow-up.',
   gec_voters_not_in_dpg: 'Use to identify voter-file outreach gaps where DPG does not yet have a contact relationship.',
   possible_gec_matches: 'Use as a review queue before confirming a voter-file link on a contact record.',
-  dpg_gec_mismatches: 'Use to spot contacts whose current DPG information may differ from official GEC voter-file information.',
+  dpg_gec_mismatches: 'Use to explain cases where someone belongs to one DPG contact village for outreach but another official GEC village/precinct for Election Day.',
   transfer_list: 'Use after new GEC imports to understand village changes in the voter file.',
   purge_list: 'Use after new GEC imports to inspect voters removed from the current file.',
   mapping_issues_list: 'Use when imported GEC rows need village mapping cleanup.',
@@ -122,7 +122,9 @@ const SUPPORTER_REPORT_TYPES = new Set([
 ]);
 
 export default function TeamReportsPage() {
-  const [selectedReport, setSelectedReport] = useState<string>('support_list');
+  const [searchParams] = useSearchParams();
+  const initialReport = searchParams.get('report') || 'support_list';
+  const [selectedReport, setSelectedReport] = useState<string>(initialReport);
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedVillage, setSelectedVillage] = useState('');
   const [selectedPrecinct, setSelectedPrecinct] = useState('');
@@ -227,7 +229,7 @@ export default function TeamReportsPage() {
             Report Workspace
           </div>
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-gray-950">Reports</h1>
-          <p className="mt-1 max-w-3xl text-sm text-gray-500">Choose a report, narrow the filters that matter, preview the rows, then download the final export.</p>
+          <p className="mt-1 max-w-3xl text-sm text-gray-500">Choose a report, narrow the filters that matter, preview the rows, then download the final export. DPG contact village is for organizing; official GEC village/precinct is for voter-file and Election Day workflows.</p>
         </div>
         {reportsList && (
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm">
