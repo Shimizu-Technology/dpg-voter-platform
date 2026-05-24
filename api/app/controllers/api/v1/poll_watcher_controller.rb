@@ -320,8 +320,13 @@ module Api
         end
 
         return voter if voter.precinct_id == precinct.id
-        return voter if requested_turnout_status == "observed_elsewhere"
-        return voter if voter.turnout_status == "observed_elsewhere" && can_reconcile_cross_precinct_turnout?
+
+        # Keep poll-watcher writes strictly scoped to assigned precinct rows. Out-of-precinct
+        # observations are useful for reconciliation, but only admins/coordinators may alter
+        # those voter records directly; poll watchers should file a Name Not On List incident.
+        if requested_turnout_status == "observed_elsewhere" || voter.turnout_status == "observed_elsewhere"
+          return voter if can_reconcile_cross_precinct_turnout?
+        end
 
         render_voter_not_found!(requested_turnout_status)
       end
@@ -403,8 +408,6 @@ module Api
           else
             scope.none
           end
-        elsif current_user.chief?
-          current_user.assigned_village_id.present? ? scope.where(village_id: current_user.assigned_village_id) : scope.none
         else
           scope.none
         end

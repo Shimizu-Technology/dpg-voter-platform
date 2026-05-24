@@ -85,7 +85,6 @@ const TURNOUT_PRIMARY_OPTIONS = [
   { value: 'voted', label: 'Voted' },
 ] as const;
 
-const TURNOUT_OBSERVED_ELSEWHERE_OPTION = { value: 'observed_elsewhere', label: 'Observed Elsewhere' } as const;
 const TURNOUT_CLEAR_OPTION = { value: 'unknown', label: 'Clear turnout status' } as const;
 
 function turnoutColor(pct: number | null) {
@@ -337,44 +336,30 @@ export default function PollWatcherPage() {
             <p className="font-semibold">Registered outside Precinct {selectedPrecinct?.number}</p>
             <p className="mt-1">
               This voter belongs to {voter.village_name || 'another village'} / Precinct {voter.precinct_number || 'unknown'} in the election-day list.
-              Use <span className="font-semibold">Observed Elsewhere</span> to flag that they were seen voting here without overwriting their registered-precinct turnout as a normal in-precinct mark.
+              Poll watchers cannot directly change out-of-precinct voter records. Submit a <span className="font-semibold">Name Not On List</span> incident with the voter name and context for DPG reconciliation.
             </p>
           </div>
         ) : null}
 
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {(isExternalMatch ? [TURNOUT_OBSERVED_ELSEWHERE_OPTION] : TURNOUT_PRIMARY_OPTIONS).map((option) => (
-            <button
-              key={`${voter.id}-${option.value}`}
-              type="button"
-              onClick={() => setTurnoutDraftByVoter((prev) => ({ ...prev, [voter.id]: option.value }))}
-              className={`min-h-[44px] rounded-xl border text-xs font-semibold ${
-                selectedTurnoutStatus === option.value
-                  ? option.value === 'observed_elsewhere'
-                    ? 'border-amber-300 bg-amber-50 text-amber-800'
-                    : 'border-primary bg-blue-50 text-primary'
-                  : 'border-[var(--border-soft)] text-[var(--text-secondary)]'
-              }`}
-              disabled={turnoutMutation.isPending}
-            >
-              {option.label}
-            </button>
-          ))}
-          {isExternalMatch && (
-            <button
-              type="button"
-              onClick={() => setTurnoutDraftByVoter((prev) => ({ ...prev, [voter.id]: TURNOUT_CLEAR_OPTION.value }))}
-              className={`min-h-[44px] rounded-xl border text-xs font-semibold ${
-                selectedTurnoutStatus === TURNOUT_CLEAR_OPTION.value
-                  ? 'border-[var(--border-soft)] bg-[var(--surface-overlay)] text-[var(--text-primary)]'
-                  : 'border-[var(--border-soft)] text-[var(--text-secondary)]'
-              }`}
-              disabled={turnoutMutation.isPending}
-            >
-              {TURNOUT_CLEAR_OPTION.label}
-            </button>
-          )}
-        </div>
+        {!isExternalMatch && (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {TURNOUT_PRIMARY_OPTIONS.map((option) => (
+              <button
+                key={`${voter.id}-${option.value}`}
+                type="button"
+                onClick={() => setTurnoutDraftByVoter((prev) => ({ ...prev, [voter.id]: option.value }))}
+                className={`min-h-[44px] rounded-xl border text-xs font-semibold ${
+                  selectedTurnoutStatus === option.value
+                    ? 'border-primary bg-blue-50 text-primary'
+                    : 'border-[var(--border-soft)] text-[var(--text-secondary)]'
+                }`}
+                disabled={turnoutMutation.isPending}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {!isExternalMatch && (
           <div className="mt-2">
@@ -393,37 +378,39 @@ export default function PollWatcherPage() {
           </div>
         )}
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => turnoutMutation.mutate({ voterId: voter.id, turnoutStatus: selectedTurnoutStatus })}
-            disabled={!hasPendingTurnoutChange || turnoutMutation.isPending}
-            className="min-h-[40px] rounded-xl bg-primary text-white text-xs font-semibold px-3 disabled:opacity-40"
-          >
-            Save Turnout
-          </button>
-          <button
-            type="button"
-            onClick={() => setTurnoutDraftByVoter((prev) => {
-              const next = { ...prev };
-              delete next[voter.id];
-              return next;
-            })}
-            disabled={!hasPendingTurnoutChange || turnoutMutation.isPending}
-            className="min-h-[40px] rounded-xl border border-[var(--border-soft)] text-xs font-semibold px-3 text-[var(--text-secondary)] disabled:opacity-40"
-          >
-            Revert
-          </button>
-          {hasPendingTurnoutChange && (
-            <span className="text-[11px] text-amber-700">Unsaved turnout change</span>
-          )}
-        </div>
+        {!isExternalMatch && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => turnoutMutation.mutate({ voterId: voter.id, turnoutStatus: selectedTurnoutStatus })}
+              disabled={!hasPendingTurnoutChange || turnoutMutation.isPending}
+              className="min-h-[40px] rounded-xl bg-primary text-white text-xs font-semibold px-3 disabled:opacity-40"
+            >
+              Save Turnout
+            </button>
+            <button
+              type="button"
+              onClick={() => setTurnoutDraftByVoter((prev) => {
+                const next = { ...prev };
+                delete next[voter.id];
+                return next;
+              })}
+              disabled={!hasPendingTurnoutChange || turnoutMutation.isPending}
+              className="min-h-[40px] rounded-xl border border-[var(--border-soft)] text-xs font-semibold px-3 text-[var(--text-secondary)] disabled:opacity-40"
+            >
+              Revert
+            </button>
+            {hasPendingTurnoutChange && (
+              <span className="text-[11px] text-amber-700">Unsaved turnout change</span>
+            )}
+          </div>
+        )}
 
         <p className="mt-2 text-[11px] text-[var(--text-secondary)]">
           {isExternalMatch
             ? supporterCount > 0
-              ? `${supporterCount} linked DPG contact${supporterCount === 1 ? '' : 's'} will be flagged for Election Day dashboard reconciliation when marked observed elsewhere.`
-              : 'Use this when a voter is seen here even though their registered election-day precinct is somewhere else.'
+              ? `${supporterCount} linked DPG contact${supporterCount === 1 ? '' : 's'} may need DPG reconciliation; submit an incident instead of directly changing this out-of-precinct row.`
+              : 'Submit a Name Not On List incident if this voter was heard or seen at this site.'
             : supporterCount > 0
               ? `${supporterCount} linked DPG contact${supporterCount === 1 ? '' : 's'} will stay connected to this turnout status for DPG follow-up.`
               : 'No linked DPG contact for this voter yet, so only turnout can be updated here.'}
@@ -436,24 +423,26 @@ export default function PollWatcherPage() {
           </div>
         )}
 
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={() => setNoteOpenByVoter((prev) => ({ ...prev, [voter.id]: !noteOpen }))}
-            className="text-xs text-[var(--text-secondary)] underline underline-offset-2"
-          >
-            {noteOpen ? 'Hide note' : 'Add note'}
-          </button>
-          {noteOpen && (
-            <input
-              type="text"
-              value={turnoutNoteByVoter[voter.id] || ''}
-              onChange={(e) => setTurnoutNoteByVoter((prev) => ({ ...prev, [voter.id]: e.target.value }))}
-              placeholder={isExternalMatch ? 'Optional note for out-of-precinct or provisional observation' : 'Optional note for turnout update'}
-              className="mt-2 w-full px-3 py-2 border border-[var(--border-soft)] rounded-xl text-xs min-h-[44px]"
-            />
-          )}
-        </div>
+        {!isExternalMatch && (
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => setNoteOpenByVoter((prev) => ({ ...prev, [voter.id]: !noteOpen }))}
+              className="text-xs text-[var(--text-secondary)] underline underline-offset-2"
+            >
+              {noteOpen ? 'Hide note' : 'Add note'}
+            </button>
+            {noteOpen && (
+              <input
+                type="text"
+                value={turnoutNoteByVoter[voter.id] || ''}
+                onChange={(e) => setTurnoutNoteByVoter((prev) => ({ ...prev, [voter.id]: e.target.value }))}
+                placeholder="Optional note for turnout update"
+                className="mt-2 w-full px-3 py-2 border border-[var(--border-soft)] rounded-xl text-xs min-h-[44px]"
+              />
+            )}
+          </div>
+        )}
       </>
     );
   };
@@ -574,7 +563,7 @@ export default function PollWatcherPage() {
 
               {debouncedStrikeSearch && externalMatches.length > 0 && (
                 <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  {externalMatches.length} out-of-precinct search match{externalMatches.length === 1 ? '' : 'es'} found. These can be marked <span className="font-semibold">Observed Elsewhere</span> without converting them into normal in-precinct turnout.
+                  {externalMatches.length} out-of-precinct search match{externalMatches.length === 1 ? '' : 'es'} found. Submit a <span className="font-semibold">Name Not On List</span> incident if the voter was heard or seen at this site.
                 </div>
               )}
 

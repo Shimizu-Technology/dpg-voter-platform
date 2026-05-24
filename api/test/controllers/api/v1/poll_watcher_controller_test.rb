@@ -85,6 +85,27 @@ module Api
         assert_equal "not_yet_voted", @other_voter.reload.turnout_status
       end
 
+      test "poll watcher cannot directly mark arbitrary out-of-precinct voter as observed elsewhere" do
+        patch "/api/v1/poll_watcher/strike_list/#{@other_voter.id}/turnout",
+          params: { turnout: { precinct_id: @precinct.id, turnout_status: "observed_elsewhere" } },
+          headers: auth_headers(@watcher)
+
+        assert_response :not_found
+        assert_equal "not_yet_voted", @other_voter.reload.turnout_status
+      end
+
+      test "admin may reconcile out-of-precinct observed elsewhere status" do
+        assert_difference "AuditLog.count", 1 do
+          patch "/api/v1/poll_watcher/strike_list/#{@other_voter.id}/turnout",
+            params: { turnout: { precinct_id: @precinct.id, turnout_status: "observed_elsewhere", note: "Reported at table" } },
+            headers: auth_headers(@admin)
+        end
+
+        assert_response :success
+        assert_equal "observed_elsewhere", @other_voter.reload.turnout_status
+        assert_equal "admin_override", @other_voter.turnout_source
+      end
+
       test "unassigned poll watcher sees no precincts" do
         get "/api/v1/poll_watcher", headers: auth_headers(@other_watcher)
 
