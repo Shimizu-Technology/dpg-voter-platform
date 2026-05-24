@@ -550,7 +550,7 @@ export default function PollWatcherPage() {
               <div className="flex items-center justify-between mb-3 gap-2">
                 <h3 className="font-bold text-[var(--text-primary)]">Precinct Voter List</h3>
                 <span className="text-xs text-[var(--text-secondary)]">
-                  {(strikeListData?.pagination?.total || strikeListData?.voters.length || 0) + externalMatches.length} voters shown
+                  {visibleStrikeVoters.length} shown{strikeListData?.pagination ? ` of ${strikeListData.pagination.total + externalMatches.length}` : ''}
                 </span>
               </div>
               <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 mb-3">
