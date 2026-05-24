@@ -294,16 +294,19 @@ Possible scope:
 
 ## Open questions for DPG / Mike Weekly
 
+See also `docs/dpg-open-questions.md` for the current walkthrough question list, including the key distinction between official GEC precinct/village for Election Day checkoff and separate DPG contact village for outreach.
+
 Confirm before or during PR 1/PR 2 planning:
 
 1. Should poll watchers mark individual voters, submit aggregate turnout counts, or both?
 2. Should poll watchers be able to correct their own marks?
 3. Who can clear `observed_elsewhere` or mistaken voted marks?
 4. Should poll watchers see phone/contact info, or only GEC voter info?
-5. Should out-of-precinct search be enabled for poll watchers or admin-only?
+5. Should out-of-precinct search be enabled for poll watchers or admin-only? If enabled, should poll watchers only file incidents, or can any trusted role mark an out-of-precinct voter as voted/observed elsewhere?
 6. What should the dashboard prioritize: all GEC turnout, DPG supporters, members, registered Democrats, ride-to-polls, or a combination?
-7. What training date is needed before the August 1 primary?
-8. What language does DPG want for the dashboard: "War Room," "Election Day Dashboard," or another term?
+7. If a DPG contact's self-reported village differs from their official GEC registered village, should the app show them only in the GEC precinct list and surface the DPG contact village as context, or should DPG also want contact-village exception queues?
+8. What training date is needed before the August 1 primary?
+9. What language does DPG want for the dashboard: "War Room," "Election Day Dashboard," or another term?
 
 ## Clean-room guardrails
 

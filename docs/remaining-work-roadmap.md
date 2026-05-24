@@ -86,10 +86,13 @@ Open questions:
 - What exactly can poll watchers legally/operationally record?
 - Should they mark individual voters, submit aggregate counts, or both?
 - Will they search by name, registration number, precinct list, or paper roster order?
+- If a DPG contact village differs from the official GEC registered precinct/village, should Election Day checkoff stay strictly GEC-based while showing DPG contact context, or should DPG want contact-village exception queues?
 - Who can correct a mistaken voted/not-voted mark?
 - Should poll watchers see any DPG contact/phone info, or only GEC voter rows?
 - How often does the dashboard need updates?
 - What training date is needed before the August 1 primary?
+
+Track the full question set in `docs/dpg-open-questions.md`.
 
 Clean-room guardrail: do not copy Josh/Tina election-day operating workflows or private playbooks. Reuse only neutral platform primitives like roles, precincts, GEC voters, audit logs, and realtime updates, and implement DPG-specific language/workflows because DPG explicitly requested this module.
 
