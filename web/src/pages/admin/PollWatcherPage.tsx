@@ -123,6 +123,15 @@ function turnoutSourceLabel(source?: string | null) {
   return source.replace(/_/g, ' ');
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string; error?: string; errors?: string[] } } }).response;
+    return response?.data?.message || response?.data?.error || response?.data?.errors?.join(', ') || fallback;
+  }
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
 export default function PollWatcherPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -146,6 +155,8 @@ export default function PollWatcherPage() {
   const [strikePage, setStrikePage] = useState(1);
   const [strikePerPage, setStrikePerPage] = useState(25);
   const [reportFormOpen, setReportFormOpen] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [turnoutError, setTurnoutError] = useState('');
   const debouncedStrikeSearch = useDebouncedValue(strikeSearch, 250);
   const isNameNotOnListReport = reportType === 'not_on_list';
 
@@ -157,6 +168,7 @@ export default function PollWatcherPage() {
 
   const reportMutation = useMutation({
     mutationFn: submitPollReport,
+    onMutate: () => setReportError(''),
     onSuccess: (data) => {
       setSuccessMsg(data.message);
       setVoterCount('');
@@ -164,6 +176,9 @@ export default function PollWatcherPage() {
       setSelectedPrecinct(null);
       queryClient.invalidateQueries({ queryKey: ['poll_watcher'] });
       setTimeout(() => setSuccessMsg(''), 3000);
+    },
+    onError: (error) => {
+      setReportError(getErrorMessage(error, 'Could not submit this poll watcher report.'));
     },
   });
 
@@ -188,6 +203,7 @@ export default function PollWatcherPage() {
         note: turnoutNoteByVoter[voterId] || undefined,
       });
     },
+    onMutate: () => setTurnoutError(''),
     onSuccess: (response: { message?: string }, variables) => {
       setStrikeNotice(response?.message || 'Turnout updated');
       setTurnoutDraftByVoter((prev) => {
@@ -198,6 +214,9 @@ export default function PollWatcherPage() {
       queryClient.invalidateQueries({ queryKey: ['poll_watcher'] });
       queryClient.invalidateQueries({ queryKey: ['poll_watcher_strike_list'] });
       setTimeout(() => setStrikeNotice(''), 3000);
+    },
+    onError: (error) => {
+      setTurnoutError(getErrorMessage(error, 'Could not update this voter turnout status.'));
     },
   });
 
@@ -347,7 +366,10 @@ export default function PollWatcherPage() {
               <button
                 key={`${voter.id}-${option.value}`}
                 type="button"
-                onClick={() => setTurnoutDraftByVoter((prev) => ({ ...prev, [voter.id]: option.value }))}
+                onClick={() => {
+                  setTurnoutError('');
+                  setTurnoutDraftByVoter((prev) => ({ ...prev, [voter.id]: option.value }));
+                }}
                 className={`min-h-[44px] rounded-xl border text-xs font-semibold ${
                   selectedTurnoutStatus === option.value
                     ? 'border-primary bg-blue-50 text-primary'
@@ -365,7 +387,10 @@ export default function PollWatcherPage() {
           <div className="mt-2">
             <button
               type="button"
-              onClick={() => setTurnoutDraftByVoter((prev) => ({ ...prev, [voter.id]: TURNOUT_CLEAR_OPTION.value }))}
+              onClick={() => {
+                setTurnoutError('');
+                setTurnoutDraftByVoter((prev) => ({ ...prev, [voter.id]: TURNOUT_CLEAR_OPTION.value }));
+              }}
               className={`min-h-[40px] rounded-xl border px-3 text-xs font-semibold ${
                 selectedTurnoutStatus === TURNOUT_CLEAR_OPTION.value
                   ? 'border-amber-300 bg-amber-50 text-amber-800'
@@ -470,6 +495,12 @@ export default function PollWatcherPage() {
             <span className="font-medium">{successMsg}</span>
           </div>
         )}
+        {reportError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-3 mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <span className="font-medium">{reportError}</span>
+          </div>
+        )}
 
         {/* Stats Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
@@ -528,6 +559,11 @@ export default function PollWatcherPage() {
               {strikeNotice && (
                 <p className="text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-2.5 py-2 mb-3">
                   {strikeNotice}
+                </p>
+              )}
+              {turnoutError && (
+                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-2 mb-3">
+                  {turnoutError}
                 </p>
               )}
 
@@ -793,7 +829,10 @@ export default function PollWatcherPage() {
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setReportType(value)}
+                      onClick={() => {
+                        setReportType(value);
+                        setReportError('');
+                      }}
                       className={`p-2 min-h-[44px] rounded-xl border text-sm font-medium text-left flex items-center gap-2 ${
                         reportType === value
                           ? 'border-primary bg-blue-50 text-primary'
@@ -817,7 +856,10 @@ export default function PollWatcherPage() {
                     <input
                       type="number"
                       value={voterCount}
-                      onChange={e => setVoterCount(e.target.value)}
+                      onChange={(e) => {
+                        setVoterCount(e.target.value);
+                        setReportError('');
+                      }}
                       placeholder="Enter count"
                       className="w-full px-4 py-3 border border-[var(--border-soft)] rounded-xl text-lg focus:ring-2 focus:ring-primary"
                       min="0"
@@ -833,7 +875,10 @@ export default function PollWatcherPage() {
                   </label>
                   <textarea
                     value={notes}
-                    onChange={e => setNotes(e.target.value)}
+                    onChange={(e) => {
+                      setNotes(e.target.value);
+                      setReportError('');
+                    }}
                     placeholder={isNameNotOnListReport
                       ? 'Example: a voter said they voted here, but no election-day voter row was found. Include name and context for DPG data follow-up.'
                       : 'Any issues, observations...'}

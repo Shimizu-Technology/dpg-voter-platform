@@ -12,10 +12,12 @@ class PollReport < ApplicationRecord
   scope :today, -> { where("reported_at >= ?", Date.current.beginning_of_day) }
   scope :chronological, -> { order(reported_at: :desc) }
 
-  # Get the latest report for each precinct. Keep this portable across PostgreSQL
-  # and SQLite so controller tests do not depend on DISTINCT ON.
+  # Get the latest report for each precinct by reported_at, with id as a stable
+  # tie-breaker. Uses a SQL window function supported by PostgreSQL and SQLite.
   def self.latest_per_precinct
-    eligible = where.not(report_type: "not_on_list")
-    where(id: eligible.select("MAX(poll_reports.id)").group(:precinct_id))
+    ranked = where.not(report_type: "not_on_list")
+      .select("poll_reports.*, ROW_NUMBER() OVER (PARTITION BY precinct_id ORDER BY reported_at DESC, id DESC) AS report_rank")
+
+    from("(#{ranked.to_sql}) poll_reports").where(report_rank: 1)
   end
 end

@@ -400,8 +400,8 @@ module Api
         elsif current_user.coordinator?
           current_user.assigned_district_id.present? ? scope.joins(:village).where(villages: { district_id: current_user.assigned_district_id }) : scope
         elsif current_user.poll_watcher?
-          assigned_precinct_ids = current_user.poll_watcher_precinct_assignments.select(:precinct_id)
-          if current_user.poll_watcher_precinct_assignments.exists?
+          assigned_precinct_ids = current_user.poll_watcher_precinct_assignments.pluck(:precinct_id)
+          if assigned_precinct_ids.any?
             scope.where(id: assigned_precinct_ids)
           elsif current_user.assigned_village_id.present?
             scope.where(village_id: current_user.assigned_village_id)

@@ -61,6 +61,29 @@ module Api
         assert_equal "precinct_not_authorized", response.parsed_body.fetch("code")
       end
 
+      test "index uses latest report by reported_at not by id" do
+        newer_report = PollReport.create!(
+          precinct: @precinct,
+          user: @watcher,
+          voter_count: 40,
+          report_type: "turnout_update",
+          reported_at: 1.hour.ago
+        )
+        PollReport.create!(
+          precinct: @precinct,
+          user: @watcher,
+          voter_count: 10,
+          report_type: "turnout_update",
+          reported_at: 2.hours.ago
+        )
+
+        get "/api/v1/poll_watcher", headers: auth_headers(@watcher)
+
+        assert_response :success
+        precinct_payload = response.parsed_body.fetch("villages").first.fetch("precincts").first
+        assert_equal newer_report.voter_count, precinct_payload.fetch("last_voter_count")
+      end
+
       test "poll watcher can update turnout for assigned precinct voter" do
         assert_difference "AuditLog.count", 1 do
           patch "/api/v1/poll_watcher/strike_list/#{@voter.id}/turnout",
