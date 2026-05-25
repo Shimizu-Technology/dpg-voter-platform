@@ -53,6 +53,18 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
+  test "update cannot directly activate an election event" do
+    patch "/api/v1/election_events/#{@event.id}",
+      params: { election_event: { status: "active", name: "Renamed Primary" } },
+      headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    @event.reload
+    assert_equal "setup", @event.status
+    assert_equal "Renamed Primary", @event.name
+    assert_nil @event.activated_at
+  end
+
   test "command center uses active election GEC list and chase list contact status" do
     @event.activate!(actor_user: @admin)
     SupporterContactAttempt.create!(supporter: @supporter, recorded_by_user: @admin, channel: "call", outcome: "attempted", recorded_at: Time.current)

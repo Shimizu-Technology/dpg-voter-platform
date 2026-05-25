@@ -72,7 +72,7 @@ module Api
       private
 
       def election_event_params
-        params.require(:election_event).permit(:name, :election_type, :election_date, :status, :gec_import_id)
+        params.require(:election_event).permit(:name, :election_type, :election_date, :gec_import_id)
       end
 
       def require_command_center_access!
