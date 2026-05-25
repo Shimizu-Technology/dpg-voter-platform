@@ -72,6 +72,14 @@ module Api
 
       def close
         event = ElectionEvent.find(params[:id])
+        unless event.status.in?(%w[setup training active])
+          return render_api_error(
+            message: "Only setup, training, or active election events can be closed",
+            status: :conflict,
+            code: "election_event_not_closable"
+          )
+        end
+
         previous_status = event.status
         event.close!(actor_user: current_user)
         log_audit!(event, action: "election_event_closed", changed_data: { status: [ previous_status, "closed" ] })

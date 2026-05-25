@@ -47,7 +47,9 @@ module Api
 
         attempt = supporter.supporter_contact_attempts.build(contact_attempt_params)
         attempt.recorded_by_user = current_user
-        attempt.recorded_at ||= Time.current
+        # Election Day chase-list contact state should reflect when the command center logged the touch,
+        # not a client-supplied timestamp that could hide/show the row under "contacted today" incorrectly.
+        attempt.recorded_at = Time.current
         attempt.note = election_contact_note(event, attempt.note)
 
         if attempt.save
@@ -205,7 +207,7 @@ module Api
       end
 
       def contact_attempt_params
-        params.require(:contact_attempt).permit(:channel, :outcome, :note, :recorded_at)
+        params.require(:contact_attempt).permit(:channel, :outcome, :note)
       end
 
       def dpg_operations_compliance_note

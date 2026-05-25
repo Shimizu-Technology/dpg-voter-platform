@@ -101,17 +101,28 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
     assert_equal 0, response.parsed_body.dig("stats", "chase_list_count")
   end
 
-  test "command center contact logging writes normal contact history" do
+  test "command center contact logging writes normal contact history and ignores client supplied recorded_at" do
     @event.activate!(actor_user: @admin)
-
-    post "/api/v1/election_day/contact",
-      params: { supporter_id: @supporter.id, contact_attempt: { channel: "call", outcome: "reached", note: "Plans to vote after work" } },
-      headers: auth_headers(@admin), as: :json
+    travel_to Time.zone.local(2026, 8, 1, 10, 30, 0) do
+      post "/api/v1/election_day/contact",
+        params: { supporter_id: @supporter.id, contact_attempt: { channel: "call", outcome: "reached", note: "Plans to vote after work", recorded_at: 2.days.ago.iso8601 } },
+        headers: auth_headers(@admin), as: :json
+    end
 
     assert_response :created
     attempt = @supporter.supporter_contact_attempts.order(:created_at).last
     assert_equal "call", attempt.channel
     assert_equal "reached", attempt.outcome
     assert_includes attempt.note, @event.name
+    assert_equal Time.zone.local(2026, 8, 1, 10, 30, 0), attempt.recorded_at
+  end
+
+  test "already closed election event cannot be closed again" do
+    @event.close!(actor_user: @admin)
+
+    post "/api/v1/election_events/#{@event.id}/close", headers: auth_headers(@admin), as: :json
+
+    assert_response :conflict
+    assert_equal "election_event_not_closable", response.parsed_body["code"]
   end
 end
