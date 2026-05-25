@@ -99,6 +99,31 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
     refute_includes payload["chase_list"].map { |row| row["gec_voter_id"] }, @older_voter.id
   end
 
+  test "command center returns the full chase list, not only the first 200 contacts" do
+    @event.activate!(actor_user: @admin)
+    201.times do |index|
+      voter = GecVoter.create!(
+        first_name: "Chase", last_name: "Contact#{index}", birth_year: 1980,
+        address: "#{index} Chalan Santo Papa", village: @village, village_name: @village.name,
+        precinct: @precinct, precinct_number: @precinct.number,
+        voter_registration_number: "GEC-CHASE-#{index}", gec_list_date: @gec_import.gec_list_date, imported_at: Time.current
+      )
+      supporter = Supporter.create!(
+        first_name: "Chase", last_name: "Contact#{index}", contact_number: "671555#{format('%04d', index)}",
+        village: @village, precinct: @precinct, source: "staff_entry",
+        contact_classification: "active_contact", support_status: "supporter",
+        status: "active", verification_status: "verified"
+      )
+      supporter.update_columns(gec_voter_id: voter.id)
+    end
+
+    get "/api/v1/election_day", headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    assert_equal 202, response.parsed_body.dig("stats", "chase_list_count")
+    assert_equal 202, response.parsed_body["chase_list"].size
+  end
+
   test "poll watcher turnout update creates election scoped record and removes from chase list" do
     @event.activate!(actor_user: @admin)
     PollWatcherPrecinctAssignment.create!(user: @poll_watcher, precinct: @precinct, assigned_at: Time.current)

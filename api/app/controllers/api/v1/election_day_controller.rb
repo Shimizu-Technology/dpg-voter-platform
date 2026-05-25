@@ -32,7 +32,7 @@ module Api
           active_election: election_event_json(event),
           stats: command_center_stats(voters, records, chase, exceptions),
           villages: villages,
-          chase_list: chase.first(200),
+          chase_list: chase,
           exceptions: exceptions.first(100),
           recent_reports: recent_reports(event)
         }

@@ -12,6 +12,7 @@ import {
 } from '../../lib/api';
 import { formatDateTime } from '../../lib/datetime';
 import { getErrorMessage } from '../../lib/contactAttempt';
+import { useSession } from '../../hooks/useSession';
 
 type ElectionEvent = {
   id: number;
@@ -133,7 +134,10 @@ export default function ElectionDayCommandCenterPage() {
   const [villageFilter, setVillageFilter] = useState('');
   const [contactFilter, setContactFilter] = useState<'all' | 'not_contacted' | 'contacted' | 'rides'>('not_contacted');
   const [contactDrafts, setContactDrafts] = useState<Record<number, { channel: string; outcome: string; note: string }>>({});
+  const [pendingContactIds, setPendingContactIds] = useState<Set<number>>(() => new Set());
 
+  const sessionQuery = useSession();
+  const canManageElectionSetup = ['admin', 'data_team'].includes(sessionQuery.data?.user.role || '');
   const eventsQuery = useQuery<ElectionEventsData>({ queryKey: ['election-events'], queryFn: getElectionEvents });
   const commandQuery = useQuery<CommandCenterData>({ queryKey: ['election-day-command-center'], queryFn: getElectionDayCommandCenter, refetchInterval: 30_000 });
 
@@ -165,9 +169,21 @@ export default function ElectionDayCommandCenterPage() {
   const contactMutation = useMutation({
     mutationFn: ({ supporterId, payload }: { supporterId: number; payload: { channel: string; outcome: string; note: string } }) =>
       logElectionDayContact(supporterId, payload),
+    onMutate: (variables) => {
+      setPendingContactIds((prev) => new Set(prev).add(variables.supporterId));
+    },
     onSuccess: (_data, variables) => {
       setContactDrafts((prev) => ({ ...prev, [variables.supporterId]: { channel: 'call', outcome: 'attempted', note: '' } }));
       void queryClient.invalidateQueries({ queryKey: ['election-day-command-center'] });
+    },
+    onSettled: (_data, _error, variables) => {
+      if (!variables) return;
+
+      setPendingContactIds((prev) => {
+        const next = new Set(prev);
+        next.delete(variables.supporterId);
+        return next;
+      });
     },
   });
 
@@ -205,9 +221,11 @@ export default function ElectionDayCommandCenterPage() {
             Track the active election, official GEC list, turnout, not-yet-voted DPG contact follow-up, ride requests, and polling-place exceptions.
           </p>
         </div>
-        <button type="button" onClick={() => setSetupOpen((value) => !value)} className="app-btn-secondary w-fit">
-          {setupOpen ? 'Hide setup' : 'Election setup'}
-        </button>
+        {canManageElectionSetup && (
+          <button type="button" onClick={() => setSetupOpen((value) => !value)} className="app-btn-secondary w-fit">
+            {setupOpen ? 'Hide setup' : 'Election setup'}
+          </button>
+        )}
       </div>
 
       {activeElection ? (
@@ -221,9 +239,11 @@ export default function ElectionDayCommandCenterPage() {
               </p>
               {activeElection.gec_import_filename && <p className="mt-1 text-xs text-slate-500">Source: {activeElection.gec_import_filename}</p>}
             </div>
-            <button type="button" onClick={() => activeElection && closeMutation.mutate(activeElection.id)} className="app-btn-secondary text-xs" disabled={closeMutation.isPending}>
-              Close election
-            </button>
+            {canManageElectionSetup && (
+              <button type="button" onClick={() => activeElection && closeMutation.mutate(activeElection.id)} className="app-btn-secondary text-xs" disabled={closeMutation.isPending}>
+                Close election
+              </button>
+            )}
           </div>
         </section>
       ) : (
@@ -238,7 +258,7 @@ export default function ElectionDayCommandCenterPage() {
         </section>
       )}
 
-      {setupOpen && (
+      {setupOpen && canManageElectionSetup && (
         <section className="app-card p-5">
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)]">
             <div>
@@ -373,6 +393,7 @@ export default function ElectionDayCommandCenterPage() {
           <div className="mt-4 space-y-3">
             {filteredChase.map((contact) => {
               const draftForContact = contactDrafts[contact.supporter_id] || { channel: 'call', outcome: 'attempted', note: '' };
+              const contactPending = pendingContactIds.has(contact.supporter_id);
               return (
                 <div key={`${contact.supporter_id}-${contact.gec_voter_id}`} className="rounded-2xl border border-[var(--border-soft)] p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -404,8 +425,8 @@ export default function ElectionDayCommandCenterPage() {
                         </select>
                       </div>
                       <input value={draftForContact.note} onChange={(e) => setContactDrafts((prev) => ({ ...prev, [contact.supporter_id]: { ...draftForContact, note: e.target.value } }))} placeholder="Election Day note: plans to vote, needs ride, already voted..." className="rounded-xl border border-[var(--border-soft)] px-3 py-2 text-sm" />
-                      <button type="button" onClick={() => contactMutation.mutate({ supporterId: contact.supporter_id, payload: draftForContact })} disabled={contactMutation.isPending} className="app-btn-primary justify-center text-sm">
-                        <Phone className="h-4 w-4" /> Log contact
+                      <button type="button" onClick={() => contactMutation.mutate({ supporterId: contact.supporter_id, payload: draftForContact })} disabled={contactPending} className="app-btn-primary justify-center text-sm">
+                        <Phone className="h-4 w-4" /> {contactPending ? 'Logging...' : 'Log contact'}
                       </button>
                     </div>
                   </div>
