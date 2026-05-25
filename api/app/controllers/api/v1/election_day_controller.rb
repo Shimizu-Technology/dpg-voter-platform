@@ -169,7 +169,7 @@ module Api
         reports = PollReport.where(reported_at: event.election_date.all_day)
         reports = reports.where(precinct_id: precinct_ids) if precinct_ids.any?
 
-        reports.includes(:precinct, :user).order(reported_at: :desc).limit(25).map do |report|
+        reports.includes(:user, precinct: :village).order(reported_at: :desc).limit(25).map do |report|
           {
             id: report.id,
             precinct_id: report.precinct_id,
