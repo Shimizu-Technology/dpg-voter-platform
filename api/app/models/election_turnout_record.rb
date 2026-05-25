@@ -36,6 +36,6 @@ class ElectionTurnoutRecord < ApplicationRecord
     record.registered_precinct = gec_voter.precinct
     record.registered_precinct_number = gec_voter.precinct_number || gec_voter.precinct&.number
     record.registered_village_name = gec_voter.village_name || gec_voter.village&.name
-    record.turnout_status = "not_yet_voted"
+    record.turnout_status = TURNOUT_STATUSES.include?(gec_voter.turnout_status) ? gec_voter.turnout_status : "not_yet_voted"
   end
 end

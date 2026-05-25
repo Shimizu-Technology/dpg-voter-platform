@@ -37,6 +37,15 @@ class ElectionTurnoutUpdateServiceTest < ActiveSupport::TestCase
     assert_equal "not_yet_voted", @voter.reload.turnout_status
   end
 
+  test "display fallback seeds turnout status from legacy GEC voter status" do
+    @voter.update!(turnout_status: "voted", turnout_source: "poll_watcher", turnout_updated_at: Time.current, turnout_updated_by_user: @user)
+
+    record = ElectionTurnoutRecord.build_for_display(election_event: @event, gec_voter: @voter)
+
+    assert record.new_record?
+    assert_equal "voted", record.turnout_status
+  end
+
   test "audit log records previous turnout timestamp on corrections" do
     first_result = ElectionTurnoutUpdateService.new(
       election_event: @event,
