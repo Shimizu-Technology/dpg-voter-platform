@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_23_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_25_091000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -122,6 +122,56 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_020000) do
     t.index ["supporter_id", "dismissed_supporter_id"], name: "index_duplicate_pair_dismissals_on_pair", unique: true
     t.index ["supporter_id"], name: "index_duplicate_pair_dismissals_on_supporter_id"
     t.check_constraint "supporter_id < dismissed_supporter_id", name: "duplicate_pair_dismissals_ordered_pair"
+  end
+
+  create_table "election_events", force: :cascade do |t|
+    t.datetime "activated_at"
+    t.bigint "activated_by_user_id"
+    t.datetime "closed_at"
+    t.bigint "closed_by_user_id"
+    t.datetime "created_at", null: false
+    t.date "election_date", null: false
+    t.string "election_type", default: "general", null: false
+    t.bigint "gec_import_id"
+    t.jsonb "metadata", default: {}, null: false
+    t.string "name", null: false
+    t.string "status", default: "setup", null: false
+    t.datetime "updated_at", null: false
+    t.index ["activated_by_user_id"], name: "index_election_events_on_activated_by_user_id"
+    t.index ["closed_by_user_id"], name: "index_election_events_on_closed_by_user_id"
+    t.index ["election_date", "name"], name: "index_election_events_on_election_date_and_name"
+    t.index ["gec_import_id"], name: "index_election_events_on_gec_import_id"
+    t.index ["status"], name: "index_election_events_on_status"
+    t.index ["status"], name: "index_election_events_unique_active", unique: true, where: "((status)::text = 'active'::text)"
+  end
+
+  create_table "election_turnout_records", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "election_event_id", null: false
+    t.bigint "gec_voter_id", null: false
+    t.bigint "observation_precinct_id"
+    t.string "observation_precinct_number"
+    t.string "observation_village_name"
+    t.bigint "registered_precinct_id"
+    t.string "registered_precinct_number"
+    t.string "registered_village_name"
+    t.bigint "supporter_id"
+    t.text "turnout_note"
+    t.string "turnout_source"
+    t.string "turnout_status", default: "not_yet_voted", null: false
+    t.datetime "turnout_updated_at"
+    t.bigint "turnout_updated_by_user_id"
+    t.datetime "updated_at", null: false
+    t.index ["election_event_id", "gec_voter_id"], name: "index_election_turnout_unique_voter", unique: true
+    t.index ["election_event_id", "registered_precinct_id"], name: "index_election_turnout_on_event_precinct"
+    t.index ["election_event_id", "supporter_id"], name: "index_election_turnout_on_event_supporter"
+    t.index ["election_event_id", "turnout_status"], name: "index_election_turnout_on_event_status"
+    t.index ["election_event_id"], name: "index_election_turnout_records_on_election_event_id"
+    t.index ["gec_voter_id"], name: "index_election_turnout_records_on_gec_voter_id"
+    t.index ["observation_precinct_id"], name: "index_election_turnout_records_on_observation_precinct_id"
+    t.index ["registered_precinct_id"], name: "index_election_turnout_records_on_registered_precinct_id"
+    t.index ["supporter_id"], name: "index_election_turnout_records_on_supporter_id"
+    t.index ["turnout_updated_by_user_id"], name: "index_election_turnout_records_on_turnout_updated_by_user_id"
   end
 
   create_table "email_blasts", force: :cascade do |t|
@@ -804,6 +854,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_020000) do
   add_foreign_key "duplicate_pair_dismissals", "supporters"
   add_foreign_key "duplicate_pair_dismissals", "supporters", column: "dismissed_supporter_id"
   add_foreign_key "duplicate_pair_dismissals", "users", column: "resolved_by_id"
+  add_foreign_key "election_events", "gec_imports"
+  add_foreign_key "election_events", "users", column: "activated_by_user_id"
+  add_foreign_key "election_events", "users", column: "closed_by_user_id"
+  add_foreign_key "election_turnout_records", "election_events"
+  add_foreign_key "election_turnout_records", "gec_voters"
+  add_foreign_key "election_turnout_records", "precincts", column: "observation_precinct_id"
+  add_foreign_key "election_turnout_records", "precincts", column: "registered_precinct_id"
+  add_foreign_key "election_turnout_records", "supporters"
+  add_foreign_key "election_turnout_records", "users", column: "turnout_updated_by_user_id"
   add_foreign_key "email_blasts", "users", column: "initiated_by_user_id"
   add_foreign_key "event_rsvps", "events"
   add_foreign_key "event_rsvps", "supporters"

@@ -50,6 +50,7 @@ class Supporter < ApplicationRecord
 
   has_many :audit_logs, as: :auditable, dependent: :destroy
   has_many :supporter_contact_attempts, dependent: :destroy
+  has_many :election_turnout_records, dependent: :nullify
 
   validates :first_name, presence: true
   validates :last_name, presence: true

@@ -59,6 +59,7 @@ module Api
             can_access_reports: can_access_reports?,
             can_access_qr: can_access_qr?,
             can_access_poll_watcher: can_access_poll_watcher?,
+            can_access_command_center: can_access_command_center?,
             can_import_supporters: can_import_supporters?,
             can_export_supporters: can_export_supporters?,
             can_upload_gec: can_upload_gec?,

@@ -139,18 +139,20 @@ module Api
         precinct = resolve_accessible_precinct_from_params
         return unless precinct
 
-        voters = gec_voters_scope_for_precinct(precinct.id)
-        voters = voters.where(turnout_status: params[:turnout_status]) if params[:turnout_status].present?
-
-        voters = apply_strike_list_search(voters, params[:search]) if params[:search].present?
+        voters_scope = gec_voters_scope_for_precinct(precinct.id)
+        voters_scope = apply_strike_list_search(voters_scope, params[:search]) if params[:search].present?
+        voters_all = voters_scope.to_a
+        turnout_records = election_turnout_records_for(voters_all)
+        voters_filtered = filter_voters_by_turnout(voters_all, turnout_records, params[:turnout_status])
         external_matches = external_strike_list_matches(precinct, params[:search], params[:turnout_status])
+        external_records = election_turnout_records_for(external_matches)
 
         page = [ params[:page].to_i, 1 ].max
         per_page = params[:per_page].to_i
         per_page = 25 if per_page <= 0
         per_page = [ per_page, 100 ].min
-        total = voters.count
-        voters = voters.offset((page - 1) * per_page).limit(per_page).to_a
+        total = voters_filtered.size
+        voters = voters_filtered.slice((page - 1) * per_page, per_page) || []
         overlays = supporter_overlays_for_voter_ids(voters.map(&:id) + external_matches.map(&:id))
 
         render json: {
@@ -162,8 +164,8 @@ module Api
             village_id: precinct.village_id,
             village_name: precinct.village.name
           },
-          voters: voters.map { |voter| strike_list_voter_payload(voter, overlays[voter.id] || []) },
-          external_matches: external_matches.map { |voter| strike_list_voter_payload(voter, overlays[voter.id] || [], observation_precinct: precinct) },
+          voters: voters.map { |voter| strike_list_voter_payload(voter, overlays[voter.id] || [], turnout_record: turnout_records[voter.id]) },
+          external_matches: external_matches.map { |voter| strike_list_voter_payload(voter, overlays[voter.id] || [], observation_precinct: precinct, turnout_record: external_records[voter.id]) },
           pagination: {
             page: page,
             per_page: per_page,
@@ -186,22 +188,33 @@ module Api
         return unless voter
 
         original_turnout_status = voter.turnout_status
-        result = GecVoterTurnoutService.new(
-          gec_voter: voter,
-          actor_user: current_user,
-          turnout_status: turnout_update_params[:turnout_status],
-          note: turnout_update_params[:note],
-          source: turnout_source_for_current_user,
-          observation_precinct: precinct
-        )
-          .call
+        result = if active_election_event
+          ElectionTurnoutUpdateService.new(
+            election_event: active_election_event,
+            gec_voter: voter,
+            actor_user: current_user,
+            turnout_status: turnout_update_params[:turnout_status],
+            note: turnout_update_params[:note],
+            source: turnout_source_for_current_user,
+            observation_precinct: precinct
+          ).call
+        else
+          GecVoterTurnoutService.new(
+            gec_voter: voter,
+            actor_user: current_user,
+            turnout_status: turnout_update_params[:turnout_status],
+            note: turnout_update_params[:note],
+            source: turnout_source_for_current_user,
+            observation_precinct: precinct
+          ).call
+        end
 
         if result.success?
           overlays = supporter_overlays_for_voter_ids([ voter.id ])
           render json: {
             message: "Voter turnout status updated",
             compliance_note: dpg_operations_compliance_note,
-            voter: strike_list_voter_payload(voter.reload, overlays[voter.id] || [], observation_precinct: precinct),
+            voter: strike_list_voter_payload(voter.reload, overlays[voter.id] || [], observation_precinct: precinct, turnout_record: result.respond_to?(:record) ? result.record : nil),
             changed: {
               turnout_status: [ original_turnout_status, voter.turnout_status ]
             }
@@ -292,29 +305,58 @@ module Api
       end
 
       def gec_voters_scope_for_precinct(precinct_id)
-        GecVoter
-          .election_day_active
+        election_gec_voter_scope
           .where(precinct_id: precinct_id)
           .order(:last_name, :first_name, :id)
+      end
+
+      def election_gec_voter_scope
+        scope = GecVoter.active
+        if active_election_event&.gec_list_date.present?
+          scope.for_list_date(active_election_event.gec_list_date)
+        else
+          GecVoter.election_day_active
+        end
+      end
+
+      def election_turnout_records_for(voters)
+        return {} if active_election_event.blank? || voters.blank?
+
+        existing = active_election_event.election_turnout_records.where(gec_voter_id: voters.map(&:id)).index_by(&:gec_voter_id)
+        voters.each_with_object({}) do |voter, memo|
+          memo[voter.id] = existing[voter.id] || ElectionTurnoutRecord.for(election_event: active_election_event, gec_voter: voter)
+        end
+      end
+
+      def filter_voters_by_turnout(voters, records, turnout_status)
+        return voters if turnout_status.blank?
+
+        voters.select do |voter|
+          effective_turnout_status(voter, records[voter.id]) == turnout_status
+        end
+      end
+
+      def effective_turnout_status(voter, turnout_record)
+        turnout_record&.turnout_status || voter.turnout_status
       end
 
       def external_strike_list_matches(precinct, raw_search, turnout_status)
         return [] if raw_search.to_s.strip.blank?
 
-        matches = GecVoter
-          .election_day_active
+        matches = election_gec_voter_scope
           .where.not(precinct_id: precinct.id)
-        matches = matches.where(turnout_status: turnout_status) if turnout_status.present?
         matches = apply_strike_list_search(matches, raw_search)
-        matches
+        candidates = matches
           .includes(:precinct, :village)
           .order(:last_name, :first_name, :id)
-          .limit(10)
+          .limit(50)
           .to_a
+        records = election_turnout_records_for(candidates)
+        filter_voters_by_turnout(candidates, records, turnout_status).first(10)
       end
 
       def find_accessible_gec_voter!(voter_id, precinct, requested_turnout_status)
-        voter = GecVoter.election_day_active.find_by(id: voter_id)
+        voter = election_gec_voter_scope.find_by(id: voter_id)
         if voter.nil?
           return render_voter_not_found!(requested_turnout_status)
         end
@@ -365,8 +407,9 @@ module Api
           .group_by(&:gec_voter_id)
       end
 
-      def strike_list_voter_payload(voter, linked_supporters, observation_precinct: nil)
+      def strike_list_voter_payload(voter, linked_supporters, observation_precinct: nil, turnout_record: nil)
         out_of_precinct = observation_precinct.present? && voter.precinct_id != observation_precinct.id
+        effective_status = effective_turnout_status(voter, turnout_record)
 
         {
           id: voter.id,
@@ -385,10 +428,10 @@ module Api
           precinct_number: voter.precinct_number || voter.precinct&.number,
           village_name: voter.village_name || voter.village&.name,
           out_of_precinct: out_of_precinct,
-          turnout_status: voter.turnout_status,
-          turnout_source: voter.turnout_source,
-          turnout_note: voter.turnout_note,
-          turnout_updated_at: voter.turnout_updated_at&.iso8601,
+          turnout_status: effective_status,
+          turnout_source: turnout_record&.turnout_source || voter.turnout_source,
+          turnout_note: turnout_record&.turnout_note || voter.turnout_note,
+          turnout_updated_at: (turnout_record&.turnout_updated_at || voter.turnout_updated_at)&.iso8601,
           supporter_overlay: supporter_overlay_payload(linked_supporters)
         }
       end
@@ -424,14 +467,23 @@ module Api
         end
       end
 
+      def active_election_event
+        @active_election_event ||= ElectionEvent.active_event
+      end
+
       def election_day_payload
-        active_import = GecImport.active_election_day_import
+        active_import = active_election_event&.gec_import || GecImport.active_election_day_import
         {
-          list_date: GecVoter.election_day_list_date&.iso8601,
+          election_event_id: active_election_event&.id,
+          election_name: active_election_event&.name,
+          election_date: active_election_event&.election_date&.iso8601,
+          election_status: active_election_event&.status,
+          list_date: (active_election_event&.gec_list_date || GecVoter.election_day_list_date)&.iso8601,
           active_import_id: active_import&.id,
           active_import_filename: active_import&.filename,
           active_import_set_at: active_import&.activated_for_election_at&.iso8601,
-          active_import_explicit: active_import.present?
+          active_import_explicit: active_import.present?,
+          setup_required: active_election_event.blank?
         }
       end
     end

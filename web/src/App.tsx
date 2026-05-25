@@ -36,6 +36,7 @@ const QuotaPeriodsPage = lazy(() => import('./pages/admin/QuotaPeriodsPage'));
 const AuditLogsPage = lazy(() => import('./pages/admin/AuditLogsPage'));
 const OutreachPage = lazy(() => import('./pages/admin/OutreachPage'));
 const PollWatcherPage = lazy(() => import('./pages/admin/PollWatcherPage'));
+const ElectionDayCommandCenterPage = lazy(() => import('./pages/admin/ElectionDayCommandCenterPage'));
 const TeamReportsPage = lazy(() => import('./pages/team/TeamReportsPage'));
 
 function LazyFallback() {
@@ -83,6 +84,7 @@ type PermissionKey =
   | 'can_access_audit_logs'
   | 'can_access_qr'
   | 'can_access_poll_watcher'
+  | 'can_access_command_center'
   | 'can_access_data_team';
 
 function AdminHomeRoute() {
@@ -176,6 +178,7 @@ export default function App() {
             <Route path="/admin/precincts" element={<AdminRoute><PermissionRoute permission="can_manage_configuration"><PrecinctSettingsPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/outreach" element={<AdminRoute><PermissionRoute permission="can_view_supporters"><OutreachPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/poll-watcher" element={<AdminRoute><PermissionRoute permission="can_access_poll_watcher"><PollWatcherPage /></PermissionRoute></AdminRoute>} />
+            <Route path="/admin/election-day" element={<AdminRoute><PermissionRoute permission="can_access_command_center"><ElectionDayCommandCenterPage /></PermissionRoute></AdminRoute>} />
             <Route path="/admin/audit-logs" element={<AdminRoute><PermissionRoute permission="can_access_audit_logs"><AuditLogsPage /></PermissionRoute></AdminRoute>} />
 
             {/* Legacy workspace aliases */}
