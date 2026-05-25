@@ -59,27 +59,32 @@ After the guided beta pass, update handoff language around anything DPG finds co
 
 This is the most important next feature area. The adjacent `campaign-tracker` application has a mature poll watcher and war-room implementation, and we should use it as the technical blueprint for DPG while adapting language, permissions, and assumptions to DPG's party operations needs. See `docs/poll-watcher-implementation-plan.md` for the detailed review and build plan.
 
-Recommended phased scope:
+Recommended scope:
 
-1. Poll Watcher MVP:
+1. Poll Watcher MVP, PR #46:
    - Poll Watcher role
-   - precinct/polling-place assignments
+   - precinct/polling-place assignments at the model/API level
    - active election-day GEC list
    - mobile-first voter search/checkoff
    - voted/not-voted/observed-elsewhere status by voter and precinct
    - audit trail for every turnout/checkoff change
    - minimal poll watcher visibility
-2. Election Day Dashboard:
-   - village/precinct turnout summary
-   - issue/escalation notes from polling places
-   - not-yet-voted linked DPG supporters/contacts
+
+2. Election Day Command Center bundle, likely PR #47:
+   - explicit election event setup so August/November do not share turnout counts
+   - attach/select the GEC import/list used for each election
+   - election-scoped turnout records instead of relying only on fields directly on GEC voter rows
+   - village/precinct turnout dashboard
+   - voted and not-yet-voted lists
+   - not-yet-voted linked DPG contact chase list
+   - contacted/not-contacted Election Day follow-up counts
+   - inline call/text/in-person logging into Contact History
    - ride-to-polls requests
-   - observed-elsewhere reconciliation queue
-   - admin/field organizer dashboard by village/precinct/time
-3. User assignment/training polish:
-   - precinct assignment UI
-   - training/test mode
-   - DPG/Mike Weekly training checklist
+   - name-not-on-list and observed-elsewhere reconciliation queues
+   - correction/undo flows for mistaken turnout marks with audit logs
+   - precinct assignment UI and training/setup checklist if feasible in the same PR
+
+The PR #47 bundle is large but coherent: it completes the real Election Day operating loop around one election-scoped data model. If it becomes too hard to review/test, split it into stacked PRs: election event foundation, dashboard, chase list/contact logging, then assignment/training polish.
 
 Open questions:
 
@@ -90,6 +95,7 @@ Open questions:
 - Who can correct a mistaken voted/not-voted mark?
 - Should poll watchers see any DPG contact/phone info, or only GEC voter rows?
 - How often does the dashboard need updates?
+- What should the election objects be called in DPG language: Primary, General, Election Event, Election Day setup, or something else?
 - What training date is needed before the August 1 primary?
 
 Track the full question set in `docs/dpg-open-questions.md`.

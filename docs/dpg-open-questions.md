@@ -56,9 +56,20 @@ Questions to confirm:
    - Should corrections require a note?
    - Who can reconcile out-of-precinct exceptions after Election Day?
 
-6. **Election Day dashboard language**
+6. **Election event setup / repeat elections**
+   - Should DPG create a separate election event for each election, such as August primary and November general, so turnout counts reset cleanly?
+   - What should DPG call this in the app: Election Event, Election Day Setup, Primary Election, General Election, or something else?
+   - Who can create, activate, close, or archive an election event?
+   - Should each election require selecting the exact GEC import/list date used by poll watchers?
+   - If DPG imports a newer GEC list after training or after checkoff begins, who can switch the election to the newer list, and what confirmation/audit should be required?
+   - Should training/test turnout be isolated in a training election or resettable before the real election opens?
+
+7. **Election Day dashboard / command center language**
    - Should DPG call the admin dashboard “Election Day Dashboard,” “War Room,” “Command Center,” or something else?
-   - What are the top dashboard metrics DPG wants: total GEC turnout, DPG supporters, registered Democrats, members, ride-to-polls, unresolved exceptions, or a combination?
+   - What are the top dashboard metrics DPG wants: total GEC turnout, DPG supporters, registered Democrats, members, ride-to-polls, unresolved exceptions, contacted/not-contacted not-yet-voted voters, or a combination?
+   - Should admins be able to drill from village to precinct to a list of voted/not-yet-voted voters?
+   - Should the command center include an inline call/text queue for linked DPG contacts who have not yet voted?
+   - What Election Day follow-up outcomes should be tracked: plans to vote, needs ride, already voted, unreachable, wrong number, refused, do-not-contact?
 
 ## 2. DPG list samples needed
 
@@ -126,4 +137,6 @@ Until DPG answers the above:
 - Normal dashboard/contact reports may continue grouping by DPG contact village, but labels should be explicit when GEC village/precinct is different.
 - Out-of-precinct search matches should be recorded as incidents/exceptions, not normal turnout by poll watchers.
 - Admin/coordinator reconciliation can handle exceptions with audit logs.
+- The next full Election Day build should add explicit election events and election-scoped turnout so August/November or future elections do not share counts.
+- Poll Watcher and Command Center should use the GEC import/list attached to the active election, not silently use stale or ambiguous data.
 - Official member/registered-Democrat/import workflows should remain pending real DPG list samples.
