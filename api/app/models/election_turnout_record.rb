@@ -21,11 +21,21 @@ class ElectionTurnoutRecord < ApplicationRecord
 
   def self.for(election_event:, gec_voter:)
     find_or_initialize_by(election_event: election_event, gec_voter: gec_voter) do |record|
-      record.registered_precinct = gec_voter.precinct
-      record.registered_precinct_number = gec_voter.precinct_number || gec_voter.precinct&.number
-      record.registered_village_name = gec_voter.village_name || gec_voter.village&.name
+      apply_voter_defaults(record, gec_voter)
       record.supporter = Supporter.where(gec_voter_id: gec_voter.id).order(:id).first
-      record.turnout_status = "not_yet_voted"
     end
+  end
+
+  def self.build_for_display(election_event:, gec_voter:)
+    new(election_event: election_event, gec_voter: gec_voter).tap do |record|
+      apply_voter_defaults(record, gec_voter)
+    end
+  end
+
+  def self.apply_voter_defaults(record, gec_voter)
+    record.registered_precinct = gec_voter.precinct
+    record.registered_precinct_number = gec_voter.precinct_number || gec_voter.precinct&.number
+    record.registered_village_name = gec_voter.village_name || gec_voter.village&.name
+    record.turnout_status = "not_yet_voted"
   end
 end

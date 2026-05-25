@@ -83,7 +83,7 @@ module Api
       def turnout_records_for(event, voters)
         existing = event.election_turnout_records.where(gec_voter_id: voters.select(:id)).index_by(&:gec_voter_id)
         voters.each_with_object({}) do |voter, memo|
-          memo[voter.id] = existing[voter.id] || ElectionTurnoutRecord.for(election_event: event, gec_voter: voter)
+          memo[voter.id] = existing[voter.id] || ElectionTurnoutRecord.build_for_display(election_event: event, gec_voter: voter)
         end
       end
 
