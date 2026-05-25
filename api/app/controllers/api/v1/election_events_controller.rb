@@ -56,7 +56,16 @@ module Api
         end
 
         previous_status = event.status
-        event.activate!(actor_user: current_user)
+        begin
+          event.activate!(actor_user: current_user)
+        rescue ActiveRecord::StatementInvalid
+          return render_api_error(
+            message: "Another election event is already active; please refresh and try again.",
+            status: :conflict,
+            code: "election_event_activate_conflict"
+          )
+        end
+
         log_audit!(event, action: "election_event_activated", changed_data: { status: [ previous_status, "active" ], gec_import_id: event.gec_import_id })
         render json: { election_event: election_event_json(event.reload) }
       end

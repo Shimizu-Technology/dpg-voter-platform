@@ -15,7 +15,7 @@ class ElectionTurnoutUpdateService
 
   def call
     record = ElectionTurnoutRecord.for(election_event: election_event, gec_voter: gec_voter)
-    original = record.attributes.slice("turnout_status", "turnout_note", "turnout_source", "turnout_updated_by_user_id")
+    original = record.attributes.slice("turnout_status", "turnout_note", "turnout_source", "turnout_updated_by_user_id", "turnout_updated_at")
     record.assign_attributes(turnout_attrs)
     failure_result = nil
 
@@ -77,7 +77,6 @@ class ElectionTurnoutUpdateService
       after = record.public_send(field)
       changed[field] = { from: before, to: after } if before != after
     end
-    changed["turnout_updated_at"] = { from: nil, to: record.turnout_updated_at&.iso8601 }
 
     AuditLog.create!(
       auditable: record,
