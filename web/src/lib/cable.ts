@@ -12,7 +12,7 @@ function buildCableUrl(token?: string): string {
   return url.toString();
 }
 
-export type CampaignEventType = 'new_supporter' | 'supporter_updated' | 'stats_update' | 'quota_period_updated';
+export type CampaignEventType = 'new_supporter' | 'supporter_updated' | 'stats_update' | 'quota_period_updated' | 'poll_report';
 
 export interface CampaignEvent {
   type: CampaignEventType;

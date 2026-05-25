@@ -72,7 +72,7 @@ class GecVoterTurnoutService
         observation_village_name: observation_precinct&.village&.name,
         turnout_source: gec_voter.turnout_source,
         linked_supporter_ids: Supporter.where(gec_voter_id: gec_voter.id).pluck(:id),
-        compliance_context: "campaign_operations_not_official_record"
+        compliance_context: "dpg_operations_not_official_record"
       }
     )
   end

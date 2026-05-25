@@ -235,64 +235,160 @@ Tests:
 - out-of-precinct observed-elsewhere behavior is correct
 - non-poll-watcher roles cannot access restricted endpoints unless explicitly allowed
 
-### PR 2 — DPG Election Day Dashboard
+### PR 2 / PR #47 — Election Day Command Center bundle
 
-Goal: admins/field organizers can monitor Election Day operations.
+Goal: finish the full operational Election Day loop after the Poll Watcher MVP: election setup/reset, selected GEC list, admin turnout dashboard, not-yet-voted chase list, contact logging, correction/reconciliation, and training readiness.
+
+This can be implemented as one larger PR if we keep the scope disciplined and test it thoroughly. It should not be a vague “war room” copy; it should be DPG’s Election Day module with explicit election scoping and auditability.
+
+#### 1. Election event foundation
+
+Add an explicit election object before expanding dashboard/call-chase workflows.
+
+Recommended model concept:
+
+- `elections` / `election_events`
+  - name, e.g. `2026 Primary Election`
+  - election date
+  - election type, e.g. primary/general/runoff/special
+  - status, e.g. setup/training/active/closed/archived
+  - active GEC import/list date for that election
+  - created/updated/activated/closed by user
+
+Why this matters:
+
+- August and November must not share turnout counts.
+- Historical turnout/checkoff data should remain available after an election closes.
+- Training/test marks should be resettable or isolated.
+- Poll Watcher should always show which election and GEC list it is operating against.
+
+#### 2. Election-scoped turnout records
+
+Move future Election Day tracking away from storing the only source of truth directly on `gec_voters.turnout_status`.
+
+Recommended model concept:
+
+- `election_turnout_records`
+  - election_event_id
+  - gec_voter_id
+  - linked supporter/contact id when available
+  - registered precinct/village from the election GEC list
+  - observation precinct/village when different
+  - turnout status: unknown/not_yet_voted/voted/observed_elsewhere
+  - note/source/updated_by/updated_at
+
+The existing `gec_voters.turnout_status` and `supporters.turnout_status` can remain as transitional/current-election convenience fields if helpful, but the durable record should be scoped to the election.
+
+#### 3. Active GEC list rules
+
+Election Day workflows should use the GEC list attached to the active election, not an implicit stale list.
+
+Required behavior:
+
+- admins/data managers can attach or switch the GEC import used for an election
+- UI clearly shows election name, election date, GEC list date, and source filename
+- changing the GEC list after turnout/checkoff has started requires a confirmation and audit log
+- normal GEC monthly imports can continue, but Poll Watcher uses the selected election list
+- if no election is active, Poll Watcher/Command Center should show setup-required messaging instead of silently using the wrong list
+
+#### 4. Election Day Dashboard / Command Center
+
+Admins/field organizers need a central dashboard showing turnout and follow-up state.
 
 Backend scope:
 
-- add DPG-scoped dashboard endpoint, likely adapted from `WarRoomController`
-- permission such as `can_access_election_day_dashboard?` or `can_access_war_room?`
+- add DPG-scoped command-center endpoint, likely adapted from `WarRoomController`
+- permission such as `can_access_election_day_dashboard?` or `can_access_command_center?`
 - aggregate by village/precinct:
-  - active election-day GEC voters
-  - precinct reports
+  - election-scoped GEC voters
   - turnout status counts
-  - not-yet-voted linked DPG supporters
-  - observed-elsewhere exceptions
+  - precinct reports
+  - not-yet-voted linked DPG contacts/supporters
+  - contacted/not-contacted Election Day follow-up counts
   - ride-to-polls requests
-  - unmatched approved supporters/contacts
-  - recent reports/activity
+  - observed-elsewhere/name-not-on-list exceptions
+  - recent poll watcher reports/activity
 
 Frontend scope:
 
-- add Election Day Dashboard / War Room page
-- DPG language and compact mobile/desktop views
-- link to Poll Watcher page for allowed users
+- add Election Day Dashboard / Command Center page
+- DPG language and compact desktop/tablet/mobile views
+- village/precinct drilldown
+- voted list and not-yet-voted list
+- “not yet voted and not contacted today” queue
+- ride-to-polls and exception panels
+- link to Poll Watcher for allowed users
 - remove motorcade/campaign-specific assumptions
 
-Tests:
+#### 5. Not-yet-voted chase list and call logging
 
-- poll watchers cannot access dashboard unless DPG explicitly allows it
-- admins/field organizers can access dashboard
-- dashboard respects village/district scope where applicable
-- aggregate stats are correct
+The dashboard should support the actual DPG follow-up loop:
 
-### PR 3 — User assignment/admin polish
+- list linked DPG contacts who have not yet voted
+- filter by village, precinct, contact village vs GEC village, support status, ride need, contacted today, not contacted today
+- log call/text/in-person attempts inline
+- reuse `SupporterContactAttempt` for the durable contact history
+- capture Election Day-specific outcomes such as:
+  - reached, plans to vote
+  - needs ride
+  - already voted / says voted
+  - wrong number
+  - unreachable
+  - refused / do not contact
+- show who has already been called and who has not
 
-Goal: make Poll Watcher role manageable by DPG admins.
+#### 6. Correction and reconciliation rules
 
-Scope:
+Required behavior:
 
-- Users page supports Poll Watcher role
-- role permission matrix explains limited access
-- assign one or more precincts to a poll watcher
-- show assigned precincts in user management
-- validate assignment rules
-- possibly bulk assign watchers by precinct list
+- poll watchers can correct in-precinct marks they made, either by setting `not_yet_voted` or clearing to `unknown`
+- admins/coordinators can correct any accessible election turnout mark with audit logging
+- correction UI should show previous status, new status, actor, time, and optional note
+- out-of-precinct observations remain exception/reconciliation items unless DPG confirms direct cross-precinct marking
 
-### PR 4 — Training/safety mode
+#### 7. Assignment and training polish
 
-Goal: safely train DPG poll watchers before Election Day.
+If this bundle is the next PR, include the minimum admin setup needed so DPG can actually run training:
 
-Possible scope:
+- assign poll watcher users to one or more precincts
+- show assignments in user management or an Election setup screen
+- training/test mode or resettable training election
+- setup checklist: election created, GEC list attached, precinct assignments complete, poll watcher accounts ready
 
-- training/test mode banner
-- resettable training turnout data in non-production or explicit training environment
-- test election mode flag if needed
-- user-facing training checklist
-- safe fake voter/contact records for rehearsal
+#### Tests for the bundled PR
+
+- new election starts with clean turnout counts
+- closed/archived election preserves historical turnout
+- Poll Watcher uses the selected election’s GEC import/list date
+- switching an election GEC list is permission-gated and audited
+- poll watcher can mark and correct assigned in-precinct voters
+- poll watcher cannot directly mark out-of-precinct voters
+- admin/coordinator can reconcile exceptions
+- dashboard aggregates voted/not-yet-voted by village/precinct correctly
+- not-yet-voted chase list excludes voters already marked voted
+- contact attempts logged from the command center appear in normal Contact History
+- contacted/not-contacted counts update correctly
+- ride-to-polls and name-not-on-list queues are visible
+- role/permission boundaries hold for poll watchers, field organizers, coordinators, data managers, and admins
+
+#### Scope caution
+
+This is a large PR. It is acceptable as PR #47 only if it is treated as one cohesive vertical slice and validated locally before merge. If it becomes hard to review or test, split it into stacked PRs in this order: election event foundation, command center dashboard, chase-list/contact logging, assignment/training polish.
+
+## GEC election-manual research notes
+
+The Guam Election Commission Election Manual linked from `https://gec.guam.gov/` was reviewed on May 24, 2026. Relevant guidance supports a conservative DPG MVP:
+
+- Poll watchers are observers for recognized parties/candidates. They may observe election conduct, issue voter challenges, and monitor voter participation.
+- Poll watchers must not interfere with precinct officials, enter the barricade/voting area, access the official voter signature roster or official voter documents, ask voters for ID, speak to voters about marking ballots, or campaign/wear campaign identifiers.
+- Wrong-precinct and not-on-roster situations are handled through precinct official/GEC procedures, including registration/polling-location checks and possible provisional ballots.
+- Challenge grounds include precinct residency, whether the person voted that day, voted in another precinct, or voted in another U.S. jurisdiction.
+
+Product implication: DPG poll watcher tools should remain explicitly unofficial DPG operations tools. Poll watchers can track DPG observations for assigned precincts, but out-of-precinct or name-not-on-list situations should be incident/exception reports unless DPG/Mike Weekly confirms a different workflow.
 
 ## Open questions for DPG / Mike Weekly
+
+See also `docs/dpg-open-questions.md` for the current walkthrough question list, including the key distinction between official GEC precinct/village for Election Day checkoff and separate DPG contact village for outreach.
 
 Confirm before or during PR 1/PR 2 planning:
 
@@ -300,10 +396,12 @@ Confirm before or during PR 1/PR 2 planning:
 2. Should poll watchers be able to correct their own marks?
 3. Who can clear `observed_elsewhere` or mistaken voted marks?
 4. Should poll watchers see phone/contact info, or only GEC voter info?
-5. Should out-of-precinct search be enabled for poll watchers or admin-only?
+5. Should out-of-precinct search be enabled for poll watchers or admin-only? If enabled, should poll watchers only file incidents, or can any trusted role mark an out-of-precinct voter as voted/observed elsewhere?
 6. What should the dashboard prioritize: all GEC turnout, DPG supporters, members, registered Democrats, ride-to-polls, or a combination?
-7. What training date is needed before the August 1 primary?
-8. What language does DPG want for the dashboard: "War Room," "Election Day Dashboard," or another term?
+7. If a DPG contact's self-reported village differs from their official GEC registered village, should the app show them only in the GEC precinct list and surface the DPG contact village as context, or should DPG also want contact-village exception queues?
+8. For normal organizing reports outside Election Day, should DPG continue grouping people by DPG contact/signup village while Election Day tools group by official GEC registered precinct? Current product recommendation: yes, but make labels and exports explicit so staff understand both geographies.
+9. What training date is needed before the August 1 primary?
+10. What language does DPG want for the dashboard: "War Room," "Election Day Dashboard," or another term?
 
 ## Clean-room guardrails
 

@@ -219,6 +219,16 @@ module Authenticatable
     )
   end
 
+  def require_poll_watcher_access!
+    return if can_access_poll_watcher?
+
+    render_api_error(
+      message: "Poll watcher access required",
+      status: :forbidden,
+      code: "poll_watcher_access_required"
+    )
+  end
+
   def require_audit_logs_access!
     return if can_access_audit_logs?
 
@@ -271,6 +281,10 @@ module Authenticatable
 
   def can_access_leaderboard?
     current_user&.admin? || current_user&.coordinator? || current_user&.chief? || current_user&.leader?
+  end
+
+  def can_access_poll_watcher?
+    current_user&.admin? || current_user&.coordinator? || current_user&.poll_watcher?
   end
 
   def can_access_duplicates?
@@ -334,7 +348,7 @@ module Authenticatable
 
   def manageable_roles_for_current_user
     return User::ROLES if current_user&.admin?
-    return [ "village_chief", "block_leader" ] if current_user&.coordinator?
+    return [ "village_chief", "block_leader", "poll_watcher" ] if current_user&.coordinator?
 
     []
   end

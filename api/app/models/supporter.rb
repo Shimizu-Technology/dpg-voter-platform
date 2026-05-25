@@ -16,7 +16,7 @@ class Supporter < ApplicationRecord
   REGISTERED_VOTER_STATUSES = %w[yes no not_sure].freeze
   SUPPORT_FOLLOW_UP_STATUSES = %w[in_progress completed declined].freeze
   TURNOUT_STATUSES = %w[unknown not_yet_voted voted observed_elsewhere].freeze
-  TURNOUT_SOURCES = %w[data_team admin_override].freeze
+  TURNOUT_SOURCES = %w[poll_watcher data_team admin_override].freeze
   VERIFICATION_STATUSES = %w[unverified verified flagged].freeze
   VERIFICATION_REASONS = %w[
     matched_current_gec

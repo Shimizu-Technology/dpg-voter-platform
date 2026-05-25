@@ -45,6 +45,7 @@ export interface SessionResponse {
     can_access_qr: boolean;
     can_access_data_team: boolean;
     can_access_reports: boolean;
+    can_access_poll_watcher: boolean;
     can_upload_gec: boolean;
     can_bulk_vet: boolean;
     can_review_public: boolean;

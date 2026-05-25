@@ -17,6 +17,7 @@ type PermissionKey =
   | 'can_manage_data_configuration'
   | 'can_access_audit_logs'
   | 'can_access_reports'
+  | 'can_access_poll_watcher'
   | 'can_upload_gec';
 
 type PermissionRule = {
@@ -31,6 +32,7 @@ const PERMISSION_RULES: PermissionRule[] = [
   { prefix: '/admin/intake', permission: 'can_view_supporters' },
   { prefix: '/admin/gec-voters', permission: 'can_view_supporters' },
   { prefix: '/admin/households', permission: 'can_view_supporters' },
+  { prefix: '/admin/poll-watcher', permission: 'can_access_poll_watcher' },
   { prefix: '/admin/reports', permission: 'can_access_reports' },
   { prefix: '/admin/duplicates', permission: 'can_access_duplicates' },
   { prefix: '/admin/sms/settings', permission: 'can_manage_configuration' },

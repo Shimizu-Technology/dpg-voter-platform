@@ -84,6 +84,17 @@ class Api::V1::SupportersControllerTest < ActionDispatch::IntegrationTest
     assert_equal gec_village.name, row["GEC Village"]
     assert_equal "78246", row["GEC Voter Reg #"]
     assert_equal "PO BOX 761", row["GEC Address"]
+
+    get "/api/v1/supporters",
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    payload = response.parsed_body["supporters"].find { |record| record["id"] == supporter.id }
+    assert_equal dpg_village.name, payload["village_name"]
+    assert_equal gec_village.name, payload["gec_village_name"]
+    assert_equal "1", payload["gec_precinct_number"]
+    assert_equal true, payload["dpg_gec_village_mismatch"]
   end
 
   test "manual GEC verification links official voter geography while preserving submitted contact details" do

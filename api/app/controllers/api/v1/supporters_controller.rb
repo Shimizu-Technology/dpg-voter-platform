@@ -477,6 +477,7 @@ module Api
             :submitted_village,
             :precinct,
             :block,
+            :gec_voter,
             :referred_from_village,
             household_group: :supporters
           ).contacts
@@ -1630,6 +1631,12 @@ module Api
           registered_voter_location_note: supporter.registered_voter_location_note,
           registered_voter: supporter.registered_voter,
           current_gec_match: current_gec_match,
+          gec_voter_id: supporter.gec_voter_id,
+          gec_voter_registration_number: supporter.gec_voter&.voter_registration_number,
+          gec_village_name: supporter.gec_voter&.village_name,
+          gec_precinct_number: supporter.gec_voter&.precinct_number,
+          gec_address: supporter.gec_voter&.address,
+          dpg_gec_village_mismatch: dpg_gec_village_mismatch?(supporter),
           wants_to_volunteer: supporter.wants_to_volunteer,
           needs_absentee_ballot_help: supporter.needs_absentee_ballot_help,
           needs_homebound_voting_help: supporter.needs_homebound_voting_help,
@@ -1683,6 +1690,12 @@ module Api
           latest_contact_attempt: latest_contact_attempt && contact_attempt_summary_json(latest_contact_attempt),
           created_at: supporter.created_at&.iso8601
         }
+      end
+
+      def dpg_gec_village_mismatch?(supporter)
+        supporter.village&.name.present? &&
+          supporter.gec_voter&.village_name.present? &&
+          !supporter.village.name.casecmp?(supporter.gec_voter.village_name)
       end
 
       def outreach_json(supporter, latest_contact_attempt: nil)

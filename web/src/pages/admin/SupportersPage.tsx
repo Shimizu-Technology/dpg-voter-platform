@@ -50,6 +50,9 @@ interface SupporterItem {
   registered_voter_location_note?: string | null;
   registered_voter: boolean;
   current_gec_match?: boolean;
+  gec_village_name?: string | null;
+  gec_precinct_number?: string | null;
+  dpg_gec_village_mismatch?: boolean;
   wants_to_volunteer?: boolean;
   needs_absentee_ballot_help?: boolean;
   needs_homebound_voting_help?: boolean;
@@ -214,6 +217,17 @@ function selfReportedStatusLabel(supporter: Pick<SupporterItem, 'registered_vote
   if (supporter.registered_voter_status === 'yes') return 'Self-reported voter: Yes';
   if (supporter.registered_voter_status === 'no') return 'Self-reported voter: No';
   return 'Self-reported voter: Not sure';
+}
+
+function contactGeographyDetail(supporter: Pick<SupporterItem, 'village_name' | 'precinct_number' | 'gec_village_name' | 'gec_precinct_number' | 'dpg_gec_village_mismatch'>) {
+  const dpgPrecinct = supporter.precinct_number ? ` · Precinct ${supporter.precinct_number}` : '';
+  const gecPrecinct = supporter.gec_precinct_number ? ` · Precinct ${supporter.gec_precinct_number}` : '';
+
+  return {
+    dpg: `${supporter.village_name || 'Unknown'}${dpgPrecinct}`,
+    gec: supporter.gec_village_name ? `${supporter.gec_village_name}${gecPrecinct}` : 'No linked GEC voter',
+    mismatch: Boolean(supporter.dpg_gec_village_mismatch),
+  };
 }
 
 function supportRequestBadges(supporter: Pick<SupporterItem, 'needs_voter_registration_help' | 'needs_absentee_ballot_help' | 'needs_homebound_voting_help' | 'needs_election_day_ride' | 'wants_to_volunteer' | 'household_member_count'>) {
@@ -964,11 +978,16 @@ export default function SupportersPage() {
                 </div>
               </div>
               <div className="text-sm text-[var(--text-secondary)] space-y-0.5">
-                <div className="flex justify-between">
-                  <span>{s.village_name}</span>
+                <div className="flex justify-between gap-3">
                   <span>{s.contact_number}</span>
+                  {s.dpg_gec_village_mismatch && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Village mismatch</span>
+                  )}
                 </div>
-                <div>{renderPrecinctAssignControl(s)}</div>
+                <div className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-bg)] px-3 py-2 text-xs">
+                  <div className="font-semibold text-[var(--text-primary)]">DPG contact village: {contactGeographyDetail(s).dpg}</div>
+                  <div className="mt-0.5 text-[var(--text-muted)]">Official GEC village: {contactGeographyDetail(s).gec}</div>
+                </div>
                 <div className="text-xs text-[var(--text-muted)]">{selfReportedStatusLabel(s)}</div>
                 {verificationStatusDetail(s) && (
                   <div className={`text-xs leading-5 ${
@@ -1040,10 +1059,10 @@ export default function SupportersPage() {
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Phone</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">
                   <button type="button" onClick={() => handleSort('village_name')} className="inline-flex items-center gap-1 hover:text-[var(--text-primary)]">
-                    Village <ArrowUpDown className="w-3.5 h-3.5" /> {sortLabel('village_name')}
+                    DPG Contact Village <ArrowUpDown className="w-3.5 h-3.5" /> {sortLabel('village_name')}
                   </button>
                 </th>
-                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Precinct</th>
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Official GEC Village</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Flags</th>
                 <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">
                   <button type="button" onClick={() => handleSort('registered_voter')} className="inline-flex items-center gap-1 hover:text-[var(--text-primary)]">
@@ -1088,8 +1107,16 @@ export default function SupportersPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">{s.contact_number}</td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">{s.village_name}</td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">{renderPrecinctAssignControl(s)}</td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">
+                    <div className="font-medium text-[var(--text-primary)]">{s.village_name || 'Unknown'}</div>
+                    <div className="mt-0.5 text-xs text-[var(--text-muted)]">{renderPrecinctAssignControl(s)}</div>
+                  </td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">
+                    <div className={s.dpg_gec_village_mismatch ? 'font-semibold text-amber-800' : ''}>{s.gec_village_name || 'No linked GEC voter'}</div>
+                    <div className="mt-0.5 text-xs text-[var(--text-muted)]">
+                      {s.gec_precinct_number ? `Precinct ${s.gec_precinct_number}` : s.gec_village_name ? 'Precinct unknown' : 'Link in voter check'}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">
                     <div className="flex items-center gap-1.5 whitespace-nowrap">
                       {registrationFollowUpResultLabel(s) && (

@@ -4,6 +4,7 @@ const ROLE_LABELS: Record<string, string> = {
   district_coordinator: 'Field Organizer',
   village_chief: 'Village Coordinator',
   block_leader: 'Canvasser',
+  poll_watcher: 'Poll Watcher',
 };
 
 export function formatRoleLabel(role: unknown): string {

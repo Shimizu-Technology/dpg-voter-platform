@@ -92,6 +92,12 @@ const ROLE_GUIDE: RoleGuideRow[] = [
     who: 'Canvasser',
     can: 'Work assigned-village contacts, submit new contacts, use signup links, and log household canvass outcomes',
   },
+  {
+    role: 'poll_watcher',
+    level: 'Election Day',
+    who: 'Poll Watcher',
+    can: 'Use assigned-precinct Election Day tools to search voter rows, report polling-place issues, and mark voter turnout status',
+  },
 ];
 
 type PermissionKey =
@@ -111,6 +117,7 @@ type PermissionKey =
   | 'can_access_audit_logs'
   | 'can_access_data_team'
   | 'can_access_reports'
+  | 'can_access_poll_watcher'
   | 'can_upload_gec'
   | 'can_bulk_vet'
   | 'can_review_public';
@@ -132,6 +139,7 @@ const PERMISSION_KEYS: PermissionKey[] = [
   'can_access_audit_logs',
   'can_access_data_team',
   'can_access_reports',
+  'can_access_poll_watcher',
   'can_upload_gec',
   'can_bulk_vet',
   'can_review_public',
@@ -154,6 +162,7 @@ const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_access_audit_logs: 'Activity log',
   can_access_data_team: 'Data management tools',
   can_access_reports: 'Reports',
+  can_access_poll_watcher: 'Poll Watcher',
   can_upload_gec: 'GEC imports',
   can_bulk_vet: 'Bulk vetting',
   can_review_public: 'Public signup review',
@@ -199,6 +208,9 @@ const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     'can_create_staff_supporters',
     'can_access_qr',
         ],
+  poll_watcher: [
+    'can_access_poll_watcher',
+  ],
 };
 
 function roleLabel(role: string) {
@@ -209,7 +221,7 @@ function roleLabel(role: string) {
 function roleAssignmentType(role: string): 'none' | 'district' | 'village' {
   if (role === 'campaign_admin' || role === 'data_team') return 'none';
   if (role === 'district_coordinator') return 'district';
-  return 'village'; // village_chief, block_leader
+  return 'village'; // village_chief, block_leader, poll_watcher
 }
 
 function AssignmentDropdown({
