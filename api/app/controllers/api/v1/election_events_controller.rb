@@ -55,15 +55,17 @@ module Api
           return render_api_error(message: "Select a completed GEC import before activating this election", status: :unprocessable_entity, code: "missing_active_gec_import")
         end
 
+        previous_status = event.status
         event.activate!(actor_user: current_user)
-        log_audit!(event, action: "election_event_activated", changed_data: { status: [ nil, "active" ], gec_import_id: event.gec_import_id })
+        log_audit!(event, action: "election_event_activated", changed_data: { status: [ previous_status, "active" ], gec_import_id: event.gec_import_id })
         render json: { election_event: election_event_json(event.reload) }
       end
 
       def close
         event = ElectionEvent.find(params[:id])
+        previous_status = event.status
         event.close!(actor_user: current_user)
-        log_audit!(event, action: "election_event_closed", changed_data: { status: [ nil, "closed" ] })
+        log_audit!(event, action: "election_event_closed", changed_data: { status: [ previous_status, "closed" ] })
         render json: { election_event: election_event_json(event.reload) }
       end
 

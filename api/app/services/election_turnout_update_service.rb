@@ -17,15 +17,24 @@ class ElectionTurnoutUpdateService
     record = ElectionTurnoutRecord.for(election_event: election_event, gec_voter: gec_voter)
     original = record.attributes.slice("turnout_status", "turnout_note", "turnout_source", "turnout_updated_by_user_id")
     record.assign_attributes(turnout_attrs)
+    failure_result = nil
 
     ActiveRecord::Base.transaction do
       unless record.save
-        return Result.new(success?: false, record: record, errors: record.errors.full_messages)
+        failure_result = Result.new(success?: false, record: record, errors: record.errors.full_messages)
+        raise ActiveRecord::Rollback
       end
 
-      sync_current_turnout_fields!
+      legacy_result = sync_current_turnout_fields
+      unless legacy_result.success?
+        failure_result = Result.new(success?: false, record: record, errors: legacy_result.errors.presence || [ "Current turnout sync failed" ])
+        raise ActiveRecord::Rollback
+      end
+
       log_turnout_audit!(record, original)
     end
+
+    return failure_result if failure_result
 
     Result.new(success?: true, record: record, errors: [])
   end
@@ -51,8 +60,8 @@ class ElectionTurnoutUpdateService
     }
   end
 
-  def sync_current_turnout_fields!
-    legacy = GecVoterTurnoutService.new(
+  def sync_current_turnout_fields
+    GecVoterTurnoutService.new(
       gec_voter: gec_voter,
       actor_user: actor_user,
       turnout_status: turnout_status,
@@ -60,7 +69,6 @@ class ElectionTurnoutUpdateService
       source: source,
       observation_precinct: observation_precinct
     ).call
-    raise ActiveRecord::Rollback unless legacy.success?
   end
 
   def log_turnout_audit!(record, original)

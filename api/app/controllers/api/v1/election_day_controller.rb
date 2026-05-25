@@ -141,7 +141,11 @@ module Api
       end
 
       def exception_payloads(event)
-        records = event.election_turnout_records.observed_elsewhere.includes(:gec_voter, :observation_precinct).recent_first rescue event.election_turnout_records.observed_elsewhere.includes(:gec_voter, :observation_precinct).order(updated_at: :desc)
+        records = event.election_turnout_records
+          .observed_elsewhere
+          .includes(:gec_voter, :observation_precinct)
+          .order(updated_at: :desc)
+
         records.map do |record|
           voter = record.gec_voter
           {
