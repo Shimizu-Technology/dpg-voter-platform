@@ -10,7 +10,13 @@ module Api
       before_action :require_command_center_access!, only: [ :index, :show ]
 
       def index
-        events = ElectionEvent.includes(:gec_import).recent_first.limit(25)
+        events = ElectionEvent
+          .left_joins(:election_turnout_records)
+          .includes(:gec_import)
+          .select("election_events.*, COUNT(election_turnout_records.id) AS turnout_records_count_cached")
+          .group("election_events.id")
+          .recent_first
+          .limit(25)
         render json: {
           active_election: election_event_json(ElectionEvent.active_event),
           election_events: events.map { |event| election_event_json(event) },
@@ -134,8 +140,15 @@ module Api
           gec_import_filename: event.gec_import&.filename,
           activated_at: event.activated_at&.iso8601,
           closed_at: event.closed_at&.iso8601,
-          turnout_records_count: event.election_turnout_records.count
+          turnout_records_count: event_turnout_records_count(event)
         }
+      end
+
+      def event_turnout_records_count(event)
+        cached_count = event.attributes["turnout_records_count_cached"]
+        return cached_count.to_i if cached_count.present?
+
+        event.election_turnout_records.count
       end
 
       def gec_import_json(gec_import)

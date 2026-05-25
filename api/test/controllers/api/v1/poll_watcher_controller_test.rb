@@ -110,6 +110,35 @@ module Api
         assert_equal "poll_watcher", @supporter.turnout_source
       end
 
+      test "strike list external search filters election turnout before limiting matches" do
+        gec_import = GecImport.create!(filename: "poll-watcher-gec.csv", gec_list_date: Date.current, status: "completed")
+        event = ElectionEvent.create!(name: "Poll Watcher Primary", election_type: "primary", election_date: Date.current, gec_import: gec_import)
+        event.activate!(actor_user: @admin)
+
+        60.times do |index|
+          voter = create_voter(first_name: "Alex", last_name: "External#{format('%02d', index)}", precinct: @other_precinct, village: @other_village)
+          if index < 50
+            ElectionTurnoutRecord.create!(
+              election_event: event,
+              gec_voter: voter,
+              turnout_status: "voted",
+              turnout_source: "admin_override",
+              turnout_updated_by_user: @admin,
+              turnout_updated_at: Time.current
+            )
+          end
+        end
+
+        get "/api/v1/poll_watcher/strike_list",
+          params: { precinct_id: @precinct.id, search: "Alex", turnout_status: "not_yet_voted" },
+          headers: auth_headers(@watcher)
+
+        assert_response :success
+        external_matches = response.parsed_body.fetch("external_matches")
+        assert_equal 10, external_matches.size
+        assert external_matches.all? { |row| row.fetch("turnout_status") == "not_yet_voted" }
+      end
+
       test "poll watcher cannot mark voter from unassigned precinct as in-precinct turnout" do
         patch "/api/v1/poll_watcher/strike_list/#{@other_voter.id}/turnout",
           params: { turnout: { precinct_id: @precinct.id, turnout_status: "voted" } },
