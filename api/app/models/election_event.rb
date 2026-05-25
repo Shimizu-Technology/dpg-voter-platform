@@ -24,7 +24,13 @@ class ElectionEvent < ApplicationRecord
 
   def activate!(actor_user:)
     transaction do
-      self.class.where(status: "active").where.not(id: id).update_all(status: "closed", closed_at: Time.current, updated_at: Time.current)
+      closed_at = Time.current
+      self.class.where(status: "active").where.not(id: id).update_all(
+        status: "closed",
+        closed_at: closed_at,
+        closed_by_user_id: actor_user&.id,
+        updated_at: closed_at
+      )
       update!(status: "active", activated_at: Time.current, activated_by_user: actor_user)
     end
   end

@@ -34,7 +34,7 @@ module Api
           villages: villages,
           chase_list: chase,
           exceptions: exceptions.first(100),
-          recent_reports: recent_reports(event)
+          recent_reports: recent_reports(event, voters)
         }
       end
 
@@ -42,8 +42,8 @@ module Api
         event = current_election_event
         return render_api_error(message: "No active election event", status: :unprocessable_entity, code: "active_election_required") unless event
 
-        supporter = Supporter.contacts.find_by(id: params[:supporter_id])
-        return render_api_error(message: "Contact not found", status: :not_found, code: "supporter_not_found") unless supporter
+        supporter = Supporter.contacts.find_by(id: params[:supporter_id], gec_voter_id: election_voters(event).select(:id))
+        return render_api_error(message: "Contact not found on this election's GEC list", status: :not_found, code: "supporter_not_found") unless supporter
 
         attempt = supporter.supporter_contact_attempts.build(contact_attempt_params)
         attempt.recorded_by_user = current_user
@@ -164,8 +164,12 @@ module Api
         end
       end
 
-      def recent_reports(_event)
-        PollReport.today.includes(:precinct, :user).order(reported_at: :desc).limit(25).map do |report|
+      def recent_reports(event, voters)
+        precinct_ids = voters.map(&:precinct_id).compact.uniq
+        reports = PollReport.where(reported_at: event.election_date.all_day)
+        reports = reports.where(precinct_id: precinct_ids) if precinct_ids.any?
+
+        reports.includes(:precinct, :user).order(reported_at: :desc).limit(25).map do |report|
           {
             id: report.id,
             precinct_id: report.precinct_id,

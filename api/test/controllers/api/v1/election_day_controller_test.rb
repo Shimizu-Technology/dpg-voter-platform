@@ -45,6 +45,19 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
     assert_equal event_id, ElectionEvent.active_event.id
   end
 
+  test "activating a new event records who closed the displaced active event" do
+    @event.activate!(actor_user: @admin)
+    replacement = ElectionEvent.create!(name: "2026 General Election", election_type: "general", election_date: Date.new(2026, 11, 3), gec_import: @gec_import)
+
+    post "/api/v1/election_events/#{replacement.id}/activate", headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    @event.reload
+    assert_equal "closed", @event.status
+    assert_equal @admin.id, @event.closed_by_user_id
+    assert_not_nil @event.closed_at
+  end
+
   test "poll watcher cannot manage election setup" do
     post "/api/v1/election_events",
       params: { election_event: { name: "Blocked", election_type: "primary", election_date: "2026-08-01", gec_import_id: @gec_import.id } },
@@ -99,6 +112,19 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
     refute_includes payload["chase_list"].map { |row| row["gec_voter_id"] }, @older_voter.id
   end
 
+  test "command center reports are scoped to election date and precincts" do
+    @event.activate!(actor_user: @admin)
+    PollReport.create!(precinct: @precinct, user: @poll_watcher, report_type: "turnout_update", voter_count: 10, reported_at: Time.zone.local(2026, 8, 1, 9, 0, 0))
+    PollReport.create!(precinct: @precinct, user: @poll_watcher, report_type: "turnout_update", voter_count: 99, reported_at: Time.zone.local(2026, 8, 2, 9, 0, 0))
+
+    get "/api/v1/election_day", headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    reports = response.parsed_body["recent_reports"]
+    assert_equal 1, reports.size
+    assert_equal 10, reports.first["voter_count"]
+  end
+
   test "command center returns the full chase list, not only the first 200 contacts" do
     @event.activate!(actor_user: @admin)
     201.times do |index|
@@ -142,6 +168,25 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal 1, response.parsed_body.dig("stats", "voted")
     assert_equal 0, response.parsed_body.dig("stats", "chase_list_count")
+  end
+
+  test "command center contact logging rejects contacts outside active election GEC list" do
+    @event.activate!(actor_user: @admin)
+    outside_supporter = Supporter.create!(
+      first_name: "Old", last_name: "List", contact_number: "6715559999",
+      village: @village, precinct: @precinct, source: "staff_entry",
+      contact_classification: "active_contact", support_status: "supporter",
+      status: "active", verification_status: "verified"
+    )
+    outside_supporter.update_columns(gec_voter_id: @older_voter.id)
+
+    post "/api/v1/election_day/contact",
+      params: { supporter_id: outside_supporter.id, contact_attempt: { channel: "call", outcome: "reached", note: "Wrong list" } },
+      headers: auth_headers(@admin), as: :json
+
+    assert_response :not_found
+    assert_equal "supporter_not_found", response.parsed_body["code"]
+    assert_equal 0, outside_supporter.supporter_contact_attempts.count
   end
 
   test "command center contact logging writes normal contact history and ignores client supplied recorded_at" do
