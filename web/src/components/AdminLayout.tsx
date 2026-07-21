@@ -7,6 +7,7 @@ import AdminShell from './AdminShell';
 import WorkspaceBrandPanel from './WorkspaceBrandPanel';
 import { useSession } from '../hooks/useSession';
 import { identifyStaffUser, isAnalyticsEnabled } from '../lib/analytics';
+import { Ban } from 'lucide-react';
 
 function getHttpStatus(error: unknown): number | undefined {
   const maybeAxiosError = error as { response?: { status?: number } };
@@ -271,7 +272,7 @@ function AuthorizedContent({ children }: { children: React.ReactNode }) {
               badge="Staff workspace"
             />
             <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-[0_24px_60px_-32px_rgba(15,42,91,0.35)]">
-              <div className="mb-4 text-5xl">🚫</div>
+              <Ban aria-hidden="true" className="mx-auto mb-4 h-12 w-12 text-red-600" />
               <h1 className="mb-2 text-2xl font-bold text-gray-900">Access Denied</h1>
               <p className="mb-6 text-gray-500">
             Your account is not authorized to access this application. Please contact the DPG admin to request access.

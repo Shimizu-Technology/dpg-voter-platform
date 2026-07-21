@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Mail, Pencil, Plus, Save, Search, Trash2, Users, X, Check } from 'lucide-react';
-import { createUser, deleteUser, getDistricts, getUsers, getVillages, resendUserInvite, updateUser } from '../../lib/api';
+import { createUser, deleteUser, getDistricts, getPrecincts, getUsers, getVillages, resendUserInvite, updateUser } from '../../lib/api';
 import { useSession } from '../../hooks/useSession';
 import WorkspacePage from '../../components/WorkspacePage';
 import { formatRoleLabel } from '../../lib/roles';
@@ -18,6 +18,13 @@ interface DistrictOption {
   villages: { id: number; name: string }[];
 }
 
+interface PrecinctOption {
+  id: number;
+  number: string;
+  village_name: string;
+  polling_site: string | null;
+}
+
 interface UserItem {
   id: number;
   email: string;
@@ -27,6 +34,8 @@ interface UserItem {
   assigned_district_id: number | null;
   assigned_village_id: number | null;
   assigned_block_id: number | null;
+  poll_watcher_precinct_ids: number[];
+  poll_watcher_precincts: Array<{ id: number; number: string; village_name: string }>;
 }
 
 interface UsersResponse {
@@ -48,6 +57,7 @@ interface UserDraft {
   role: string;
   assigned_district_id: number | null;
   assigned_village_id: number | null;
+  poll_watcher_precinct_ids: number[];
 }
 
 function splitName(fullName: string | null): { firstName: string; lastName: string } {
@@ -118,6 +128,7 @@ type PermissionKey =
   | 'can_access_data_team'
   | 'can_access_reports'
   | 'can_access_poll_watcher'
+  | 'can_access_command_center'
   | 'can_upload_gec'
   | 'can_bulk_vet'
   | 'can_review_public';
@@ -140,6 +151,7 @@ const PERMISSION_KEYS: PermissionKey[] = [
   'can_access_data_team',
   'can_access_reports',
   'can_access_poll_watcher',
+  'can_access_command_center',
   'can_upload_gec',
   'can_bulk_vet',
   'can_review_public',
@@ -163,6 +175,7 @@ const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_access_data_team: 'Data management tools',
   can_access_reports: 'Reports',
   can_access_poll_watcher: 'Poll Watcher',
+  can_access_command_center: 'Election Day Command Center',
   can_upload_gec: 'GEC imports',
   can_bulk_vet: 'Bulk vetting',
   can_review_public: 'Public signup review',
@@ -183,6 +196,7 @@ const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     'can_access_audit_logs',
     'can_access_data_team',
     'can_access_reports',
+    'can_access_command_center',
     'can_upload_gec',
     'can_bulk_vet',
     'can_review_public',
@@ -197,6 +211,7 @@ const ROLE_PERMISSION_MAP: Record<string, PermissionKey[]> = {
     'can_import_supporters',
     'can_access_qr',
     'can_access_reports',
+    'can_access_command_center',
             ],
   village_chief: [
     'can_view_supporters',
@@ -218,10 +233,64 @@ function roleLabel(role: string) {
 }
 
 /** Which area assignment field does this role need? */
-function roleAssignmentType(role: string): 'none' | 'district' | 'village' {
+function roleAssignmentType(role: string): 'none' | 'district' | 'village' | 'precincts' {
   if (role === 'campaign_admin' || role === 'data_team') return 'none';
   if (role === 'district_coordinator') return 'district';
-  return 'village'; // village_chief, block_leader, poll_watcher
+  if (role === 'poll_watcher') return 'precincts';
+  return 'village';
+}
+
+function PrecinctAssignmentPicker({
+  selectedIds,
+  onChange,
+  precincts,
+}: {
+  selectedIds: number[];
+  onChange: (ids: number[]) => void;
+  precincts: PrecinctOption[];
+}) {
+  const [filter, setFilter] = useState('');
+  const visible = precincts.filter((precinct) => {
+    const value = `${precinct.village_name} ${precinct.number} ${precinct.polling_site || ''}`.toLowerCase();
+    return value.includes(filter.trim().toLowerCase());
+  });
+
+  return (
+    <fieldset className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-raised)] p-3">
+      <legend className="px-1 text-xs font-medium text-[var(--text-secondary)]">Assigned precincts</legend>
+      <input
+        type="search"
+        value={filter}
+        onChange={(event) => setFilter(event.target.value)}
+        placeholder="Filter precincts..."
+        className="mb-2 min-h-[44px] w-full rounded-lg border border-[var(--border-soft)] px-3 py-2 text-sm"
+      />
+      <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
+        {visible.map((precinct) => {
+          const checked = selectedIds.includes(precinct.id);
+          return (
+            <label key={precinct.id} className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-[var(--surface-bg)]">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => onChange(
+                  checked
+                    ? selectedIds.filter((id) => id !== precinct.id)
+                    : [...selectedIds, precinct.id].sort((a, b) => a - b)
+                )}
+                className="h-4 w-4"
+              />
+              <span className="text-sm text-[var(--text-primary)]">
+                {precinct.village_name} · Precinct {precinct.number}
+              </span>
+            </label>
+          );
+        })}
+        {visible.length === 0 && <p className="px-2 py-3 text-xs text-[var(--text-muted)]">No precincts match.</p>}
+      </div>
+      <p className="mt-2 text-xs text-[var(--text-muted)]">{selectedIds.length} precinct{selectedIds.length === 1 ? '' : 's'} selected</p>
+    </fieldset>
+  );
 }
 
 function AssignmentDropdown({
@@ -290,6 +359,12 @@ function assignmentLabel(
     const v = villages.find((v) => v.id === user.assigned_village_id);
     return v ? `Village: ${v.name}` : `Village #${user.assigned_village_id}`;
   }
+  if (type === 'precincts') {
+    if (user.poll_watcher_precincts.length === 0) return 'No precinct assigned';
+    return user.poll_watcher_precincts
+      .map((precinct) => `${precinct.village_name} ${precinct.number}`)
+      .join(', ');
+  }
   if (type === 'none') return '';
   return 'No area assigned';
 }
@@ -342,6 +417,7 @@ function roleScopeRule(role: string): string {
   if (role === 'campaign_admin') return 'Scope rule: full access to all villages';
   if (role === 'data_team') return 'Scope rule: island-wide contact and data access';
   if (role === 'district_coordinator') return 'Scope rule: assigned district (or all villages if no district assigned)';
+  if (role === 'poll_watcher') return 'Scope rule: explicitly assigned precincts only';
   return 'Scope rule: assigned village only';
 }
 
@@ -350,7 +426,8 @@ function scopeLabelForRole(
   assignedDistrictId: number | null,
   assignedVillageId: number | null,
   villages: VillageOption[],
-  districts: DistrictOption[]
+  districts: DistrictOption[],
+  precinctCount = 0
 ): string {
   if (role === 'campaign_admin') return 'Scope: all villages';
   if (role === 'data_team') return 'Scope: island-wide data tools';
@@ -359,6 +436,7 @@ function scopeLabelForRole(
     const district = districts.find((d) => d.id === assignedDistrictId);
     return `Scope: assigned district (${district?.name || `District #${assignedDistrictId}`})`;
   }
+  if (role === 'poll_watcher') return precinctCount > 0 ? `Scope: ${precinctCount} assigned precinct${precinctCount === 1 ? '' : 's'}` : 'Scope: no precinct assigned';
 
   if (!assignedVillageId) return 'Scope: no village assigned (no scoped data)';
   const village = villages.find((v) => v.id === assignedVillageId);
@@ -426,13 +504,19 @@ export default function UsersPage() {
     queryKey: ['districts'],
     queryFn: getDistricts,
   });
+  const { data: precinctsData } = useQuery<{ precincts: PrecinctOption[] }>({
+    queryKey: ['precincts', 'active'],
+    queryFn: () => getPrecincts({ status: 'active' }),
+  });
   const villages = useMemo(() => villagesData?.villages || [], [villagesData]);
   const districts = useMemo(() => districtsData?.districts || [], [districtsData]);
+  const precincts = useMemo(() => precinctsData?.precincts || [], [precinctsData]);
 
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState('block_leader');
   const [newAssignedVillageId, setNewAssignedVillageId] = useState<number | null>(null);
   const [newAssignedDistrictId, setNewAssignedDistrictId] = useState<number | null>(null);
+  const [newPollWatcherPrecinctIds, setNewPollWatcherPrecinctIds] = useState<number[]>([]);
   const [draftByUser, setDraftByUser] = useState<Record<number, UserDraft>>({});
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -490,6 +574,7 @@ export default function UsersPage() {
         role: newRole,
         assigned_village_id: assignType === 'village' ? newAssignedVillageId : null,
         assigned_district_id: assignType === 'district' ? newAssignedDistrictId : null,
+        poll_watcher_precinct_ids: assignType === 'precincts' ? newPollWatcherPrecinctIds : [],
       });
     },
     onSuccess: () => {
@@ -497,6 +582,7 @@ export default function UsersPage() {
       setNewRole('block_leader');
       setNewAssignedVillageId(null);
       setNewAssignedDistrictId(null);
+      setNewPollWatcherPrecinctIds([]);
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
   });
@@ -510,6 +596,7 @@ export default function UsersPage() {
         role: payload.role,
         assigned_village_id: assignType === 'village' ? payload.assigned_village_id : null,
         assigned_district_id: assignType === 'district' ? payload.assigned_district_id : null,
+        poll_watcher_precinct_ids: assignType === 'precincts' ? payload.poll_watcher_precinct_ids : [],
       });
     },
     onSuccess: (_data, variables) => {
@@ -557,6 +644,7 @@ export default function UsersPage() {
       firstName, lastName, email: user.email, role: user.role,
       assigned_district_id: user.assigned_district_id,
       assigned_village_id: user.assigned_village_id,
+      poll_watcher_precinct_ids: user.poll_watcher_precinct_ids,
     };
   };
 
@@ -568,6 +656,7 @@ export default function UsersPage() {
         firstName, lastName, email: user.email, role: user.role,
         assigned_district_id: user.assigned_district_id,
         assigned_village_id: user.assigned_village_id,
+        poll_watcher_precinct_ids: user.poll_watcher_precinct_ids,
       },
     }));
   };
@@ -601,6 +690,7 @@ export default function UsersPage() {
     user.role !== draft.role ||
     user.assigned_village_id !== draft.assigned_village_id ||
     user.assigned_district_id !== draft.assigned_district_id
+    || user.poll_watcher_precinct_ids.join(',') !== draft.poll_watcher_precinct_ids.join(',')
   );
 
   const pendingSaves = useMemo(
@@ -672,6 +762,7 @@ export default function UsersPage() {
                 setNewRole(e.target.value);
                 setNewAssignedVillageId(null);
                 setNewAssignedDistrictId(null);
+                setNewPollWatcherPrecinctIds([]);
               }}
               className="border border-[var(--border-soft)] rounded-xl px-3 py-2 bg-[var(--surface-raised)] min-h-[44px]"
             >
@@ -683,23 +774,27 @@ export default function UsersPage() {
           {roleAssignmentType(newRole) !== 'none' && (
             <div className="mt-3 max-w-sm">
               <label className="block text-xs text-[var(--text-secondary)] mb-1">
-                {roleAssignmentType(newRole) === 'district' ? 'Assign to district' : 'Assign to village'}
+                {roleAssignmentType(newRole) === 'district' ? 'Assign to district' : roleAssignmentType(newRole) === 'precincts' ? 'Assign exact precincts' : 'Assign to village'}
               </label>
-              <AssignmentDropdown
-                role={newRole}
-                villageId={newAssignedVillageId}
-                districtId={newAssignedDistrictId}
-                onVillageChange={setNewAssignedVillageId}
-                onDistrictChange={setNewAssignedDistrictId}
-                villages={villages}
-                districts={districts}
-              />
+              {roleAssignmentType(newRole) === 'precincts' ? (
+                <PrecinctAssignmentPicker selectedIds={newPollWatcherPrecinctIds} onChange={setNewPollWatcherPrecinctIds} precincts={precincts} />
+              ) : (
+                <AssignmentDropdown
+                  role={newRole}
+                  villageId={newAssignedVillageId}
+                  districtId={newAssignedDistrictId}
+                  onVillageChange={setNewAssignedVillageId}
+                  onDistrictChange={setNewAssignedDistrictId}
+                  villages={villages}
+                  districts={districts}
+                />
+              )}
             </div>
           )}
           <button
             type="button"
             onClick={() => createMutation.mutate()}
-            disabled={!newEmail || createMutation.isPending || (roleAssignmentType(newRole) === 'village' && !newAssignedVillageId) || (roleAssignmentType(newRole) === 'district' && !newAssignedDistrictId)}
+            disabled={!newEmail || createMutation.isPending || (roleAssignmentType(newRole) === 'village' && !newAssignedVillageId) || (roleAssignmentType(newRole) === 'district' && !newAssignedDistrictId) || (roleAssignmentType(newRole) === 'precincts' && newPollWatcherPrecinctIds.length === 0)}
             className="mt-3 w-full sm:w-auto bg-primary text-white px-4 py-2 rounded-xl min-h-[44px] text-sm font-medium inline-flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <Plus className="w-4 h-4" /> {createMutation.isPending ? 'Adding...' : 'Add User'}
@@ -936,6 +1031,7 @@ export default function UsersPage() {
                                   role: newRole,
                                   assigned_village_id: newType === oldType ? draft.assigned_village_id : null,
                                   assigned_district_id: newType === oldType ? draft.assigned_district_id : null,
+                                  poll_watcher_precinct_ids: newType === oldType ? draft.poll_watcher_precinct_ids : [],
                                 },
                               }));
                             }}
@@ -946,20 +1042,28 @@ export default function UsersPage() {
                             ))}
                           </select>
                           {roleAssignmentType(draft.role) !== 'none' && (
-                            <AssignmentDropdown
-                              role={draft.role}
-                              villageId={draft.assigned_village_id}
-                              districtId={draft.assigned_district_id}
-                              onVillageChange={(id) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, assigned_village_id: id } }))}
-                              onDistrictChange={(id) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, assigned_district_id: id } }))}
-                              villages={villages}
-                              districts={districts}
-                            />
+                            roleAssignmentType(draft.role) === 'precincts' ? (
+                              <PrecinctAssignmentPicker
+                                selectedIds={draft.poll_watcher_precinct_ids}
+                                onChange={(ids) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, poll_watcher_precinct_ids: ids } }))}
+                                precincts={precincts}
+                              />
+                            ) : (
+                              <AssignmentDropdown
+                                role={draft.role}
+                                villageId={draft.assigned_village_id}
+                                districtId={draft.assigned_district_id}
+                                onVillageChange={(id) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, assigned_village_id: id } }))}
+                                onDistrictChange={(id) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, assigned_district_id: id } }))}
+                                villages={villages}
+                                districts={districts}
+                              />
+                            )
                           )}
                           <div className="grid grid-cols-2 gap-2">
                             <button
                               type="button"
-                              disabled={!changed || updateMutation.isPending}
+                              disabled={!changed || updateMutation.isPending || (draft.role === 'poll_watcher' && draft.poll_watcher_precinct_ids.length === 0)}
                               onClick={() => updateMutation.mutate({ id: user.id, payload: draft })}
                               className="bg-primary text-white px-3 py-2 rounded-xl min-h-[44px] text-xs font-medium flex items-center justify-center gap-1 disabled:opacity-50"
                             >
@@ -989,12 +1093,12 @@ export default function UsersPage() {
                             <p className="text-xs text-[var(--text-secondary)] break-all">{user.email}</p>
                             <p className="text-xs text-[var(--text-secondary)] mt-1">Role: {roleLabel(user.role)}</p>
                             {assignmentLabel(user, villages, districts) && (
-                              <p className={`text-xs mt-0.5 ${user.assigned_village_id || user.assigned_district_id ? 'text-[var(--text-secondary)]' : 'text-amber-600'}`}>
+                              <p className={`text-xs mt-0.5 ${user.assigned_village_id || user.assigned_district_id || user.poll_watcher_precinct_ids.length > 0 ? 'text-[var(--text-secondary)]' : 'text-amber-600'}`}>
                                 {assignmentLabel(user, villages, districts)}
                               </p>
                             )}
                             <p className="text-xs text-[var(--text-muted)] mt-1">
-                              {scopeLabelForRole(user.role, user.assigned_district_id, user.assigned_village_id, villages, districts)}
+                              {scopeLabelForRole(user.role, user.assigned_district_id, user.assigned_village_id, villages, districts, user.poll_watcher_precinct_ids.length)}
                             </p>
                             <RolePermissionsDisclosure role={user.role} />
                           </div>
@@ -1114,6 +1218,7 @@ export default function UsersPage() {
                                         role: newRole,
                                         assigned_village_id: newType === oldType ? draft.assigned_village_id : null,
                                         assigned_district_id: newType === oldType ? draft.assigned_district_id : null,
+                                        poll_watcher_precinct_ids: newType === oldType ? draft.poll_watcher_precinct_ids : [],
                                       },
                                     }));
                                   }}
@@ -1130,25 +1235,35 @@ export default function UsersPage() {
                             <td className="px-4 py-3">
                               {isEditing ? (
                                 roleAssignmentType(draft.role) !== 'none' ? (
-                                  <AssignmentDropdown
-                                    role={draft.role}
-                                    villageId={draft.assigned_village_id}
-                                    districtId={draft.assigned_district_id}
-                                    onVillageChange={(id) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, assigned_village_id: id } }))}
-                                    onDistrictChange={(id) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, assigned_district_id: id } }))}
-                                    villages={villages}
-                                    districts={districts}
-                                  />
+                                  roleAssignmentType(draft.role) === 'precincts' ? (
+                                    <div className="min-w-72">
+                                      <PrecinctAssignmentPicker
+                                        selectedIds={draft.poll_watcher_precinct_ids}
+                                        onChange={(ids) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, poll_watcher_precinct_ids: ids } }))}
+                                        precincts={precincts}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <AssignmentDropdown
+                                      role={draft.role}
+                                      villageId={draft.assigned_village_id}
+                                      districtId={draft.assigned_district_id}
+                                      onVillageChange={(id) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, assigned_village_id: id } }))}
+                                      onDistrictChange={(id) => setDraftByUser((prev) => ({ ...prev, [user.id]: { ...draft, assigned_district_id: id } }))}
+                                      villages={villages}
+                                      districts={districts}
+                                    />
+                                  )
                                 ) : (
                                   <span className="text-xs text-[var(--text-muted)]">Full access</span>
                                 )
                               ) : (
                                 <div>
-                                  <span className={`block text-xs font-medium ${user.assigned_village_id || user.assigned_district_id ? 'text-[var(--text-primary)]' : roleAssignmentType(user.role) === 'none' ? 'text-[var(--text-muted)]' : 'text-amber-600'}`}>
+                                  <span className={`block text-xs font-medium ${user.assigned_village_id || user.assigned_district_id || user.poll_watcher_precinct_ids.length > 0 ? 'text-[var(--text-primary)]' : roleAssignmentType(user.role) === 'none' ? 'text-[var(--text-muted)]' : 'text-amber-600'}`}>
                                     {assignmentLabel(user, villages, districts) || 'Full access'}
                                   </span>
                                   <span className="block text-[11px] text-[var(--text-muted)] mt-0.5">
-                                    {scopeLabelForRole(user.role, user.assigned_district_id, user.assigned_village_id, villages, districts)}
+                                    {scopeLabelForRole(user.role, user.assigned_district_id, user.assigned_village_id, villages, districts, user.poll_watcher_precinct_ids.length)}
                                   </span>
                                   <button
                                     type="button"
@@ -1167,7 +1282,7 @@ export default function UsersPage() {
                                   <>
                                     <button
                                       type="button"
-                                      disabled={!changed || updateMutation.isPending}
+                                      disabled={!changed || updateMutation.isPending || (draft.role === 'poll_watcher' && draft.poll_watcher_precinct_ids.length === 0)}
                                       onClick={() => updateMutation.mutate({ id: user.id, payload: draft })}
                                       className="bg-primary text-white px-3 py-2 rounded-xl min-h-[44px] text-xs font-medium flex items-center gap-1 disabled:opacity-50"
                                     >

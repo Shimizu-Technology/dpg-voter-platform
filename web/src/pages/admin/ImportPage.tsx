@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { uploadImportPreview, parseImportRows, confirmImport, getVillages } from '../../lib/api';
 import { captureAnalyticsEvent } from '../../lib/analytics';
 import { useSession } from '../../hooks/useSession';
-import { Upload, FileSpreadsheet, ArrowLeft, Check, AlertTriangle, Loader2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, ArrowLeft, ArrowRight, Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import WorkspacePage from '../../components/WorkspacePage';
 
@@ -355,11 +355,13 @@ export default function ImportPage() {
             <div className="app-card p-4">
               <h2 className="font-semibold text-[var(--text-primary)] mb-2">Quick checklist</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                <div className={`rounded-lg border px-3 py-2 ${hasNameMapping ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-                  1) Name mapped {hasNameMapping ? '✅' : '⚠️'}
+                <div className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${hasNameMapping ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                  <span>1) Name mapped</span>
+                  {hasNameMapping ? <Check className="h-4 w-4" aria-label="Complete" /> : <AlertTriangle className="h-4 w-4" aria-label="Needs attention" />}
                 </div>
-                <div className={`rounded-lg border px-3 py-2 ${hasVillageSource ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-                  2) Village source set {hasVillageSource ? '✅' : '⚠️'}
+                <div className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${hasVillageSource ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                  <span>2) Village source set</span>
+                  {hasVillageSource ? <Check className="h-4 w-4" aria-label="Complete" /> : <AlertTriangle className="h-4 w-4" aria-label="Needs attention" />}
                 </div>
                 <div className="rounded-lg border border-blue-200 bg-blue-50 text-blue-800 px-3 py-2">
                   3) Continue to review

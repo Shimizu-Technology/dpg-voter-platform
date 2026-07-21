@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_23_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -122,6 +122,59 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_020000) do
     t.index ["supporter_id", "dismissed_supporter_id"], name: "index_duplicate_pair_dismissals_on_pair", unique: true
     t.index ["supporter_id"], name: "index_duplicate_pair_dismissals_on_supporter_id"
     t.check_constraint "supporter_id < dismissed_supporter_id", name: "duplicate_pair_dismissals_ordered_pair"
+  end
+
+  create_table "election_events", force: :cascade do |t|
+    t.datetime "activated_at"
+    t.bigint "activated_by_user_id"
+    t.datetime "closed_at"
+    t.bigint "closed_by_user_id"
+    t.datetime "created_at", null: false
+    t.date "election_date", null: false
+    t.string "election_type", default: "general", null: false
+    t.bigint "gec_import_id"
+    t.jsonb "metadata", default: {}, null: false
+    t.string "name", null: false
+    t.string "status", default: "setup", null: false
+    t.datetime "training_started_at"
+    t.bigint "training_started_by_user_id"
+    t.datetime "updated_at", null: false
+    t.index "(1)", name: "index_election_events_unique_current", unique: true, where: "((status)::text = ANY ((ARRAY['training'::character varying, 'active'::character varying])::text[]))"
+    t.index ["activated_by_user_id"], name: "index_election_events_on_activated_by_user_id"
+    t.index ["closed_by_user_id"], name: "index_election_events_on_closed_by_user_id"
+    t.index ["election_date", "name"], name: "index_election_events_on_election_date_and_name"
+    t.index ["gec_import_id"], name: "index_election_events_on_gec_import_id"
+    t.index ["status"], name: "index_election_events_on_status"
+    t.index ["training_started_by_user_id"], name: "index_election_events_on_training_started_by_user_id"
+  end
+
+  create_table "election_turnout_records", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "election_event_id", null: false
+    t.bigint "gec_voter_id", null: false
+    t.bigint "observation_precinct_id"
+    t.string "observation_precinct_number"
+    t.string "observation_village_name"
+    t.bigint "registered_precinct_id"
+    t.string "registered_precinct_number"
+    t.string "registered_village_name"
+    t.bigint "supporter_id"
+    t.text "turnout_note"
+    t.string "turnout_source"
+    t.string "turnout_status", default: "not_yet_voted", null: false
+    t.datetime "turnout_updated_at"
+    t.bigint "turnout_updated_by_user_id"
+    t.datetime "updated_at", null: false
+    t.index ["election_event_id", "gec_voter_id"], name: "index_election_turnout_unique_voter", unique: true
+    t.index ["election_event_id", "registered_precinct_id"], name: "index_election_turnout_on_event_precinct"
+    t.index ["election_event_id", "supporter_id"], name: "index_election_turnout_on_event_supporter"
+    t.index ["election_event_id", "turnout_status"], name: "index_election_turnout_on_event_status"
+    t.index ["election_event_id"], name: "index_election_turnout_records_on_election_event_id"
+    t.index ["gec_voter_id"], name: "index_election_turnout_records_on_gec_voter_id"
+    t.index ["observation_precinct_id"], name: "index_election_turnout_records_on_observation_precinct_id"
+    t.index ["registered_precinct_id"], name: "index_election_turnout_records_on_registered_precinct_id"
+    t.index ["supporter_id"], name: "index_election_turnout_records_on_supporter_id"
+    t.index ["turnout_updated_by_user_id"], name: "index_election_turnout_records_on_turnout_updated_by_user_id"
   end
 
   create_table "email_blasts", force: :cascade do |t|
@@ -375,6 +428,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_020000) do
 
   create_table "poll_reports", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.bigint "election_event_id"
     t.text "notes"
     t.bigint "precinct_id", null: false
     t.string "report_type", default: "turnout_update", null: false
@@ -382,6 +436,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_020000) do
     t.datetime "updated_at", null: false
     t.bigint "user_id"
     t.integer "voter_count", null: false
+    t.index ["election_event_id", "precinct_id", "reported_at"], name: "index_poll_reports_on_event_precinct_reported_at"
+    t.index ["election_event_id"], name: "index_poll_reports_on_election_event_id"
     t.index ["precinct_id", "reported_at"], name: "index_poll_reports_on_precinct_id_and_reported_at"
     t.index ["precinct_id"], name: "index_poll_reports_on_precinct_id"
     t.index ["reported_at"], name: "index_poll_reports_on_reported_at"
@@ -804,6 +860,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_020000) do
   add_foreign_key "duplicate_pair_dismissals", "supporters"
   add_foreign_key "duplicate_pair_dismissals", "supporters", column: "dismissed_supporter_id"
   add_foreign_key "duplicate_pair_dismissals", "users", column: "resolved_by_id"
+  add_foreign_key "election_events", "gec_imports"
+  add_foreign_key "election_events", "users", column: "activated_by_user_id"
+  add_foreign_key "election_events", "users", column: "closed_by_user_id"
+  add_foreign_key "election_events", "users", column: "training_started_by_user_id"
+  add_foreign_key "election_turnout_records", "election_events"
+  add_foreign_key "election_turnout_records", "gec_voters"
+  add_foreign_key "election_turnout_records", "precincts", column: "observation_precinct_id"
+  add_foreign_key "election_turnout_records", "precincts", column: "registered_precinct_id"
+  add_foreign_key "election_turnout_records", "supporters"
+  add_foreign_key "election_turnout_records", "users", column: "turnout_updated_by_user_id"
   add_foreign_key "email_blasts", "users", column: "initiated_by_user_id"
   add_foreign_key "event_rsvps", "events"
   add_foreign_key "event_rsvps", "supporters"
@@ -825,6 +891,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_020000) do
   add_foreign_key "outreach_deliveries", "outreach_deliveries", column: "resend_of_id"
   add_foreign_key "outreach_deliveries", "sms_blasts"
   add_foreign_key "outreach_deliveries", "supporters"
+  add_foreign_key "poll_reports", "election_events"
   add_foreign_key "poll_reports", "precincts"
   add_foreign_key "poll_reports", "users"
   add_foreign_key "poll_watcher_precinct_assignments", "precincts"

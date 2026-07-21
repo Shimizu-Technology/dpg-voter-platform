@@ -25,6 +25,7 @@ import {
   Database,
   QrCode,
   Target,
+  RadioTower,
 } from 'lucide-react';
 import WorkspaceBrandPanel from './WorkspaceBrandPanel';
 import { publicSiteConfig } from '../lib/publicSite';
@@ -88,6 +89,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     {
       label: 'Election Day',
       items: [
+        ...(permissions?.can_access_command_center ? [ { to: '/admin/election-day', label: 'Election Day', icon: RadioTower } ] : []),
         ...(permissions?.can_access_poll_watcher ? [ { to: '/admin/poll-watcher', label: 'Poll Watcher', icon: MapPin } ] : []),
       ],
     },

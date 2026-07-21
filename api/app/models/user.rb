@@ -9,6 +9,10 @@ class User < ApplicationRecord
   has_many :created_referral_codes, class_name: "ReferralCode", foreign_key: :created_by_user_id, dependent: :nullify
   has_many :poll_watcher_precinct_assignments, dependent: :destroy
   has_many :assigned_poll_watcher_precincts, through: :poll_watcher_precinct_assignments, source: :precinct
+  has_many :activated_election_events, class_name: "ElectionEvent", foreign_key: :activated_by_user_id, dependent: :nullify
+  has_many :training_started_election_events, class_name: "ElectionEvent", foreign_key: :training_started_by_user_id, dependent: :nullify
+  has_many :closed_election_events, class_name: "ElectionEvent", foreign_key: :closed_by_user_id, dependent: :nullify
+  has_many :election_turnout_updates, class_name: "ElectionTurnoutRecord", foreign_key: :turnout_updated_by_user_id, dependent: :nullify
 
   validates :clerk_id, presence: true, uniqueness: true
   validates :email, presence: true, uniqueness: true

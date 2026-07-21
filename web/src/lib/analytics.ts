@@ -24,7 +24,7 @@ export function captureAnalyticsEvent(event: string, props: AnalyticsProps = {})
 export function capturePageview(pathname: string, search: string) {
   if (!isAnalyticsEnabled || typeof window === 'undefined') return;
   captureAnalyticsEvent('$pageview', {
-    $current_url: window.location.href,
+    $current_url: `${window.location.origin}${pathname}`,
     $pathname: pathname,
     route_area: routeArea(pathname),
     has_query: search.length > 0,
@@ -40,12 +40,7 @@ export function identifyStaffUser(user: {
 }) {
   if (!isAnalyticsEnabled) return;
 
-  posthog.identify(`staff:${user.id}`, compactProps({
-    app_role: user.role,
-    assigned_village_id: user.assigned_village_id,
-    assigned_district_id: user.assigned_district_id,
-    assigned_block_id: user.assigned_block_id,
-  }));
+  posthog.identify(`staff:${user.id}`, compactProps({ app_role: user.role }));
 }
 
 export function resetAnalytics() {

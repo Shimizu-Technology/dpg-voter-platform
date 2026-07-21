@@ -120,7 +120,16 @@ export const getEmailBlastStatus = (id: number) => api.get(`/email/blasts/${id}`
 export const getEmailBlastDeliveries = (id: number) => api.get(`/email/blasts/${id}/deliveries`).then(r => r.data);
 export const resendFailedEmailBlast = (id: number) => api.post(`/email/blasts/${id}/resend_failed`).then(r => r.data);
 
-// Election Day / poll watcher
+// Election Day / command center / poll watcher
+export const getElectionEvents = () => api.get('/election_events').then(r => r.data);
+export const createElectionEvent = (data: JsonRecord) => api.post('/election_events', { election_event: data }).then(r => r.data);
+export const updateElectionEvent = (id: number, data: JsonRecord) => api.patch(`/election_events/${id}`, { election_event: data }).then(r => r.data);
+export const activateElectionEvent = (id: number) => api.post(`/election_events/${id}/activate`).then(r => r.data);
+export const startTrainingElectionEvent = (id: number) => api.post(`/election_events/${id}/start_training`).then(r => r.data);
+export const closeElectionEvent = (id: number) => api.post(`/election_events/${id}/close`).then(r => r.data);
+export const getElectionDayCommandCenter = (params?: QueryParams) => api.get('/election_day', { params }).then(r => r.data);
+export const logElectionDayContact = (supporterId: number, data: JsonRecord) =>
+  api.post('/election_day/contact', { supporter_id: supporterId, contact_attempt: data }).then(r => r.data);
 export const getPollWatcher = () => api.get('/poll_watcher').then(r => r.data);
 export const submitPollReport = (data: JsonRecord) => api.post('/poll_watcher/report', { report: data }).then(r => r.data);
 export const getPrecinctHistory = (id: number) => api.get(`/poll_watcher/precinct/${id}/history`).then(r => r.data);

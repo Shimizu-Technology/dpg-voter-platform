@@ -17,12 +17,9 @@ const posthogOptions = {
   api_host: posthogHost,
   person_profiles: 'identified_only' as const,
   capture_pageview: false,
-  capture_pageleave: true,
-  autocapture: true,
-  disable_session_recording: false,
-  session_recording: {
-    maskAllInputs: true,
-  },
+  capture_pageleave: false,
+  autocapture: false,
+  disable_session_recording: true,
 }
 
 const app = isPlaceholderClerkKey(CLERK_KEY)

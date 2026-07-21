@@ -287,6 +287,10 @@ module Authenticatable
     current_user&.admin? || current_user&.coordinator? || current_user&.poll_watcher?
   end
 
+  def can_access_command_center?
+    current_user&.admin? || current_user&.data_team? || current_user&.coordinator?
+  end
+
   def can_access_duplicates?
     current_user&.admin? || current_user&.data_team?
   end

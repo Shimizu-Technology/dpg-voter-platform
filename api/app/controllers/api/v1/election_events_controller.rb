@@ -1,0 +1,224 @@
+# frozen_string_literal: true
+
+module Api
+  module V1
+    class ElectionEventsController < ApplicationController
+      include Authenticatable
+      include AuditLoggable
+      before_action :authenticate_request
+      before_action :require_election_day_admin_access!, except: [ :index, :show ]
+      before_action :require_command_center_access!, only: [ :index, :show ]
+
+      def index
+        events = ElectionEvent
+          .left_joins(:election_turnout_records)
+          .includes(:gec_import)
+          .select("election_events.*, COUNT(election_turnout_records.id) AS turnout_records_count_cached")
+          .group("election_events.id")
+          .recent_first
+          .limit(25)
+        render json: {
+          active_election: election_event_json(ElectionEvent.current_event),
+          election_events: events.map { |event| election_event_json(event) },
+          completed_gec_imports: GecImport.completed.latest.limit(25).map { |gec_import| gec_import_json(gec_import) }
+        }
+      end
+
+      def show
+        event = ElectionEvent.includes(:gec_import).find(params[:id])
+        render json: { election_event: election_event_json(event) }
+      end
+
+      def create
+        event = ElectionEvent.new(election_event_params)
+        if event.save
+          log_audit!(event, action: "election_event_created", changed_data: event.saved_changes.except("created_at", "updated_at"))
+          render json: { election_event: election_event_json(event) }, status: :created
+        else
+          render_api_error(message: event.errors.full_messages.to_sentence, status: :unprocessable_entity, code: "election_event_create_failed")
+        end
+      end
+
+      def update
+        event = ElectionEvent.find(params[:id])
+        permitted_params = election_event_params
+        if current_gec_import_change?(event, permitted_params)
+          return render_api_error(
+            message: "The GEC import for a training or live election cannot be changed. Close this election and create a new event for a different list.",
+            status: :conflict,
+            code: "current_election_gec_import_locked"
+          )
+        end
+
+        before = event.attributes.slice("name", "election_type", "election_date", "status", "gec_import_id")
+        if event.update(permitted_params)
+          changes = before.each_with_object({}) do |(key, value), memo|
+            next if event.public_send(key) == value
+
+            memo[key] = [ value, event.public_send(key) ]
+          end
+          log_audit!(event, action: "election_event_updated", changed_data: changes) if changes.any?
+          render json: { election_event: election_event_json(event) }
+        else
+          render_api_error(message: event.errors.full_messages.to_sentence, status: :unprocessable_entity, code: "election_event_update_failed")
+        end
+      end
+
+      def activate
+        event = ElectionEvent.find(params[:id])
+        unless event.status == "setup"
+          return render_api_error(
+            message: "Only an election in setup can be activated. Close training and create a clean live election so training turnout is never reused.",
+            status: :conflict,
+            code: "election_event_not_activatable"
+          )
+        end
+        unless event.gec_import&.completed?
+          return render_api_error(message: "Select a completed GEC import before activating this election", status: :unprocessable_entity, code: "missing_active_gec_import")
+        end
+        if (current_event = ElectionEvent.current_event)
+          return render_api_error(
+            message: "Close #{current_event.name} before activating a different live election",
+            status: :conflict,
+            code: "current_election_must_be_closed"
+          )
+        end
+
+        previous_status = event.status
+        begin
+          event.activate!(actor_user: current_user)
+        rescue ActiveRecord::StatementInvalid, ElectionEvent::InvalidTransition
+          return render_api_error(
+            message: "Another election event is already active; please refresh and try again.",
+            status: :conflict,
+            code: "election_event_activate_conflict"
+          )
+        end
+
+        log_audit!(event, action: "election_event_activated", changed_data: { status: [ previous_status, "active" ], gec_import_id: event.gec_import_id })
+        render json: { election_event: election_event_json(event.reload) }
+      end
+
+      def start_training
+        event = ElectionEvent.find(params[:id])
+        unless event.status == "setup"
+          return render_api_error(
+            message: "Only an election in setup can begin training",
+            status: :conflict,
+            code: "election_event_not_trainable"
+          )
+        end
+        unless event.gec_import&.completed?
+          return render_api_error(
+            message: "Select a completed GEC import before beginning training",
+            status: :unprocessable_entity,
+            code: "missing_training_gec_import"
+          )
+        end
+        if (current_event = ElectionEvent.current_event)
+          return render_api_error(
+            message: "Close #{current_event.name} before beginning a different training event",
+            status: :conflict,
+            code: "current_election_must_be_closed"
+          )
+        end
+
+        previous_status = event.status
+        begin
+          event.start_training!(actor_user: current_user)
+        rescue ActiveRecord::StatementInvalid, ElectionEvent::InvalidTransition
+          return render_api_error(
+            message: "Another training or live election is already current; please refresh and try again.",
+            status: :conflict,
+            code: "election_event_training_conflict"
+          )
+        end
+
+        log_audit!(event, action: "election_event_training_started", changed_data: {
+          status: [ previous_status, "training" ],
+          gec_import_id: event.gec_import_id
+        })
+        render json: { election_event: election_event_json(event.reload) }
+      end
+
+      def close
+        event = ElectionEvent.find(params[:id])
+        unless event.status.in?(%w[setup training active])
+          return render_api_error(
+            message: "Only setup, training, or active election events can be closed",
+            status: :conflict,
+            code: "election_event_not_closable"
+          )
+        end
+
+        previous_status = event.status
+        event.close!(actor_user: current_user)
+        log_audit!(event, action: "election_event_closed", changed_data: { status: [ previous_status, "closed" ] })
+        render json: { election_event: election_event_json(event.reload) }
+      end
+
+      private
+
+      def election_event_params
+        params.require(:election_event).permit(:name, :election_type, :election_date, :gec_import_id)
+      end
+
+      def current_gec_import_change?(event, permitted_params)
+        return false unless event.active_or_training?
+        return false unless permitted_params.key?(:gec_import_id)
+
+        permitted_params[:gec_import_id].to_s != event.gec_import_id.to_s
+      end
+
+      def require_command_center_access!
+        return if current_user&.admin? || current_user&.data_team? || current_user&.coordinator?
+
+        render_api_error(message: "Election Day setup access required", status: :forbidden, code: "election_day_setup_access_required")
+      end
+
+      def require_election_day_admin_access!
+        return if current_user&.admin? || current_user&.data_team?
+
+        render_api_error(message: "Election Day setup management requires Administrator or Data Manager access", status: :forbidden, code: "election_day_setup_management_required")
+      end
+
+      def election_event_json(event)
+        return nil unless event
+
+        {
+          id: event.id,
+          name: event.name,
+          election_type: event.election_type,
+          election_date: event.election_date&.iso8601,
+          status: event.status,
+          gec_import_id: event.gec_import_id,
+          gec_list_date: event.gec_list_date&.iso8601,
+          gec_import_filename: event.gec_import&.filename,
+          activated_at: event.activated_at&.iso8601,
+          training_started_at: event.training_started_at&.iso8601,
+          closed_at: event.closed_at&.iso8601,
+          turnout_records_count: event_turnout_records_count(event)
+        }
+      end
+
+      def event_turnout_records_count(event)
+        cached_count = event.attributes["turnout_records_count_cached"]
+        return cached_count.to_i if cached_count.present?
+
+        event.election_turnout_records.count
+      end
+
+      def gec_import_json(gec_import)
+        {
+          id: gec_import.id,
+          filename: gec_import.filename,
+          gec_list_date: gec_import.gec_list_date&.iso8601,
+          status: gec_import.status,
+          active_election_day: gec_import.active_election_day,
+          total_records: gec_import.total_records,
+          created_at: gec_import.created_at&.iso8601
+        }
+      end
+    end
+  end
+end

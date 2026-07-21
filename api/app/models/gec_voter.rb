@@ -10,6 +10,7 @@ class GecVoter < ApplicationRecord
   belongs_to :removal_detected_by_import, class_name: "GecImport", optional: true
   belongs_to :turnout_updated_by_user, class_name: "User", optional: true
   has_many :supporters, dependent: :nullify
+  has_many :election_turnout_records, dependent: :destroy
 
   validates :first_name, presence: true
   validates :last_name, presence: true

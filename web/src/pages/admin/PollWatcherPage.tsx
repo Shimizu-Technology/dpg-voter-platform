@@ -36,6 +36,12 @@ interface PollWatcherStats {
 interface PollWatcherData {
   villages: VillageItem[];
   stats: PollWatcherStats;
+  election_day?: {
+    election_name?: string | null;
+    election_status?: 'training' | 'active' | null;
+    setup_required?: boolean;
+    precinct_assignment_required?: boolean;
+  };
 }
 
 interface StrikeListVoter {
@@ -503,6 +509,33 @@ export default function PollWatcherPage() {
       </div>
 
       <div className="space-y-4">
+        {data.election_day?.election_status === 'training' && (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Training mode: {data.election_day.election_name || 'DPG election rehearsal'}</p>
+              <p className="mt-1 text-xs">Practice reports and turnout are isolated here and will not carry into a live election event.</p>
+            </div>
+          </div>
+        )}
+        {data.election_day?.setup_required && (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+            <Lock className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Election event required</p>
+              <p className="mt-1 text-xs">An Administrator or Data Manager must start training or activate a live election before reports and turnout updates can be recorded.</p>
+            </div>
+          </div>
+        )}
+        {data.election_day?.precinct_assignment_required && (
+          <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-950">
+            <MapPin className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Precinct assignment required</p>
+              <p className="mt-1 text-xs">An Administrator or District Coordinator must assign this Poll Watcher account to at least one precinct before Election Day tools can be used.</p>
+            </div>
+          </div>
+        )}
         {/* Success Message */}
         {successMsg && (
           <div className="bg-green-50 border border-green-200 text-green-700 rounded-2xl p-3 mb-4 flex items-center gap-2">

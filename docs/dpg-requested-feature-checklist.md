@@ -8,7 +8,7 @@
 - `Democratic-Party/2) - Democratic Pary Meeting with Mrs. Stephanie and her team - April 2nd, 2026.md`
 - `Democratic-Party/3) Demoing app with the Democratic Party.md`
 
-**Current implementation note, May 23, 2026:** The foundation, QR attribution, GEC search/linking, household lookup, role labels/permissions, contact history, editable contact-attempt corrections, follow-up lane sync, Duplicate Contact Review, redesigned Reports workspace, DPG/GEC cross-reference reports, beta search/usability polish, DPG quota/period foundation, SMS/email delivery status with failed-only resend, and intake review conflict/error handling are now merged to `main` through PR #44. Leon completed initial production QA and the first live DPG demo walkthrough. Auntie Stephanie and DPG team members validated the platform direction and surfaced concrete beta polish needs; the direct May 20 asks around search, QR links, safe cleanup, quotas/periods, and outreach delivery/resend have now been implemented. The next unknown is not whether DPG wants list imports; they confirmed active/inactive party lists exist. The unknown is the exact shape of those files, so schema-specific list import work should wait for real DPG samples. Election Day/poll-watcher work should be scoped with DPG and Mike Weekly before implementation.
+**Current implementation note, July 21, 2026:** The core platform features described below are implemented. PR #47 now implements and hardens the DPG Election Day loop: isolated training/live events, event-scoped turnout and poll reports, exact Poll Watcher precinct assignments, mobile checkoff/reporting, Command Center turnout/exceptions, and a paginated DPG-contact chase list. This still requires a supervised DPG/Mike rehearsal before operational reliance. List-specific imports remain blocked on real DPG samples, and GIS/OCR/autodialer remain later modules. See `dpg-platform-review-and-delivery-plan-2026-07-21.md` for the authoritative current assessment.
 
 ## What DPG clearly asked for
 
@@ -200,7 +200,7 @@ Core build:
 
 ### 11. Poll watcher / election-day operations
 
-DPG explicitly discussed poll watchers, Election Day voted/not-voted tracking, and war-room style reporting. This is the next major product track after controlled beta QA and production hardening. The adjacent `campaign-tracker` implementation has been reviewed and should be used as the technical blueprint while adapting the workflow to DPG language, permissions, and operational needs.
+DPG explicitly discussed poll watchers, Election Day voted/not-voted tracking, and war-room style reporting. The DPG-specific implementation is now present in PR #47; the remaining gate is technical review and a supervised DPG/Mike rehearsal, not another broad first-pass build.
 
 Starter/foundation:
 
@@ -208,7 +208,7 @@ Starter/foundation:
 - keep out of starter UI until DPG defines the workflow
 - reuse neutral building blocks only: users/roles, precincts, GEC voters, audit logs, realtime updates, and reports
 
-Core build plan:
+Implemented DPG flow:
 
 - DPG-owned poll watcher workflow
 - poll watcher role and training mode
@@ -221,7 +221,13 @@ Core build plan:
 - ride-to-polls requests
 - escalation/issue notes from polling places
 - data visibility rules for poll watchers vs admins
-- Mike Weekly should be included in scoping/training before the August 1 primary
+- Mike Weakley should be included in scoping/training before the August 1 primary
+
+Current status:
+
+- implemented in PR #46/#47, including exact precinct assignment and isolated training mode;
+- requires final automated/security review, staging-like scale validation, and a DPG/Mike operational rehearsal;
+- final terminology, correction authority, owners, and closeout procedure remain DPG decisions.
 
 See `docs/poll-watcher-implementation-plan.md` for the implementation plan.
 
@@ -321,7 +327,7 @@ Status: implemented. Membership is hidden from the active manual workflow and re
 
 ## Phase 5: Election operations
 
-Scope next with DPG/Mike Weekly before implementation:
+Scope next with DPG/Mike Weakley before implementation:
 
 - poll watcher role and training mode
 - precinct/polling-place assignments
