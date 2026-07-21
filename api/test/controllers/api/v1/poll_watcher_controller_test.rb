@@ -53,6 +53,7 @@ module Api
         get "/api/v1/poll_watcher", headers: auth_headers(@watcher)
 
         assert_response :success
+        assert_not response.parsed_body.dig("election_day", "precinct_assignment_required")
         precinct_numbers = response.parsed_body.fetch("villages").flat_map { |v| v.fetch("precincts").map { |p| p.fetch("number") } }
         assert_equal [ "1" ], precinct_numbers
       end
@@ -181,10 +182,11 @@ module Api
         assert_equal "admin_override", @other_voter.turnout_source
       end
 
-      test "unassigned poll watcher sees no precincts" do
+      test "unassigned poll watcher sees an explicit assignment warning and no precincts" do
         get "/api/v1/poll_watcher", headers: auth_headers(@other_watcher)
 
         assert_response :success
+        assert response.parsed_body.dig("election_day", "precinct_assignment_required")
         assert_empty response.parsed_body.fetch("villages")
       end
 

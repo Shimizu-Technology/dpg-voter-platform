@@ -40,6 +40,7 @@ interface PollWatcherData {
     election_name?: string | null;
     election_status?: 'training' | 'active' | null;
     setup_required?: boolean;
+    precinct_assignment_required?: boolean;
   };
 }
 
@@ -523,6 +524,15 @@ export default function PollWatcherPage() {
             <div>
               <p className="font-semibold">Election event required</p>
               <p className="mt-1 text-xs">An Administrator or Data Manager must start training or activate a live election before reports and turnout updates can be recorded.</p>
+            </div>
+          </div>
+        )}
+        {data.election_day?.precinct_assignment_required && (
+          <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-950">
+            <MapPin className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Precinct assignment required</p>
+              <p className="mt-1 text-xs">An Administrator or District Coordinator must assign this Poll Watcher account to at least one precinct before Election Day tools can be used.</p>
             </div>
           </div>
         )}

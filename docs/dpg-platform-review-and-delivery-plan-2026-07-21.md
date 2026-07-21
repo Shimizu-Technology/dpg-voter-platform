@@ -70,7 +70,7 @@ An Administrator or Data Manager creates an election event and attaches a comple
 | Quota/outreach periods | Implemented foundation | DPG still needs to define what counts, who owns goals, unique-person credit, and closed-period behavior. |
 | Poll Watcher voter search/checkoff | Implemented in PR #46/#47 | Requires a supervised DPG/Mike walkthrough and rehearsal with real precinct assignments. |
 | Election event and Command Center | Implemented and hardened in PR #47 | Requires rehearsal, scale verification, correction drills, and final DPG terminology approval. |
-| Poll watcher exact precinct assignment | Implemented in this PR revision | Assignment is explicit and manager-scoped; legacy village fallback is removed. |
+| Poll watcher exact precinct assignment | Implemented in this PR revision | Assignment is explicit and manager-scoped; legacy village-only accounts are backfilled to their active precincts before the runtime fallback is removed. |
 | Election training mode | Implemented in this PR revision | Training is a separate event. It must be closed and followed by a clean live event; practice data never carries forward. |
 | GIS/maps/heatmaps | Requested; deferred/additional | Define the decision the map supports, test geocoding coverage/accuracy, approve map provider/cost/privacy, then build a bounded pilot. |
 | OCR/photo/paper form intake | Requested possibility; deferred | Needs actual DPG forms, retention/access rules, confidence thresholds, and mandatory human review. |
@@ -102,7 +102,8 @@ This branch revision addresses the product-critical gaps:
 - new poll reports carry an `election_event_id`, and Command Center/history queries use that relationship rather than calendar dates;
 - poll reports and turnout updates require a current training or live event;
 - Poll Watchers receive exact active precinct assignments through Users, with district-scoped assignment enforcement for Field Organizers;
-- Poll Watcher access no longer falls back to an entire assigned village;
+- legacy Poll Watchers that relied only on an assigned village are migrated to explicit active-precinct assignments without expanding accounts that already have an exact assignment;
+- Poll Watcher access no longer falls back to an entire assigned village, and a truly unassigned account receives a visible setup warning instead of an unexplained empty workspace;
 - Command Center counts/aggregates run in SQL, chase contacts are server-filtered and paginated, and exception/report collections are bounded;
 - the UI exposes search, filters, pagination, training controls, status warnings, and correct role permissions;
 - political analytics are reduced to deliberate aggregate events: autocapture and session recording are disabled, signup political attributes are not sent, staff geography is not identified, and page URLs exclude queries;

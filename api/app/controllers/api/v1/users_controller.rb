@@ -278,9 +278,11 @@ module Api
         user.update!(assigned_village_id: nil, assigned_district_id: nil, assigned_block_id: nil)
         user.poll_watcher_precinct_assignments.where.not(precinct_id: precinct_ids).destroy_all
         existing_ids = user.poll_watcher_precinct_assignments.where(precinct_id: precinct_ids).pluck(:precinct_id)
-        (precinct_ids - existing_ids).each do |precinct_id|
+        missing_precinct_ids = precinct_ids - existing_ids
+        precincts_by_id = allowed_poll_watcher_precinct_scope.where(id: missing_precinct_ids).index_by(&:id)
+        missing_precinct_ids.each do |precinct_id|
           user.poll_watcher_precinct_assignments.create!(
-            precinct: allowed_poll_watcher_precinct_scope.find(precinct_id),
+            precinct: precincts_by_id.fetch(precinct_id),
             assigned_by_user: current_user
           )
         end

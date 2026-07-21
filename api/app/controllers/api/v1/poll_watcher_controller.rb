@@ -502,8 +502,13 @@ module Api
           active_import_filename: active_import&.filename,
           active_import_set_at: active_import&.activated_for_election_at&.iso8601,
           active_import_explicit: active_import.present?,
-          setup_required: active_election_event.blank?
+          setup_required: active_election_event.blank?,
+          precinct_assignment_required: poll_watcher_precinct_assignment_required?
         }
+      end
+
+      def poll_watcher_precinct_assignment_required?
+        current_user.poll_watcher? && !current_user.poll_watcher_precinct_assignments.exists?
       end
     end
   end
