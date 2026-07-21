@@ -42,11 +42,11 @@ module Api
       def update
         event = ElectionEvent.find(params[:id])
         permitted_params = election_event_params
-        if active_gec_import_change?(event, permitted_params)
+        if current_gec_import_change?(event, permitted_params)
           return render_api_error(
-            message: "The GEC import for an active election cannot be changed. Close this election and create a new event for a different list.",
+            message: "The GEC import for a training or live election cannot be changed. Close this election and create a new event for a different list.",
             status: :conflict,
-            code: "active_election_gec_import_locked"
+            code: "current_election_gec_import_locked"
           )
         end
 
@@ -163,8 +163,8 @@ module Api
         params.require(:election_event).permit(:name, :election_type, :election_date, :gec_import_id)
       end
 
-      def active_gec_import_change?(event, permitted_params)
-        return false unless event.status == "active"
+      def current_gec_import_change?(event, permitted_params)
+        return false unless event.active_or_training?
         return false unless permitted_params.key?(:gec_import_id)
 
         permitted_params[:gec_import_id].to_s != event.gec_import_id.to_s

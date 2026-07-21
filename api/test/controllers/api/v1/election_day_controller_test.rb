@@ -97,7 +97,26 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
       headers: auth_headers(@admin), as: :json
 
     assert_response :conflict
-    assert_equal "active_election_gec_import_locked", response.parsed_body["code"]
+    assert_equal "current_election_gec_import_locked", response.parsed_body["code"]
+    assert_equal @gec_import.id, @event.reload.gec_import_id
+  end
+
+  test "training election event cannot switch GEC imports" do
+    @event.start_training!(actor_user: @admin)
+    replacement_import = GecImport.create!(
+      filename: "training-replacement.csv",
+      status: "completed",
+      total_records: 1,
+      gec_list_date: Date.new(2026, 8, 2)
+    )
+
+    patch "/api/v1/election_events/#{@event.id}",
+      params: { election_event: { gec_import_id: replacement_import.id } },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :conflict
+    assert_equal "current_election_gec_import_locked", response.parsed_body["code"]
     assert_equal @gec_import.id, @event.reload.gec_import_id
   end
 

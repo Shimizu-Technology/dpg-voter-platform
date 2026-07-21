@@ -154,9 +154,10 @@ class ElectionDayCommandCenterQuery
   end
 
   def contacted_today_ids
-    SupporterContactAttempt
+    @contacted_today_ids ||= SupporterContactAttempt
       .where(recorded_at: Time.zone.today.all_day)
-      .select(:supporter_id)
+      .distinct
+      .pluck(:supporter_id)
   end
 
   def turnout_join_sql

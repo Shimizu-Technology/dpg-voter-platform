@@ -94,7 +94,11 @@ module Api
         end
 
         resulting_role = updates["role"].presence || user.role
-        assignment_ids = requested_poll_watcher_precinct_ids
+        assignment_ids = if resulting_role == "poll_watcher" && !poll_watcher_precinct_ids_provided?
+          user.poll_watcher_precinct_assignments.pluck(:precinct_id)
+        else
+          requested_poll_watcher_precinct_ids
+        end
         return unless valid_poll_watcher_assignment?(role: resulting_role, precinct_ids: assignment_ids)
 
         User.transaction do
@@ -239,6 +243,10 @@ module Api
         Array(params.dig(:user, :poll_watcher_precinct_ids)).filter_map do |value|
           Integer(value, exception: false)
         end.uniq
+      end
+
+      def poll_watcher_precinct_ids_provided?
+        params.require(:user).key?(:poll_watcher_precinct_ids)
       end
 
       def valid_poll_watcher_assignment?(role:, precinct_ids:)

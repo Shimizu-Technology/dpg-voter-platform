@@ -97,6 +97,7 @@ This branch revision addresses the product-critical gaps:
 
 - turnout defaults are now clean per election event and never seeded from legacy/global GEC turnout;
 - training turnout stays inside the training event and does not sync into legacy/global live fields;
+- the selected GEC import is locked once training or live operation begins, preventing mid-event voter-universe changes;
 - the database permits only one current training-or-live event;
 - training has an explicit start action, visible warning state, audit metadata, and required close-before-live workflow;
 - new poll reports carry an `election_event_id`, and Command Center/history queries use that relationship rather than calendar dates;

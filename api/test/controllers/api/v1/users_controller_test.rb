@@ -79,4 +79,19 @@ class Api::V1::UsersControllerTest < ActionDispatch::IntegrationTest
     assert_equal @village.id, watcher.assigned_village_id
     assert_empty watcher.poll_watcher_precinct_assignments
   end
+
+  test "editing a poll watcher without precinct IDs preserves exact assignments" do
+    watcher = User.create!(clerk_id: "profile-watcher", email: "profile-watcher@example.com", name: "Original Name", role: "poll_watcher")
+    PollWatcherPrecinctAssignment.create!(user: watcher, precinct: @precinct_one, assigned_by_user: @admin)
+    PollWatcherPrecinctAssignment.create!(user: watcher, precinct: @precinct_two, assigned_by_user: @admin)
+
+    patch "/api/v1/users/#{watcher.id}",
+      params: { user: { name: "Updated Name" } },
+      headers: auth_headers(@admin),
+      as: :json
+
+    assert_response :success
+    assert_equal "Updated Name", watcher.reload.name
+    assert_equal [ @precinct_one.id, @precinct_two.id ], watcher.assigned_poll_watcher_precincts.order(:id).pluck(:id)
+  end
 end

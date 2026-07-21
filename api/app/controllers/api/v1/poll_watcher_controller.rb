@@ -218,7 +218,9 @@ module Api
         )
         return unless voter
 
-        original_turnout_status = voter.turnout_status
+        original_turnout_status = active_election_event.election_turnout_records
+          .where(gec_voter_id: voter.id)
+          .pick(:turnout_status) || "not_yet_voted"
         result = ElectionTurnoutUpdateService.new(
           election_event: active_election_event,
           gec_voter: voter,
@@ -236,7 +238,7 @@ module Api
             compliance_note: dpg_operations_compliance_note,
             voter: strike_list_voter_payload(voter.reload, overlays[voter.id] || [], observation_precinct: precinct, turnout_record: result.respond_to?(:record) ? result.record : nil),
             changed: {
-              turnout_status: [ original_turnout_status, voter.turnout_status ]
+              turnout_status: [ original_turnout_status, result.record.turnout_status ]
             }
           }
         else

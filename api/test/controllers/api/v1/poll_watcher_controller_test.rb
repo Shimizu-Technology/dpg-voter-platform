@@ -125,6 +125,29 @@ module Api
         assert_equal @watcher.id, @voter.turnout_updated_by_user_id
         assert_equal "voted", @supporter.reload.turnout_status
         assert_equal "poll_watcher", @supporter.turnout_source
+        assert_equal [ "not_yet_voted", "voted" ], response.parsed_body.dig("changed", "turnout_status")
+      end
+
+      test "training turnout response reports the election scoped change without updating legacy turnout" do
+        @election_event.close!(actor_user: @admin)
+        training_event = ElectionEvent.create!(
+          name: "Poll Watcher Training",
+          election_type: "primary",
+          election_date: Date.current,
+          gec_import: @gec_import
+        )
+        training_event.start_training!(actor_user: @admin)
+
+        patch "/api/v1/poll_watcher/strike_list/#{@voter.id}/turnout",
+          params: { turnout: { precinct_id: @precinct.id, turnout_status: "voted", note: "Training checkoff" } },
+          headers: auth_headers(@watcher),
+          as: :json
+
+        assert_response :success
+        assert_equal [ "not_yet_voted", "voted" ], response.parsed_body.dig("changed", "turnout_status")
+        assert_equal "voted", response.parsed_body.dig("voter", "turnout_status")
+        assert_equal "voted", ElectionTurnoutRecord.find_by!(election_event: training_event, gec_voter: @voter).turnout_status
+        assert_equal "not_yet_voted", @voter.reload.turnout_status
       end
 
       test "strike list external search filters election turnout before limiting matches" do
