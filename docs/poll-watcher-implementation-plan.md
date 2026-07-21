@@ -20,7 +20,7 @@ DPG asked for:
 - real-time voted/not-voted tracking
 - Election Day turnout visibility
 - war-room style dashboard
-- Mike Weekly involvement and training before the primary
+- Mike Weakley involvement and training before the primary
 
 The platform already has the foundations needed:
 
@@ -100,7 +100,7 @@ Poll watchers can submit reports such as:
 - closing
 - name not on list
 
-These reports feed the War Room dashboard. This is useful, but for DPG it should be confirmed with Mike Weekly whether poll watchers should submit aggregate counts, individual checkoffs, or both.
+These reports feed the War Room dashboard. This is useful, but for DPG it should be confirmed with Mike Weakley whether poll watchers should submit aggregate counts, individual checkoffs, or both.
 
 ### Turnout update service and audit logging
 
@@ -384,9 +384,9 @@ The Guam Election Commission Election Manual linked from `https://gec.guam.gov/`
 - Wrong-precinct and not-on-roster situations are handled through precinct official/GEC procedures, including registration/polling-location checks and possible provisional ballots.
 - Challenge grounds include precinct residency, whether the person voted that day, voted in another precinct, or voted in another U.S. jurisdiction.
 
-Product implication: DPG poll watcher tools should remain explicitly unofficial DPG operations tools. Poll watchers can track DPG observations for assigned precincts, but out-of-precinct or name-not-on-list situations should be incident/exception reports unless DPG/Mike Weekly confirms a different workflow.
+Product implication: DPG poll watcher tools should remain explicitly unofficial DPG operations tools. Poll watchers can track DPG observations for assigned precincts, but out-of-precinct or name-not-on-list situations should be incident/exception reports unless DPG/Mike Weakley confirms a different workflow.
 
-## Open questions for DPG / Mike Weekly
+## Open questions for DPG / Mike Weakley
 
 See also `docs/dpg-open-questions.md` for the current walkthrough question list, including the key distinction between official GEC precinct/village for Election Day checkoff and separate DPG contact village for outreach.
 

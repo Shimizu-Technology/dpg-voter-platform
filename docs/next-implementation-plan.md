@@ -7,7 +7,7 @@
 
 ## Current posture
 
-The DPG platform has completed its first live demo walkthrough with Auntie Stephanie and DPG team members. The demo went well: DPG understood the Intake/GEC/QR/household/duplicate workflows and began discussing real operational use with village organizers, signup contests, quotas/periods, Mike Weekly's poll-watcher team, and future list imports.
+The DPG platform has completed its first live demo walkthrough with Auntie Stephanie and DPG team members. The demo went well: DPG understood the Intake/GEC/QR/household/duplicate workflows and began discussing real operational use with village organizers, signup contests, quotas/periods, Mike Weakley's poll-watcher team, and future list imports.
 
 The app should now be treated as a controlled beta build for a small DPG tester group, not yet a broad staff rollout. PR #40 addressed the immediate beta usability polish around GEC/address search, QR-code downloads, signup-link lifecycle, and safe demo-data cleanup. PR #41 added the DPG-owned quota/period foundation. PR #43 implemented SMS/email delivery visibility and resend-to-failed/undelivered recipients. PR #44 fixed intake review stale-row/error visibility issues found during local testing and polished the email blast testing flow.
 
@@ -248,7 +248,7 @@ Recommended build sequence:
 - PR 1: Poll Watcher MVP with role, precinct assignments, active election-day GEC list, mobile voter search/checkoff, turnout audit logging, and observed-elsewhere handling
 - PR 2: DPG Election Day Dashboard with village/precinct turnout, not-yet-voted linked DPG supporters, ride-to-polls requests, exceptions, and recent poll watcher activity
 - PR 3: user assignment/admin polish for Poll Watcher role and multiple precinct assignments
-- PR 4: training/test mode and DPG/Mike Weekly handoff checklist
+- PR 4: training/test mode and DPG/Mike Weakley handoff checklist
 
 See `docs/poll-watcher-implementation-plan.md` for the detailed plan.
 

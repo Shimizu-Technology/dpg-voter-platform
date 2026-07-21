@@ -18,23 +18,20 @@ module Api
           }
         end
 
-        voters = election_voters(event).includes(:village, :precinct)
-        records = turnout_records_for(event, voters)
-        linked_supporters = linked_supporters_for(voters.map(&:id))
-        latest_attempts = LatestSupporterContactAttempts.call(linked_supporters.values.flatten, include_recorded_by: true)
-        villages = village_payloads(voters, records, linked_supporters, latest_attempts)
-        chase = chase_list(voters, records, linked_supporters, latest_attempts)
+        query = ElectionDayCommandCenterQuery.new(event: event, params: command_center_params)
+        chase = query.chase_page
         exceptions = exception_payloads(event)
 
         render json: {
           setup_required: false,
           compliance_note: dpg_operations_compliance_note,
           active_election: election_event_json(event),
-          stats: command_center_stats(voters, records, chase, exceptions),
-          villages: villages,
-          chase_list: chase,
-          exceptions: exceptions.first(100),
-          recent_reports: recent_reports(event, voters)
+          stats: query.stats,
+          villages: query.villages,
+          chase_list: chase[:records],
+          chase_pagination: chase[:pagination],
+          exceptions: exceptions,
+          recent_reports: recent_reports(event)
         }
       end
 
@@ -74,7 +71,7 @@ module Api
       end
 
       def current_election_event
-        @current_election_event ||= ElectionEvent.active_event
+        @current_election_event ||= ElectionEvent.current_event
       end
 
       def election_voters(event)
@@ -82,71 +79,12 @@ module Api
         event.gec_list_date.present? ? scope.for_list_date(event.gec_list_date) : scope.election_day_active
       end
 
-      def turnout_records_for(event, voters)
-        existing = event.election_turnout_records.where(gec_voter_id: voters.select(:id)).index_by(&:gec_voter_id)
-        voters.each_with_object({}) do |voter, memo|
-          memo[voter.id] = existing[voter.id] || ElectionTurnoutRecord.build_for_display(election_event: event, gec_voter: voter)
-        end
-      end
-
-      def linked_supporters_for(voter_ids)
-        Supporter.contacts.includes(:village, :precinct).where(gec_voter_id: voter_ids).group_by(&:gec_voter_id)
-      end
-
-      def village_payloads(voters, records, linked_supporters, latest_attempts)
-        voters.group_by { |voter| voter.village_name || voter.village&.name || "Unknown" }.sort_by(&:first).map do |village_name, village_voters|
-          village_records = village_voters.map { |voter| records[voter.id] }
-          supporters = village_voters.flat_map { |voter| linked_supporters[voter.id] || [] }
-          supporter_ids = supporters.map(&:id).uniq
-          contacted_today = supporter_ids.count { |id| contact_attempt_today?(latest_attempts[id]) }
-          {
-            name: village_name,
-            total_voters: village_voters.size,
-            voted: village_records.count { |record| record.turnout_status == "voted" },
-            not_yet_voted: village_records.count { |record| record.turnout_status == "not_yet_voted" },
-            unknown: village_records.count { |record| record.turnout_status == "unknown" },
-            observed_elsewhere: village_records.count { |record| record.turnout_status == "observed_elsewhere" },
-            linked_contacts: supporter_ids.size,
-            linked_not_yet_voted: village_voters.count { |voter| records[voter.id].turnout_status == "not_yet_voted" && linked_supporters[voter.id].present? },
-            contacted_today: contacted_today,
-            not_contacted_today: [ supporter_ids.size - contacted_today, 0 ].max,
-            ride_requests: supporters.count(&:needs_election_day_ride?)
-          }
-        end
-      end
-
-      def chase_list(voters, records, linked_supporters, latest_attempts)
-        voters.flat_map do |voter|
-          record = records[voter.id]
-          next [] unless record.turnout_status == "not_yet_voted"
-
-          (linked_supporters[voter.id] || []).map do |supporter|
-            latest_attempt = latest_attempts[supporter.id]
-            {
-              supporter_id: supporter.id,
-              gec_voter_id: voter.id,
-              name: supporter.display_name,
-              phone: supporter.contact_number,
-              email: supporter.email,
-              dpg_village: supporter.village&.name,
-              dpg_precinct: supporter.precinct&.number,
-              gec_village: voter.village_name || voter.village&.name,
-              gec_precinct: voter.precinct_number || voter.precinct&.number,
-              turnout_status: record.turnout_status,
-              needs_ride: supporter.needs_election_day_ride,
-              support_status: supporter.support_status,
-              latest_contact_attempt: latest_attempt && contact_attempt_summary_json(latest_attempt),
-              contacted_today: contact_attempt_today?(latest_attempt)
-            }
-          end
-        end.compact.sort_by { |row| [ row[:contacted_today] ? 1 : 0, row[:gec_village].to_s, row[:name].to_s ] }
-      end
-
       def exception_payloads(event)
         records = event.election_turnout_records
           .observed_elsewhere
           .includes(:gec_voter, :observation_precinct)
           .order(updated_at: :desc)
+          .limit(100)
 
         records.map do |record|
           voter = record.gec_voter
@@ -164,12 +102,8 @@ module Api
         end
       end
 
-      def recent_reports(event, voters)
-        precinct_ids = voters.map(&:precinct_id).compact.uniq
-        reports = PollReport.where(reported_at: event.election_date.all_day)
-        reports = reports.where(precinct_id: precinct_ids) if precinct_ids.any?
-
-        reports.includes(:user, precinct: :village).order(reported_at: :desc).limit(25).map do |report|
+      def recent_reports(event)
+        PollReport.for_election(event).includes(:user, precinct: :village).order(reported_at: :desc).limit(25).map do |report|
           {
             id: report.id,
             precinct_id: report.precinct_id,
@@ -184,24 +118,8 @@ module Api
         end
       end
 
-      def command_center_stats(voters, records, chase, exceptions)
-        record_values = records.values
-        {
-          total_voters: voters.size,
-          voted: record_values.count { |record| record.turnout_status == "voted" },
-          not_yet_voted: record_values.count { |record| record.turnout_status == "not_yet_voted" },
-          unknown: record_values.count { |record| record.turnout_status == "unknown" },
-          observed_elsewhere: record_values.count { |record| record.turnout_status == "observed_elsewhere" },
-          chase_list_count: chase.size,
-          contacted_today: chase.count { |row| row[:contacted_today] },
-          not_contacted_today: chase.count { |row| !row[:contacted_today] },
-          ride_requests: chase.count { |row| row[:needs_ride] },
-          exceptions: exceptions.size
-        }
-      end
-
-      def contact_attempt_today?(attempt)
-        attempt&.recorded_at&.to_date == Time.zone.today
+      def command_center_params
+        params.permit(:village, :search, :contact_filter, :chase_page, :chase_per_page)
       end
 
       def election_contact_note(event, note)

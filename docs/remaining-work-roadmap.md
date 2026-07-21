@@ -1,7 +1,7 @@
 # DPG Remaining Work Roadmap
 
-**Last updated:** May 23, 2026  
-**Status:** Roadmap after PR #44 merged to `main` at `e0ceb08`
+**Last updated:** July 21, 2026
+**Status:** PR #47 Election Day implementation complete in branch; technical and DPG operational validation remain
 
 ## Current posture
 
@@ -57,7 +57,18 @@ After the guided beta pass, update handoff language around anything DPG finds co
 
 ### 4. Election Day / poll watchers
 
-This is the most important next feature area. The adjacent `campaign-tracker` application has a mature poll watcher and war-room implementation, and we should use it as the technical blueprint for DPG while adapting language, permissions, and assumptions to DPG's party operations needs. See `docs/poll-watcher-implementation-plan.md` for the detailed review and build plan.
+Implementation status: the PR #46 Poll Watcher foundation and PR #47 Election Day operating loop are implemented. PR #47 hardening adds exact precinct assignment UI/enforcement, true isolated training events, event-scoped poll reports, clean per-event turnout defaults, and SQL-backed paginated Command Center queries.
+
+Remaining work is validation rather than another broad implementation pass:
+
+- complete automated test/security checks and PR review;
+- run the DPG/Mike supervised training walkthrough;
+- validate representative 52,000-row performance in staging-like infrastructure;
+- confirm correction rules, terminology, owners, and closeout procedure;
+- prove a clean live event does not inherit training activity;
+- verify production backups/restore and deployment configuration.
+
+See `docs/dpg-platform-review-and-delivery-plan-2026-07-21.md` for the current implementation findings and validation runbook. `docs/poll-watcher-implementation-plan.md` remains historical design context.
 
 Recommended scope:
 
@@ -215,6 +226,6 @@ DPG discussed support and donation concepts, but active workflow currently separ
 ## Current blockers
 
 - Real DPG list import work is blocked on sample files.
-- Election Day work is blocked on DPG/Mike Weekly workflow scoping.
+- Election Day work is blocked on DPG/Mike Weakley workflow scoping.
 - GIS/OCR/autodialer work is blocked on confirmed use case, process, and tool decisions.
 - Broad rollout is blocked on guided beta QA and production hardening.

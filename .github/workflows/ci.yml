@@ -120,6 +120,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Scan for known security vulnerabilities in frontend dependencies
+        run: npm audit --audit-level=high
+
       - name: Run ESLint
         run: npm run lint
 

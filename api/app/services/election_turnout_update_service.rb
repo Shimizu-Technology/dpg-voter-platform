@@ -25,10 +25,12 @@ class ElectionTurnoutUpdateService
         raise ActiveRecord::Rollback
       end
 
-      legacy_result = sync_current_turnout_fields
-      unless legacy_result.success?
-        failure_result = Result.new(success?: false, record: record, errors: legacy_result.errors.presence || [ "Current turnout sync failed" ])
-        raise ActiveRecord::Rollback
+      if election_event.status == "active"
+        legacy_result = sync_current_turnout_fields
+        unless legacy_result.success?
+          failure_result = Result.new(success?: false, record: record, errors: legacy_result.errors.presence || [ "Current turnout sync failed" ])
+          raise ActiveRecord::Rollback
+        end
       end
 
       log_turnout_audit!(record, original)

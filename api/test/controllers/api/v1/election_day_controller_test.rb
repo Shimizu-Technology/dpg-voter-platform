@@ -45,17 +45,22 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
     assert_equal event_id, ElectionEvent.active_event.id
   end
 
-  test "activating a new event records who closed the displaced active event" do
+  test "a different current event must be explicitly closed before activation" do
     @event.activate!(actor_user: @admin)
     replacement = ElectionEvent.create!(name: "2026 General Election", election_type: "general", election_date: Date.new(2026, 11, 3), gec_import: @gec_import)
 
     post "/api/v1/election_events/#{replacement.id}/activate", headers: auth_headers(@admin), as: :json
 
+    assert_response :conflict
+    assert_equal "current_election_must_be_closed", response.parsed_body["code"]
+    assert_equal "active", @event.reload.status
+    assert_equal "setup", replacement.reload.status
+
+    @event.close!(actor_user: @admin)
+    post "/api/v1/election_events/#{replacement.id}/activate", headers: auth_headers(@admin), as: :json
+
     assert_response :success
-    @event.reload
-    assert_equal "closed", @event.status
-    assert_equal @admin.id, @event.closed_by_user_id
-    assert_not_nil @event.closed_at
+    assert_equal "active", replacement.reload.status
   end
 
   test "poll watcher cannot manage election setup" do
@@ -112,10 +117,11 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
     refute_includes payload["chase_list"].map { |row| row["gec_voter_id"] }, @older_voter.id
   end
 
-  test "command center reports are scoped to election date and precincts" do
+  test "command center reports are scoped to the current election event" do
     @event.activate!(actor_user: @admin)
-    PollReport.create!(precinct: @precinct, user: @poll_watcher, report_type: "turnout_update", voter_count: 10, reported_at: Time.zone.local(2026, 8, 1, 9, 0, 0))
-    PollReport.create!(precinct: @precinct, user: @poll_watcher, report_type: "turnout_update", voter_count: 99, reported_at: Time.zone.local(2026, 8, 2, 9, 0, 0))
+    other_event = ElectionEvent.create!(name: "Other Election", election_type: "general", election_date: @event.election_date, gec_import: @gec_import)
+    PollReport.create!(election_event: @event, precinct: @precinct, user: @poll_watcher, report_type: "turnout_update", voter_count: 10, reported_at: Time.zone.local(2026, 8, 2, 9, 0, 0))
+    PollReport.create!(election_event: other_event, precinct: @precinct, user: @poll_watcher, report_type: "turnout_update", voter_count: 99, reported_at: Time.zone.local(2026, 8, 1, 9, 0, 0))
 
     get "/api/v1/election_day", headers: auth_headers(@admin), as: :json
 
@@ -125,7 +131,7 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
     assert_equal 10, reports.first["voter_count"]
   end
 
-  test "command center returns the full chase list, not only the first 200 contacts" do
+  test "command center reports full chase totals while bounding the returned page" do
     @event.activate!(actor_user: @admin)
     201.times do |index|
       voter = GecVoter.create!(
@@ -147,7 +153,9 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal 202, response.parsed_body.dig("stats", "chase_list_count")
-    assert_equal 202, response.parsed_body["chase_list"].size
+    assert_equal 50, response.parsed_body["chase_list"].size
+    assert_equal 202, response.parsed_body.dig("chase_pagination", "total")
+    assert_equal 5, response.parsed_body.dig("chase_pagination", "pages")
   end
 
   test "poll watcher turnout update creates election scoped record and removes from chase list" do
@@ -212,5 +220,41 @@ class Api::V1::ElectionDayControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :conflict
     assert_equal "election_event_not_closable", response.parsed_body["code"]
+  end
+
+  test "training event is current but cannot be promoted into the live event" do
+    post "/api/v1/election_events/#{@event.id}/start_training", headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    assert_equal "training", @event.reload.status
+    assert_equal @event.id, ElectionEvent.current_event.id
+    assert_equal @admin.id, @event.training_started_by_user_id
+
+    post "/api/v1/election_events/#{@event.id}/activate", headers: auth_headers(@admin), as: :json
+
+    assert_response :conflict
+    assert_equal "election_event_not_activatable", response.parsed_body["code"]
+  end
+
+  test "a new live election does not inherit turnout from a closed training event" do
+    @event.start_training!(actor_user: @admin)
+    ElectionTurnoutUpdateService.new(
+      election_event: @event,
+      gec_voter: @voter,
+      actor_user: @admin,
+      turnout_status: "voted",
+      source: "admin_override"
+    ).call
+    assert_equal "not_yet_voted", @voter.reload.turnout_status
+    @event.close!(actor_user: @admin)
+    live_event = ElectionEvent.create!(name: "Clean Live Election", election_type: "primary", election_date: @event.election_date, gec_import: @gec_import)
+    live_event.activate!(actor_user: @admin)
+
+    get "/api/v1/election_day", headers: auth_headers(@admin), as: :json
+
+    assert_response :success
+    assert_equal live_event.id, response.parsed_body.dig("active_election", "id")
+    assert_equal 0, response.parsed_body.dig("stats", "voted")
+    assert_equal 1, response.parsed_body.dig("stats", "not_yet_voted")
   end
 end

@@ -56,6 +56,7 @@ Rails.application.routes.draw do
       # Election Day command center and poll watcher tools. DPG-scoped; poll watchers only see assigned precincts.
       resources :election_events, only: [ :index, :show, :create, :update ] do
         member do
+          post :start_training
           post :activate
           post :close
         end

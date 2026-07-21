@@ -29,6 +29,9 @@ module Api
         @precinct = Precinct.create!(number: "1", village: @village, polling_site: "DPG School", registered_voters: 100)
         @other_precinct = Precinct.create!(number: "2", village: @other_village, polling_site: "Other School", registered_voters: 100)
         PollWatcherPrecinctAssignment.create!(user: @watcher, precinct: @precinct, assigned_by_user: @admin)
+        @gec_import = GecImport.create!(filename: "poll-watcher-current.csv", gec_list_date: Date.current, status: "completed")
+        @election_event = ElectionEvent.create!(name: "Current Poll Watcher Election", election_type: "primary", election_date: Date.current, gec_import: @gec_import)
+        @election_event.activate!(actor_user: @admin)
 
         @voter = create_voter(first_name: "Maria", last_name: "Cruz", precinct: @precinct, village: @village)
         @other_voter = create_voter(first_name: "Jose", last_name: "Santos", precinct: @other_precinct, village: @other_village)
@@ -76,6 +79,7 @@ module Api
         newer_report = PollReport.create!(
           precinct: @precinct,
           user: @watcher,
+          election_event: @election_event,
           voter_count: 40,
           report_type: "turnout_update",
           reported_at: 1.hour.ago
@@ -83,6 +87,7 @@ module Api
         PollReport.create!(
           precinct: @precinct,
           user: @watcher,
+          election_event: @election_event,
           voter_count: 10,
           report_type: "turnout_update",
           reported_at: 2.hours.ago
@@ -95,8 +100,19 @@ module Api
         assert_equal newer_report.voter_count, precinct_payload.fetch("last_voter_count")
       end
 
+      test "submitted poll report belongs to the current election event" do
+        post "/api/v1/poll_watcher/report",
+          params: { report: { precinct_id: @precinct.id, voter_count: 25, report_type: "turnout_update" } },
+          headers: auth_headers(@watcher),
+          as: :json
+
+        assert_response :created
+        report = PollReport.find(response.parsed_body.dig("report", "id"))
+        assert_equal @election_event.id, report.election_event_id
+      end
+
       test "poll watcher can update turnout for assigned precinct voter" do
-        assert_difference "AuditLog.count", 1 do
+        assert_difference -> { AuditLog.where(action: "election_turnout_updated").count }, 1 do
           patch "/api/v1/poll_watcher/strike_list/#{@voter.id}/turnout",
             params: { turnout: { precinct_id: @precinct.id, turnout_status: "voted", note: "Observed at table" } },
             headers: auth_headers(@watcher)
@@ -111,15 +127,11 @@ module Api
       end
 
       test "strike list external search filters election turnout before limiting matches" do
-        gec_import = GecImport.create!(filename: "poll-watcher-gec.csv", gec_list_date: Date.current, status: "completed")
-        event = ElectionEvent.create!(name: "Poll Watcher Primary", election_type: "primary", election_date: Date.current, gec_import: gec_import)
-        event.activate!(actor_user: @admin)
-
         60.times do |index|
           voter = create_voter(first_name: "Alex", last_name: "External#{format('%02d', index)}", precinct: @other_precinct, village: @other_village)
           if index < 50
             ElectionTurnoutRecord.create!(
-              election_event: event,
+              election_event: @election_event,
               gec_voter: voter,
               turnout_status: "voted",
               turnout_source: "admin_override",
@@ -158,7 +170,7 @@ module Api
       end
 
       test "admin may reconcile out-of-precinct observed elsewhere status" do
-        assert_difference "AuditLog.count", 1 do
+        assert_difference -> { AuditLog.where(action: "election_turnout_updated").count }, 1 do
           patch "/api/v1/poll_watcher/strike_list/#{@other_voter.id}/turnout",
             params: { turnout: { precinct_id: @precinct.id, turnout_status: "observed_elsewhere", note: "Reported at table" } },
             headers: auth_headers(@admin)

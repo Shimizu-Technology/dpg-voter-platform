@@ -1,8 +1,16 @@
 # DPG Voter Platform - Current Project Status
 
-**Last updated:** May 23, 2026
-**Current branch:** `main`
-**Base commit:** `e0ceb08` after PR #44 merged intake-review feedback and outreach testing polish
+**Last updated:** July 21, 2026
+**Current branch:** `feature/dpg-election-day-command-center`
+**Current delivery:** PR #47 completion and hardening
+
+## July 21 review update
+
+PR #47 now completes the first DPG Election Day operating loop in code: explicit setup/training/live election events, event-scoped turnout and poll reports, exact Poll Watcher precinct assignments, a mobile Poll Watcher workflow, a paginated/filtered Command Center chase list, village turnout, exceptions, ride requests, and Contact History follow-up. Training and live events are isolated so rehearsal activity cannot carry into Election Day.
+
+This is ready for technical review after the full test/security pass, but it is not yet an assertion that DPG is operationally ready. DPG and Mike still need to run a supervised rehearsal, confirm terminology/correction rules, assign owners, and verify production backup/deployment readiness. GIS/heatmaps remain a requested later/additional module. See `dpg-platform-review-and-delivery-plan-2026-07-21.md` for the current authoritative review.
+
+The detailed May status below remains as implementation history and product context.
 
 ## One-line status
 
@@ -63,7 +71,7 @@ The May 20 demo added/confirmed these near-term requests:
 - DPG-owned quota/period tracking for signup/contact credit (foundation merged in PR #41)
 - Intake review stale-row/error visibility fixes after local testing (merged in PR #44)
 - active/inactive DPG list import planning once sample files are provided
-- Mike Weekly/poll-watcher involvement for Phase 2 Election Day workflows
+- Mike Weakley/poll-watcher involvement for Phase 2 Election Day workflows
 
 ## Implemented now
 
@@ -322,7 +330,7 @@ Because the app is already deployed and the QR/search/usability polish, DPG quot
    DPG requested official member roster, registered Democrat, supporter/contact, and custom list cross-reference work. Do not build schema-specific importers until DPG provides actual files or sample columns. GEC import is the exception because we already have real GEC files. Track the requested sample list and walkthrough questions in `docs/dpg-open-questions.md`.
 
 4. **Election Day/poll-watcher implementation**
-   PR #46 delivered the conservative Poll Watcher MVP: assigned precinct checkoff, GEC/contact geography clarity, out-of-precinct incident posture, audit-backed turnout updates, and DPG operations compliance language. The next branch/PR #47 expands this into an Election Day Command Center: explicit election events, selected GEC list per election, election-scoped turnout records, admin turnout dashboard, not-yet-voted DPG contact chase list, inline Election Day contact logging, ride/exception panels, and correction/reconciliation support through audited turnout updates. Keep adapting language, permissions, ride-to-polls metrics, and visibility rules to DPG; do not import another campaign's private operating playbook. The current conservative product stance remains that Election Day checkoff uses official GEC precinct/village while DPG contact village remains separate outreach context. GEC Election Manual research supports keeping poll watchers as limited DPG operations observers/checkoff users and treating out-of-precinct or name-not-on-list cases as incidents/exceptions unless DPG/Mike Weekly confirms a different process.
+   PR #46 delivered the conservative Poll Watcher MVP: assigned precinct checkoff, GEC/contact geography clarity, out-of-precinct incident posture, audit-backed turnout updates, and DPG operations compliance language. The next branch/PR #47 expands this into an Election Day Command Center: explicit election events, selected GEC list per election, election-scoped turnout records, admin turnout dashboard, not-yet-voted DPG contact chase list, inline Election Day contact logging, ride/exception panels, and correction/reconciliation support through audited turnout updates. Keep adapting language, permissions, ride-to-polls metrics, and visibility rules to DPG; do not import another campaign's private operating playbook. The current conservative product stance remains that Election Day checkoff uses official GEC precinct/village while DPG contact village remains separate outreach context. GEC Election Manual research supports keeping poll watchers as limited DPG operations observers/checkoff users and treating out-of-precinct or name-not-on-list cases as incidents/exceptions unless DPG/Mike Weakley confirms a different process.
 
 5. **List types + list-lineage reporting after samples**
    Add DPG contacts/supporters, official member roster, registered Democrat, and custom list imports once samples exist. Then refine cross-reference reports so list origin, DPG support status, future official membership status, and GEC voter status are clear.
@@ -344,4 +352,4 @@ Because the app is already deployed and the QR/search/usability polish, DPG quot
 - `docs/proprietary-vs-reusable-review.md` - Josh/Tina vs reusable platform analysis.
 - `docs/remaining-work-roadmap.md` - post-PR #44 roadmap of remaining product tracks.
 - `docs/poll-watcher-implementation-plan.md` - detailed campaign-tracker review and DPG poll watcher implementation plan.
-- `docs/dpg-open-questions.md` - question list for Auntie Stephanie/Mike Weekly covering Election Day rules, DPG list samples, and cross-reference/reporting decisions.
+- `docs/dpg-open-questions.md` - question list for Auntie Stephanie/Mike Weakley covering Election Day rules, DPG list samples, and cross-reference/reporting decisions.

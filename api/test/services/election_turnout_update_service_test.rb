@@ -21,6 +21,7 @@ class ElectionTurnoutUpdateServiceTest < ActiveSupport::TestCase
   end
 
   test "returns failure and rolls back election turnout record when current turnout sync fails" do
+    @event.activate!(actor_user: @user)
     @voter.update_column(:status, "invalid_status")
 
     result = ElectionTurnoutUpdateService.new(
@@ -37,13 +38,13 @@ class ElectionTurnoutUpdateServiceTest < ActiveSupport::TestCase
     assert_equal "not_yet_voted", @voter.reload.turnout_status
   end
 
-  test "display fallback seeds turnout status from legacy GEC voter status" do
+  test "display fallback starts clean instead of inheriting legacy GEC turnout" do
     @voter.update!(turnout_status: "voted", turnout_source: "poll_watcher", turnout_updated_at: Time.current, turnout_updated_by_user: @user)
 
     record = ElectionTurnoutRecord.build_for_display(election_event: @event, gec_voter: @voter)
 
     assert record.new_record?
-    assert_equal "voted", record.turnout_status
+    assert_equal "not_yet_voted", record.turnout_status
   end
 
   test "audit log records previous turnout timestamp on corrections" do

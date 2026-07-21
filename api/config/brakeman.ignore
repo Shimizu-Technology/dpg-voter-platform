@@ -1,12 +1,12 @@
 {
   "ignored_warnings": [
     {
-      "fingerprint": "c6982d9f9509b931821b24f70f9d973df89e370e67dbccff68a8e062a20e1f68",
-      "note": "Role assignment in user_create_params is intentional — endpoint is restricted to campaign_admin/district_coordinator only via RBAC checks in the controller"
+      "fingerprint": "ce83982e8663b2a8764d6e1e1d1dd2ba3349d73113bc88acef81f278c855d944",
+      "note": "Role assignment in user_create_params is intentional. The authenticated manager's manageable role allowlist is checked before save, and Poll Watcher precinct IDs are separately constrained to the manager's geographic scope."
     },
     {
-      "fingerprint": "8636a8cad12c8330c4b5e883d7b2c03ce72a4fffc336d707a24be1484f8087c5",
-      "note": "Role assignment in user_update_params is intentional — endpoint is restricted to campaign_admin/district_coordinator only via RBAC checks in the controller"
+      "fingerprint": "85968d80634b2fbcfb2d4074d92e1ec0f51e00d26512d958e693d9c40eacc7b6",
+      "note": "Role assignment in user_update_params is intentional. Both the existing and requested roles must be in the authenticated manager's manageable role allowlist, and Poll Watcher precinct IDs are separately constrained to the manager's geographic scope."
     },
     {
       "fingerprint": "6d7188bba7423fe298cb2512a42db11523e6bd43f58ead66bdb3eee11ac860ec",
@@ -17,6 +17,6 @@
       "note": "The batched GEC matcher builds a VALUES CTE from connection-quoted literals and only interpolates private, static SQL fragments selected inside the model. This is a Brakeman false positive, not user-controlled SQL."
     }
   ],
-  "updated": "2026-03-20",
-  "brakeman_version": "8.0.4"
+  "updated": "2026-07-21",
+  "brakeman_version": "8.0.5"
 }

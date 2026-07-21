@@ -198,7 +198,7 @@ Auntie Stephanie clearly described the Election Day need:
 
 - primary is August 1
 - training should happen at least a week before election day
-- Mike Weekly should be involved
+- Mike Weakley should be involved
 - poll watchers need to mark voters as voted by precinct
 - DPG needs a dashboard/war-room view of who has voted
 
@@ -252,7 +252,7 @@ Include:
 
 ### Phase 2 - Election Day / poll watcher module
 
-Coordinate with Auntie Stephanie and Mike Weekly.
+Coordinate with Auntie Stephanie and Mike Weakley.
 
 Include:
 
@@ -271,7 +271,7 @@ Include:
 5. What exactly defines a quota period for DPG: calendar month, pay period, outreach push, primary cycle, or custom date range?
 6. How should inactive/archived contacts participate in future duplicate detection?
 7. What delivery states can the current SMS provider expose reliably?
-8. What does Mike Weekly need for poll-watcher training and Election Day operations?
+8. What does Mike Weakley need for poll-watcher training and Election Day operations?
 
 ## Product conclusion
 

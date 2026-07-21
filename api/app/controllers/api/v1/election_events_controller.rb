@@ -18,7 +18,7 @@ module Api
           .recent_first
           .limit(25)
         render json: {
-          active_election: election_event_json(ElectionEvent.active_event),
+          active_election: election_event_json(ElectionEvent.current_event),
           election_events: events.map { |event| election_event_json(event) },
           completed_gec_imports: GecImport.completed.latest.limit(25).map { |gec_import| gec_import_json(gec_import) }
         }
@@ -66,14 +66,28 @@ module Api
 
       def activate
         event = ElectionEvent.find(params[:id])
+        unless event.status == "setup"
+          return render_api_error(
+            message: "Only an election in setup can be activated. Close training and create a clean live election so training turnout is never reused.",
+            status: :conflict,
+            code: "election_event_not_activatable"
+          )
+        end
         unless event.gec_import&.completed?
           return render_api_error(message: "Select a completed GEC import before activating this election", status: :unprocessable_entity, code: "missing_active_gec_import")
+        end
+        if (current_event = ElectionEvent.current_event)
+          return render_api_error(
+            message: "Close #{current_event.name} before activating a different live election",
+            status: :conflict,
+            code: "current_election_must_be_closed"
+          )
         end
 
         previous_status = event.status
         begin
           event.activate!(actor_user: current_user)
-        rescue ActiveRecord::StatementInvalid
+        rescue ActiveRecord::StatementInvalid, ElectionEvent::InvalidTransition
           return render_api_error(
             message: "Another election event is already active; please refresh and try again.",
             status: :conflict,
@@ -82,6 +96,48 @@ module Api
         end
 
         log_audit!(event, action: "election_event_activated", changed_data: { status: [ previous_status, "active" ], gec_import_id: event.gec_import_id })
+        render json: { election_event: election_event_json(event.reload) }
+      end
+
+      def start_training
+        event = ElectionEvent.find(params[:id])
+        unless event.status == "setup"
+          return render_api_error(
+            message: "Only an election in setup can begin training",
+            status: :conflict,
+            code: "election_event_not_trainable"
+          )
+        end
+        unless event.gec_import&.completed?
+          return render_api_error(
+            message: "Select a completed GEC import before beginning training",
+            status: :unprocessable_entity,
+            code: "missing_training_gec_import"
+          )
+        end
+        if (current_event = ElectionEvent.current_event)
+          return render_api_error(
+            message: "Close #{current_event.name} before beginning a different training event",
+            status: :conflict,
+            code: "current_election_must_be_closed"
+          )
+        end
+
+        previous_status = event.status
+        begin
+          event.start_training!(actor_user: current_user)
+        rescue ActiveRecord::StatementInvalid, ElectionEvent::InvalidTransition
+          return render_api_error(
+            message: "Another training or live election is already current; please refresh and try again.",
+            status: :conflict,
+            code: "election_event_training_conflict"
+          )
+        end
+
+        log_audit!(event, action: "election_event_training_started", changed_data: {
+          status: [ previous_status, "training" ],
+          gec_import_id: event.gec_import_id
+        })
         render json: { election_event: election_event_json(event.reload) }
       end
 
@@ -139,6 +195,7 @@ module Api
           gec_list_date: event.gec_list_date&.iso8601,
           gec_import_filename: event.gec_import&.filename,
           activated_at: event.activated_at&.iso8601,
+          training_started_at: event.training_started_at&.iso8601,
           closed_at: event.closed_at&.iso8601,
           turnout_records_count: event_turnout_records_count(event)
         }

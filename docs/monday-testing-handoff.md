@@ -50,7 +50,7 @@ Live SMS/email sends should only be tested with controlled DPG-approved recipien
 - DPG/GEC contact cross-reference reports are implemented; official member-roster and registered-Democrat list-lineage reports still need real DPG list samples.
 - Support/lean/donation tracking is not finished.
 - QR/share attribution is implemented; print-ready/downloadable QR assets are not finished.
-- Election Day, poll watcher, turnout, and war-room workflows are not built yet and should be scoped with DPG/Mike Weekly before implementation.
+- Election Day, poll watcher, turnout, and war-room workflows are not built yet and should be scoped with DPG/Mike Weakley before implementation.
 - Maps/GIS, autodialer, OCR, and ID/photo intake are later add-ons.
 
 ## Smoke test script

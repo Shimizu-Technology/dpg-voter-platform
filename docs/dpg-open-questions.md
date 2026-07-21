@@ -2,7 +2,7 @@
 
 Last updated: May 24, 2026
 
-Use this as the working question list for Auntie Stephanie, Mike Weekly, and the DPG beta testers. The goal is to avoid guessing DPG operating rules, especially around Election Day, official party lists, and the distinction between DPG contact geography and official GEC registration geography.
+Use this as the working question list for Auntie Stephanie, Mike Weakley, and the DPG beta testers. The goal is to avoid guessing DPG operating rules, especially around Election Day, official party lists, and the distinction between DPG contact geography and official GEC registration geography.
 
 ## 1. Election Day / poll watcher rules
 
@@ -20,7 +20,7 @@ Relevant manual guidance:
 - If a person is not on the precinct signature roster or appears to be at the wrong polling location, precinct officials must make efforts to determine registration status and correct polling location, including checking precinct/polling-area lists and contacting GEC headquarters. Those situations may become provisional-ballot workflows handled by precinct officials/GEC, not by party poll watchers.
 - Challenge grounds include whether the person is not a resident of the precinct where they are voting, has voted that day, voted in another precinct, or voted in another U.S. jurisdiction.
 
-Product interpretation until DPG/Mike Weekly confirms otherwise:
+Product interpretation until DPG/Mike Weakley confirms otherwise:
 
 - Treat poll watchers as limited DPG operations observers/checkoff users, not election officials.
 - Keep “DPG operations tracking only; not official election records” language visible.

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle, ClipboardList, Phone, RadioTower, RotateCcw, Save, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, ClipboardList, FlaskConical, Phone, RadioTower, RotateCcw, Save, Search, Users } from 'lucide-react';
 import WorkspacePage from '../../components/WorkspacePage';
 import {
   activateElectionEvent,
@@ -9,6 +9,7 @@ import {
   getElectionDayCommandCenter,
   getElectionEvents,
   logElectionDayContact,
+  startTrainingElectionEvent,
 } from '../../lib/api';
 import { formatDateTime } from '../../lib/datetime';
 import { getErrorMessage } from '../../lib/contactAttempt';
@@ -112,6 +113,12 @@ type CommandCenterData = {
   chase_list?: ChaseContact[];
   exceptions?: ExceptionRow[];
   recent_reports?: PollReportRow[];
+  chase_pagination?: {
+    page: number;
+    per_page: number;
+    total: number;
+    pages: number;
+  };
 };
 
 type ElectionEventsData = {
@@ -133,13 +140,27 @@ export default function ElectionDayCommandCenterPage() {
   });
   const [villageFilter, setVillageFilter] = useState('');
   const [contactFilter, setContactFilter] = useState<'all' | 'not_contacted' | 'contacted' | 'rides'>('not_contacted');
+  const [chaseSearch, setChaseSearch] = useState('');
+  const deferredChaseSearch = useDeferredValue(chaseSearch);
+  const [chasePage, setChasePage] = useState(1);
   const [contactDrafts, setContactDrafts] = useState<Record<number, { channel: string; outcome: string; note: string }>>({});
   const [pendingContactIds, setPendingContactIds] = useState<Set<number>>(() => new Set());
 
   const sessionQuery = useSession();
-  const canManageElectionSetup = ['admin', 'data_team'].includes(sessionQuery.data?.user.role || '');
+  const canManageElectionSetup = ['campaign_admin', 'data_team'].includes(sessionQuery.data?.user.role || '');
   const eventsQuery = useQuery<ElectionEventsData>({ queryKey: ['election-events'], queryFn: getElectionEvents });
-  const commandQuery = useQuery<CommandCenterData>({ queryKey: ['election-day-command-center'], queryFn: getElectionDayCommandCenter, refetchInterval: 30_000 });
+  const commandParams = {
+    village: villageFilter || undefined,
+    contact_filter: contactFilter,
+    search: deferredChaseSearch || undefined,
+    chase_page: chasePage,
+    chase_per_page: 50,
+  };
+  const commandQuery = useQuery<CommandCenterData>({
+    queryKey: ['election-day-command-center', commandParams],
+    queryFn: () => getElectionDayCommandCenter(commandParams),
+    refetchInterval: 30_000,
+  });
 
   const createMutation = useMutation({
     mutationFn: () => createElectionEvent({ ...draft, gec_import_id: draft.gec_import_id ? Number(draft.gec_import_id) : null }),
@@ -151,6 +172,15 @@ export default function ElectionDayCommandCenterPage() {
 
   const activateMutation = useMutation({
     mutationFn: (id: number) => activateElectionEvent(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['election-events'] });
+      void queryClient.invalidateQueries({ queryKey: ['election-day-command-center'] });
+      void queryClient.invalidateQueries({ queryKey: ['poll-watcher'] });
+    },
+  });
+
+  const trainingMutation = useMutation({
+    mutationFn: (id: number) => startTrainingElectionEvent(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['election-events'] });
       void queryClient.invalidateQueries({ queryKey: ['election-day-command-center'] });
@@ -194,17 +224,8 @@ export default function ElectionDayCommandCenterPage() {
   const villages = useMemo(() => command?.villages || [], [command?.villages]);
   const activeElection = command?.active_election || eventsQuery.data?.active_election || null;
   const villageOptions = useMemo(() => villages.map((v) => v.name), [villages]);
-  const filteredChase = (command?.chase_list || []).filter((contact) => {
-    const villageHit = !villageFilter || contact.gec_village === villageFilter || contact.dpg_village === villageFilter;
-    const contactHit = contactFilter === 'all'
-      ? true
-      : contactFilter === 'not_contacted'
-        ? !contact.contacted_today
-        : contactFilter === 'contacted'
-          ? contact.contacted_today
-          : contact.needs_ride;
-    return villageHit && contactHit;
-  });
+  const chaseContacts = command?.chase_list || [];
+  const chasePagination = command?.chase_pagination;
 
   const createError = createMutation.error ? getErrorMessage(createMutation.error, 'Could not create this election.') : '';
   const contactError = contactMutation.error ? getErrorMessage(contactMutation.error, 'Could not log this contact attempt.') : '';
@@ -229,19 +250,30 @@ export default function ElectionDayCommandCenterPage() {
       </div>
 
       {activeElection ? (
-        <section className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+        <section className={`rounded-2xl border p-4 ${activeElection.status === 'training' ? 'border-amber-200 bg-amber-50/80' : 'border-emerald-100 bg-emerald-50/70'}`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Active election</p>
+              <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${activeElection.status === 'training' ? 'text-amber-800' : 'text-emerald-700'}`}>
+                {activeElection.status === 'training' ? 'Training environment' : 'Live election'}
+              </p>
               <h2 className="mt-1 text-lg font-semibold text-slate-950">{activeElection.name}</h2>
               <p className="mt-1 text-sm text-slate-600">
                 {activeElection.election_type} · {new Date(`${activeElection.election_date}T00:00:00`).toLocaleDateString()} · GEC list {activeElection.gec_list_date || 'not selected'}
               </p>
               {activeElection.gec_import_filename && <p className="mt-1 text-xs text-slate-500">Source: {activeElection.gec_import_filename}</p>}
+              {activeElection.status === 'training' && (
+                <p className="mt-2 max-w-3xl text-xs font-medium text-amber-900">
+                  Practice activity is isolated to this event. Close it and create a new live event before Election Day; training turnout will not carry forward.
+                </p>
+              )}
             </div>
             {canManageElectionSetup && (
-              <button type="button" onClick={() => activeElection && closeMutation.mutate(activeElection.id)} className="app-btn-secondary text-xs" disabled={closeMutation.isPending}>
-                Close election
+              <button type="button" onClick={() => {
+                if (!activeElection) return;
+                const label = activeElection.status === 'training' ? 'training event' : 'live election';
+                if (window.confirm(`Close this ${label}? Poll Watcher and the command center will stop accepting updates for it.`)) closeMutation.mutate(activeElection.id);
+              }} className="app-btn-secondary text-xs" disabled={closeMutation.isPending}>
+                {activeElection.status === 'training' ? 'Close training' : 'Close election'}
               </button>
             )}
           </div>
@@ -307,10 +339,33 @@ export default function ElectionDayCommandCenterPage() {
                         <p className="font-semibold text-[var(--text-primary)]">{event.name}</p>
                         <p className="text-xs text-[var(--text-muted)]">{event.status} · {event.gec_list_date || 'No GEC list'}</p>
                       </div>
-                      {event.status !== 'active' && event.gec_import_id && (
-                        <button type="button" onClick={() => activateMutation.mutate(event.id)} className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white" disabled={activateMutation.isPending}>
-                          Activate
-                        </button>
+                      {event.status === 'setup' && event.gec_import_id && (
+                        activeElection ? (
+                          <span className="max-w-44 text-right text-xs text-[var(--text-muted)]">Close the current {activeElection.status === 'training' ? 'training event' : 'live election'} first</span>
+                        ) : (
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('Start a training event with this GEC list? All practice turnout and reports will stay isolated in this event.')) trainingMutation.mutate(event.id);
+                            }}
+                            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900"
+                            disabled={trainingMutation.isPending}
+                          >
+                            <FlaskConical className="h-3.5 w-3.5" /> Start training
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('Activate this as the live election? Updates will become the DPG operational Election Day record for this event.')) activateMutation.mutate(event.id);
+                            }}
+                            className="min-h-[40px] rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white"
+                            disabled={activateMutation.isPending}
+                          >
+                            Activate live
+                          </button>
+                        </div>
+                        )
                       )}
                     </div>
                   </div>
@@ -377,11 +432,25 @@ export default function ElectionDayCommandCenterPage() {
               <p className="mt-1 text-xs text-[var(--text-muted)]">Linked DPG contacts whose official GEC voter row is not marked voted.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <select value={villageFilter} onChange={(e) => setVillageFilter(e.target.value)} className="rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm">
+              <label className="relative min-w-[220px] flex-1 lg:flex-none">
+                <span className="sr-only">Search chase list</span>
+                <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-[var(--text-muted)]" />
+                <input
+                  type="search"
+                  value={chaseSearch}
+                  onChange={(event) => {
+                    setChaseSearch(event.target.value);
+                    setChasePage(1);
+                  }}
+                  placeholder="Search name, phone, email..."
+                  className="min-h-[44px] w-full rounded-xl border border-[var(--border-soft)] bg-white py-2 pl-9 pr-3 text-sm"
+                />
+              </label>
+              <select value={villageFilter} onChange={(e) => { setVillageFilter(e.target.value); setChasePage(1); }} className="rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm">
                 <option value="">All villages</option>
                 {villageOptions.map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
-              <select value={contactFilter} onChange={(e) => setContactFilter(e.target.value as typeof contactFilter)} className="rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm">
+              <select value={contactFilter} onChange={(e) => { setContactFilter(e.target.value as typeof contactFilter); setChasePage(1); }} className="rounded-xl border border-[var(--border-soft)] bg-white px-3 py-2 text-sm">
                 <option value="not_contacted">Not contacted today</option>
                 <option value="contacted">Contacted today</option>
                 <option value="rides">Needs ride</option>
@@ -391,7 +460,7 @@ export default function ElectionDayCommandCenterPage() {
           </div>
           {contactError && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{contactError}</p>}
           <div className="mt-4 space-y-3">
-            {filteredChase.map((contact) => {
+            {chaseContacts.map((contact) => {
               const draftForContact = contactDrafts[contact.supporter_id] || { channel: 'call', outcome: 'attempted', note: '' };
               const contactPending = pendingContactIds.has(contact.supporter_id);
               return (
@@ -433,8 +502,33 @@ export default function ElectionDayCommandCenterPage() {
                 </div>
               );
             })}
-            {filteredChase.length === 0 && <p className="py-8 text-center text-sm text-[var(--text-muted)]">No contacts match this chase-list filter.</p>}
+            {chaseContacts.length === 0 && <p className="py-8 text-center text-sm text-[var(--text-muted)]">No contacts match this chase-list filter.</p>}
           </div>
+          {chasePagination && chasePagination.pages > 1 && (
+            <div className="mt-4 flex flex-col gap-2 border-t border-[var(--border-soft)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-[var(--text-muted)]">
+                Page {chasePagination.page} of {chasePagination.pages} · {chasePagination.total.toLocaleString()} contacts
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChasePage((page) => Math.max(1, page - 1))}
+                  disabled={chasePagination.page <= 1 || commandQuery.isFetching}
+                  className="app-btn-secondary min-h-[44px] text-xs disabled:opacity-50"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChasePage((page) => Math.min(chasePagination.pages, page + 1))}
+                  disabled={chasePagination.page >= chasePagination.pages || commandQuery.isFetching}
+                  className="app-btn-secondary min-h-[44px] text-xs disabled:opacity-50"
+                >
+                  Next <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       </div>
 
