@@ -62,7 +62,7 @@ gem "roo", "~> 2.10"
 # PDF parsing for GEC monthly list ingestion pipeline
 gem "pdf-reader", "~> 2.15"
 
-gem "caxlsx", "~> 4.1"
+gem "caxlsx", "~> 4.4"
 gem "aws-sdk-s3", "~> 1.0"
 
 gem "solid_queue", "~> 1.3"
