@@ -17,7 +17,7 @@
     "axios": "^1.13.5",
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.563.0",
-    "posthog-js": "^1.353.0",
+    "posthog-js": "^1.373.5",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
