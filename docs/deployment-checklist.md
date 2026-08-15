@@ -9,6 +9,8 @@ The DPG app has been deployed online and Leon has completed an initial productio
 
 The main remaining risk is not missing code for the current foundation. It is DPG workflow validation and operational readiness: Auntie Stephanie/Ethan should walk through the live app, confirm the language and role model, test with safe records, and confirm backups, auth settings, domain, and outreach sender policy before broad staff rollout.
 
+For the intentional service-pause and reactivation sequence, use [service-pause-runbook.md](service-pause-runbook.md).
+
 ## Environment isolation
 
 - [x] GitHub repository is DPG-specific: `Shimizu-Technology/dpg-voter-platform`.

@@ -33,3 +33,4 @@ Thumbs.db
 coverage/
 .env.deploy
 data/
+web/.netlify/
