@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dpg-voter-platform-v1';
+const CACHE_NAME = 'dpg-voter-platform-v2';
 const OFFLINE_URL = '/offline.html';
 
 self.addEventListener('install', (event) => {

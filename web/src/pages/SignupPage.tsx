@@ -88,10 +88,6 @@ function voterStatusChipClass(active: boolean) {
     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300';
 }
 
-function supportRequestCount(form: Pick<SignupForm, typeof SUPPORT_NEED_OPTIONS[number]['key']>) {
-  return SUPPORT_NEED_OPTIONS.filter((option) => form[option.key]).length;
-}
-
 export default function SignupPage() {
   const navigate = useNavigate();
   const { leaderCode } = useParams();
@@ -142,11 +138,6 @@ export default function SignupPage() {
     onSuccess: () => {
       captureAnalyticsEvent('public_signup_submitted', {
         has_leader_code: Boolean(leaderCode),
-        village_id: form.village_id ? Number(form.village_id) : undefined,
-        registered_voter_status: form.registered_voter_status,
-        help_request_count: supportRequestCount(form),
-        opted_in_email: form.opt_in_email,
-        opted_in_text: form.opt_in_text,
         household_member_count: form.household_members.length,
       });
       navigate('/thank-you');
